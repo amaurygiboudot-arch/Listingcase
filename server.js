@@ -130,7 +130,7 @@ function staticFile(req,res,url){
   rel=path.normalize(rel).replace(/^(\.\.(\/|\\|$))+/,"");
   const f=path.join(root,rel);
   if(!f.startsWith(root)||!fs.existsSync(f)||fs.statSync(f).isDirectory())return false;
-  res.writeHead(200,{"content-type":types[path.extname(f).toLowerCase()]||"application/octet-stream"});
+  res.writeHead(200,{"content-type":types[path.extname(f).toLowerCase()]||"application/octet-stream","cache-control":"no-store"});
   fs.createReadStream(f).pipe(res);return true;
 }
 

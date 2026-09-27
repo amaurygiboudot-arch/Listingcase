@@ -125,6 +125,7 @@ public class MainActivity extends Activity {
         web.setBackgroundColor(Color.rgb(17, 19, 24));
         web.getSettings().setJavaScriptEnabled(true);
         web.getSettings().setDomStorageEnabled(true);
+        web.getSettings().setDefaultTextEncodingName("utf-8");
         web.getSettings().setDatabaseEnabled(true);
         web.getSettings().setAllowContentAccess(true);
         web.getSettings().setAllowFileAccess(false);
