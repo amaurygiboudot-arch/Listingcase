@@ -8,7 +8,7 @@ import { recordEvent,noteInteraction,absenceState,applyAbsence,emotionalOverlay,
 import { seedInitialPreferences,learnUserPreference,learnPartnerPreferenceFromReply,preferenceContext } from "./lib/preferences.js";
 import { runLifeTick,latestExperiences,pendingExperienceStory,markExperienceTold } from "./lib/experiences.js";
 import { ensureRoutine,ensureSocialCircle,ensureGoals,lifeContext } from "./lib/routine.js";
-import { chatWithModel,fallbackReply,modelStatus } from "./lib/model.js";
+import { chatWithModel,fallbackReply,modelStatus,warmModel } from "./lib/model.js";
 import { selectVisuals,libraryStats } from "./lib/visual.js";
 import { imageProviderStatus,buildVisualPrompt } from "./lib/image-provider.js";
 
@@ -148,4 +148,4 @@ http.createServer(async(req,res)=>{
     console.error(e);
     json(res,500,{error:"server_error",message:e.message});
   }
-}).listen(port,()=>console.log(`Human Partner running on http://localhost:${port}`));
+}).listen(port,()=>{console.log(`Human Partner running on http://localhost:${port}`); warmModel().then(ok=>console.log(`LLM warmup: ${ok?"ready":"skipped"}`)).catch(e=>console.error("LLM warmup:",e.message));});
