@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.webkit.WebChromeClient;
+import android.webkit.CookieManager;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -126,6 +127,9 @@ public class MainActivity extends Activity {
         web.getSettings().setJavaScriptEnabled(true);
         web.getSettings().setDomStorageEnabled(true);
         web.getSettings().setDefaultTextEncodingName("utf-8");
+        web.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
         web.getSettings().setDatabaseEnabled(true);
         web.getSettings().setAllowContentAccess(true);
         web.getSettings().setAllowFileAccess(false);

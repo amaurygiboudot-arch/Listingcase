@@ -2,7 +2,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getSetting,setSetting,getPartner,savePartner,clearPartner,addMessage,recentMessages,addMemory,recentMemories,seedVisualSlots } from "./lib/db.js";
+import { getSetting,setSetting,getPartner,savePartner,clearPartner,addMessage,addMessageMedia,getMessageMedia,updateMessageMedia,recentMessages,addMemory,recentMemories,seedVisualSlots } from "./lib/db.js";
 import { createProfile,dailyMood,advanceRelationship,visualDecision,ensureVisualIdentity } from "./lib/profile.js";
 import { deterministicReply,sanitizeModelReply } from "./lib/dialogue-guard.js";
 import { recordEvent,noteInteraction,absenceState,applyAbsence,emotionalOverlay,decayEmotions,memoryContext,initiativeDecision } from "./lib/memory.js";
@@ -10,11 +10,16 @@ import { seedInitialPreferences,learnUserPreference,learnPartnerPreferenceFromRe
 import { runLifeTick,latestExperiences,pendingExperienceStory,markExperienceTold } from "./lib/experiences.js";
 import { ensureRoutine,ensureSocialCircle,ensureGoals,lifeContext } from "./lib/routine.js";
 import { chatWithModel,fallbackReply,modelStatus,warmModel } from "./lib/model.js";
-import { selectVisuals,libraryStats } from "./lib/visual.js";
-import { imageProviderStatus,buildVisualPrompt } from "./lib/image-provider.js";
+import { selectVisuals,selectAvailableVisuals,selectGenerationSlots,saveCharacterVisual,libraryStats } from "./lib/visual.js";
+import { imageProviderStatus,buildVisualPrompt,generateVisual,importImageSource } from "./lib/image-provider.js";
 
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||8787);
 seedVisualSlots();
+const dialogueGuardVersion=2;
+if(getSetting("dialogueGuardVersion",0)<dialogueGuardVersion){
+  setSetting("dialogueGuardVersion",dialogueGuardVersion);
+  setSetting("dialogueContextAfter",Date.now());
+}
 
 const json=(res,status,data)=>{res.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store"});res.end(JSON.stringify(data))};
 const body=async req=>{let s="";for await(const c of req)s+=c;return s?JSON.parse(s):{}};
@@ -38,7 +43,7 @@ async function state(){
     preferences:{partner:preferenceContext("partner",18),user:preferenceContext("user",18)},
     emotional:emotionalOverlay(),
     absence:partner?absenceState(partner):null,
-    library:libraryStats(),
+    library:libraryStats(partner),
     providers:{
       llm:await modelStatus(),
       image:await imageProviderStatus()
@@ -73,27 +78,113 @@ async function api(req,res,url){
   if(req.method==="POST"&&url.pathname==="/api/chat"){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
     const b=await body(req),text=String(b.text||"").trim();if(!text)return json(res,400,{error:"empty_message"});
-    const previous=recentMessages(20);
+    const contextAfter=getSetting("dialogueContextAfter",0);
+    const previous=recentMessages(20).filter(m=>m.created_at>=contextAfter);
     const absence=applyAbsence(p);
     noteInteraction();
     addMessage("user",text);
     recordEvent(text);
     learnUserPreference(text);
     ensureVisualIdentity(p);advanceRelationship(p);savePartner(p);const mood=dailyMood(p);const lifestyle=lifeContext(p,mood);
-    let reply=deterministicReply(p,mood,lifestyle,text),visuals=[];
+    let reply=deterministicReply(p,mood,lifestyle,text),visuals=[],media=[];
     if(!reply&&/photo|photos|image|images/i.test(text)){
       const d=visualDecision(p,mood,text);
       reply=d.text;
-      visuals=d.accept?selectVisuals(p,mood,d.count).map(v=>({...v,prompt:buildVisualPrompt(p,v,{})})):[];
+      if(d.accept){
+        const ready=selectAvailableVisuals(p,mood,d.count);
+        for(const v of ready){
+          media.push({kind:"image",status:"ready",url:v.url,alt:`Photo de ${p.name}`,visualId:v.id,meta:{mood:v.mood,place:v.place,outfit:v.outfit}});
+        }
+
+        let missing=Math.max(0,d.count-ready.length);
+        if(missing>0){
+          const provider=await imageProviderStatus();
+          if(provider.configured){
+            const slots=selectGenerationSlots(p,mood,Math.min(missing,2));
+            for(const slot of slots){
+              try{
+                const prompt=buildVisualPrompt(p,slot,{});
+                const generated=await generateVisual(p,slot,prompt);
+                if(generated){
+                  const saved=saveCharacterVisual(p,slot.id,generated.filePath,generated.mimeType,{canonical:ready.length===0});
+                  const url="/"+String(saved.file_path).replace(/^\/+/, "");
+                  media.push({kind:"image",status:"ready",url,alt:`Photo de ${p.name}`,visualId:slot.id,meta:{mood:slot.mood,place:slot.place,outfit:slot.outfit}});
+                  missing--;
+                }
+              }catch(e){
+                console.error("IMAGE:",e.message);
+              }
+            }
+          }
+          if(missing>0){
+            const slots=selectGenerationSlots(p,mood,1);
+            const slot=slots[0];
+            if(slot){
+              media.push({
+                kind:"image",
+                status:"pending",
+                url:null,
+                alt:`Génération d’une photo de ${p.name}…`,
+                visualId:slot.id,
+                meta:{
+                  prompt:buildVisualPrompt(p,slot,{}),
+                  clientProvider:"puter",
+                  mood:slot.mood,
+                  place:slot.place,
+                  outfit:slot.outfit
+                }
+              });
+            }
+          }
+        }
+      }
+      visuals=media;
     }else if(!reply){
       try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(10),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",10),userPreferences:preferenceContext("user",8),lifestyle})}
       catch(e){console.error("LLM:",e.message)}
       reply=sanitizeModelReply(reply,p,text)||fallbackReply(p,mood,text);
     }
-    addMessage("partner",reply);
+
+    const partnerMessageId=addMessage("partner",reply);
+    for(const item of media)addMessageMedia(partnerMessageId,item);
     learnPartnerPreferenceFromReply(reply);
     decayEmotions();
     return json(res,200,{reply,visuals,state:await state()});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/media/complete"){
+    const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
+    const b=await body(req),mediaId=Number(b.mediaId),src=String(b.imageSrc||"");
+    const media=getMessageMedia(mediaId);
+    if(!media)return json(res,404,{error:"media_not_found"});
+    if(media.status!=="pending")return json(res,409,{error:"media_not_pending"});
+    const meta=media.meta?JSON.parse(media.meta):{};
+    const slotId=media.visual_id||meta.slotId;
+    if(!slotId)return json(res,400,{error:"visual_slot_missing"});
+    try{
+      const imported=await importImageSource(src,slotId);
+      const canonical=libraryStats(p).available===0;
+      const saved=saveCharacterVisual(p,slotId,imported.filePath,imported.mimeType,{canonical});
+      const publicUrl="/"+String(saved.file_path).replace(/^\/+/, "");
+      updateMessageMedia(mediaId,{
+        url:publicUrl,
+        status:"ready",
+        alt:`Photo de ${p.name}`,
+        visualId:slotId,
+        meta:{...meta,completedAt:Date.now(),canonical}
+      });
+      return json(res,200,{ok:true,state:await state()});
+    }catch(e){
+      console.error("MEDIA COMPLETE:",e.message);
+      updateMessageMedia(mediaId,{status:"error",alt:"La génération de l’image a échoué.",meta:{...meta,error:e.message}});
+      return json(res,500,{error:"media_import_failed",message:e.message,state:await state()});
+    }
+  }
+  if(req.method==="POST"&&url.pathname==="/api/media/fail"){
+    const b=await body(req),mediaId=Number(b.mediaId);
+    const media=getMessageMedia(mediaId);if(!media)return json(res,404,{error:"media_not_found"});
+    const meta=media.meta?JSON.parse(media.meta):{};
+    updateMessageMedia(mediaId,{status:"error",alt:"La génération de l’image a échoué.",meta:{...meta,error:String(b.error||"client_generation_failed")}});
+    return json(res,200,{ok:true,state:await state()});
   }
   if(req.method==="POST"&&url.pathname==="/api/life/tick"){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
