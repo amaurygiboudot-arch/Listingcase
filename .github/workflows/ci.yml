@@ -60,10 +60,25 @@ jobs:
         run: |
           if [ -f server.pid ]; then kill $(cat server.pid) || true; fi
 
-      - name: Upload server log on failure
-        if: failure()
+      - name: Prepare downloadable artifact
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifact
+          cp index.html styles.css app.js server.js package.json README.md artifact/
+          cp -r lib artifact/lib
+          cp -r .github artifact/.github
+          cp server.log artifact/server.log 2>/dev/null || true
+          cp health.json artifact/health.json 2>/dev/null || true
+          tar -czf human-partner-${{ github.sha }}.tar.gz artifact
+
+      - name: Upload project artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: server-log
-          path: server.log
-          if-no-files-found: ignore
+          name: human-partner-${{ github.run_number }}
+          path: |
+            human-partner-${{ github.sha }}.tar.gz
+            artifact/
+          if-no-files-found: error
+          retention-days: 14
