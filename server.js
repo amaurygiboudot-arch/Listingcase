@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { getSetting,setSetting,getPartner,savePartner,clearPartner,addMessage,recentMessages,addMemory,recentMemories,seedVisualSlots } from "./lib/db.js";
 import { createProfile,dailyMood,advanceRelationship,visualDecision } from "./lib/profile.js";
 import { recordEvent,noteInteraction,absenceState,applyAbsence,emotionalOverlay,decayEmotions,memoryContext,initiativeDecision } from "./lib/memory.js";
+import { seedInitialPreferences,learnUserPreference,learnPartnerPreferenceFromReply,preferenceContext } from "./lib/preferences.js";
 import { chatWithModel,fallbackReply,modelStatus } from "./lib/model.js";
 import { selectVisuals,libraryStats } from "./lib/visual.js";
 import { imageProviderStatus,buildVisualPrompt } from "./lib/image-provider.js";
@@ -23,6 +24,7 @@ async function state(){
     mood:partner?dailyMood(partner):null,
     messages:recentMessages(40),
     memories:memoryContext(12),
+    preferences:{partner:preferenceContext("partner",18),user:preferenceContext("user",18)},
     emotional:emotionalOverlay(),
     absence:partner?absenceState(partner):null,
     library:libraryStats(),
@@ -42,6 +44,7 @@ async function api(req,res,url){
     if(!getSetting("adultConfirmed",false))return json(res,403,{error:"adult_confirmation_required"});
     const b=await body(req),p=createProfile(Array.isArray(b.interests)?b.interests:[]);
     savePartner(p);
+    seedInitialPreferences(p);
     noteInteraction();
     addMessage("partner","Salut. On ne se connaît pas encore vraiment, donc je préfère qu’on commence simplement 😄. Qu’est-ce que tu veux savoir sur moi ?");
     return json(res,201,await state());
@@ -63,6 +66,7 @@ async function api(req,res,url){
     noteInteraction();
     addMessage("user",text);
     recordEvent(text);
+    learnUserPreference(text);
     advanceRelationship(p);savePartner(p);const mood=dailyMood(p);
     let reply,visuals=[];
     if(/photo|photos|image|images/i.test(text)){
@@ -70,11 +74,12 @@ async function api(req,res,url){
       reply=d.text;
       visuals=d.accept?selectVisuals(p,mood,d.count).map(v=>({...v,prompt:buildVisualPrompt(p,v,{})})):[];
     }else{
-      try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(16),userText:text,emotional:emotionalOverlay(),absence})}
+      try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(16),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",18),userPreferences:preferenceContext("user",18)})}
       catch(e){console.error("LLM:",e.message)}
       reply=reply||fallbackReply(p,mood,text);
     }
     addMessage("partner",reply);
+    learnPartnerPreferenceFromReply(reply);
     decayEmotions();
     return json(res,200,{reply,visuals,state:await state()});
   }
