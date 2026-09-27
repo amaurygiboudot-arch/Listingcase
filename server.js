@@ -6,6 +6,7 @@ import { getSetting,setSetting,getPartner,savePartner,clearPartner,addMessage,re
 import { createProfile,dailyMood,advanceRelationship,visualDecision } from "./lib/profile.js";
 import { recordEvent,noteInteraction,absenceState,applyAbsence,emotionalOverlay,decayEmotions,memoryContext,initiativeDecision } from "./lib/memory.js";
 import { seedInitialPreferences,learnUserPreference,learnPartnerPreferenceFromReply,preferenceContext } from "./lib/preferences.js";
+import { runLifeTick,latestExperiences,pendingExperienceStory,markExperienceTold } from "./lib/experiences.js";
 import { chatWithModel,fallbackReply,modelStatus } from "./lib/model.js";
 import { selectVisuals,libraryStats } from "./lib/visual.js";
 import { imageProviderStatus,buildVisualPrompt } from "./lib/image-provider.js";
@@ -18,10 +19,15 @@ const body=async req=>{let s="";for await(const c of req)s+=c;return s?JSON.pars
 
 async function state(){
   const partner=getPartner();
+  const mood=partner?dailyMood(partner):null;
+  const life=partner?runLifeTick(partner,mood):null;
   return{
     adultConfirmed:getSetting("adultConfirmed",false),
     partner,
-    mood:partner?dailyMood(partner):null,
+    mood,
+    life,
+    experiences:latestExperiences(10),
+    pendingStory:pendingExperienceStory(),
     messages:recentMessages(40),
     memories:memoryContext(12),
     preferences:{partner:preferenceContext("partner",18),user:preferenceContext("user",18)},
@@ -83,9 +89,26 @@ async function api(req,res,url){
     decayEmotions();
     return json(res,200,{reply,visuals,state:await state()});
   }
+  if(req.method==="POST"&&url.pathname==="/api/life/tick"){
+    const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
+    const experience=runLifeTick(p,dailyMood(p));
+    return json(res,200,{experience,state:await state()});
+  }
   if(req.method==="POST"&&url.pathname==="/api/initiative"){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
-    const mood=dailyMood(p),decision=initiativeDecision(p,mood);
+    const mood=dailyMood(p);
+    const story=pendingExperienceStory();
+    if(story&&!story.told&&mood.social>=45){
+      const lead=story.outcome==="positif"
+        ?`J’ai découvert un truc autour de ${story.topic} et… ça m’a plutôt plu 😄. ${story.note}`
+        :story.outcome==="négatif"
+          ?`Bon, petite découverte du jour : ${story.topic}, c’est pas vraiment gagné 😂. ${story.note}`
+          :`J’ai testé un peu ${story.topic}. Je sais pas encore trop quoi en penser. ${story.note}`;
+      markExperienceTold();
+      addMessage("partner",lead);
+      return json(res,200,{initiative:lead,kind:"experience",state:await state()});
+    }
+    const decision=initiativeDecision(p,mood);
     if(!decision.should)return json(res,200,{initiative:null,reason:decision.reason,state:await state()});
     const prompts={attention:"J’avais juste envie de venir te parler un peu.",photo:"J’ai peut-être une photo à te montrer… enfin, si j’en ai envie 😏",question:"J’ai une question qui me trotte dans la tête : qu’est-ce qui te rend vraiment heureux dans une relation ?",idea:"J’ai pensé à un truc qu’on pourrait faire différemment.",humor:"Bon, j’ai une blague. Je décline toute responsabilité si elle est nulle 😂",clarify:"J’ai repensé à un truc entre nous et j’aimerais qu’on le clarifie.",distance:"Je suis encore un peu dans ma tête aujourd’hui. Rien de dramatique, mais j’ai besoin de calme."};
     const initiative=prompts[decision.kind]||"J’avais envie de te dire quelque chose.";
