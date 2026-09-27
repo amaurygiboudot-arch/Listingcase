@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.net.Uri;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.webkit.WebChromeClient;
@@ -23,6 +24,7 @@ public class MainActivity extends Activity {
 
     private LinearLayout root;
     private SharedPreferences prefs;
+    private WebView web;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,7 +35,9 @@ public class MainActivity extends Activity {
         if (saved == null || saved.trim().isEmpty()) {
             showSetup();
         } else {
-            showWeb(saved);
+            String fixed = normalize(saved);
+            if (!fixed.equals(saved)) prefs.edit().putString(KEY_BACKEND, fixed).apply();
+            showWeb(fixed);
         }
     }
 
@@ -61,7 +65,7 @@ public class MainActivity extends Activity {
         TextView help = text(
                 "\nPour ce prototype, le cerveau Qwen/Ollama tourne sur ton PC.\n\n" +
                 "Saisis l'adresse du backend, par exemple :\n" +
-                "http://192.168.1.25:8787\n\n" +
+                "http://192.168.1.32:8787\n\n" +
                 "Le téléphone et le PC doivent être sur le même réseau.",
                 16
         );
@@ -105,12 +109,19 @@ public class MainActivity extends Activity {
         if (!s.startsWith("http://") && !s.startsWith("https://")) {
             s = "http://" + s;
         }
+        s = s.replaceFirst("^(https?://\\d{1,3}(?:\\.\\d{1,3}){3})\\.(\\d{2,5})(/?.*)$", "$1:$2$3");
         while (s.endsWith("/")) s = s.substring(0, s.length() - 1);
+        try {
+            Uri uri = Uri.parse(s);
+            if (uri.getHost() == null || uri.getHost().trim().isEmpty()) return "";
+        } catch (Exception e) {
+            return "";
+        }
         return s;
     }
 
     private void showWeb(String backend) {
-        WebView web = new WebView(this);
+        web = new WebView(this);
         web.setBackgroundColor(Color.rgb(17, 19, 24));
         web.getSettings().setJavaScriptEnabled(true);
         web.getSettings().setDomStorageEnabled(true);
@@ -128,9 +139,11 @@ public class MainActivity extends Activity {
             public void onReceivedError(WebView view, WebResourceRequest request,
                                         android.webkit.WebResourceError error) {
                 if (request.isForMainFrame()) {
+                    prefs.edit().remove(KEY_BACKEND).apply();
                     Toast.makeText(MainActivity.this,
-                            "Backend inaccessible. Vérifie l'adresse et que le serveur tourne sur le PC.",
+                            "Backend inaccessible. Je te ramène aux réglages.",
                             Toast.LENGTH_LONG).show();
+                    view.postDelayed(() -> showSetup(), 350);
                 }
             }
         });
@@ -147,6 +160,9 @@ public class MainActivity extends Activity {
                 web.goBack();
                 return;
             }
+            prefs.edit().remove(KEY_BACKEND).apply();
+            showSetup();
+            return;
         }
         super.onBackPressed();
     }
