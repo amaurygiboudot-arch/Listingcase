@@ -3,7 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getSetting,setSetting,getPartner,savePartner,clearPartner,addMessage,recentMessages,addMemory,recentMemories,seedVisualSlots } from "./lib/db.js";
-import { createProfile,dailyMood,advanceRelationship,visualDecision } from "./lib/profile.js";
+import { createProfile,dailyMood,advanceRelationship,visualDecision,ensureVisualIdentity } from "./lib/profile.js";
+import { deterministicReply,sanitizeModelReply } from "./lib/dialogue-guard.js";
 import { recordEvent,noteInteraction,absenceState,applyAbsence,emotionalOverlay,decayEmotions,memoryContext,initiativeDecision } from "./lib/memory.js";
 import { seedInitialPreferences,learnUserPreference,learnPartnerPreferenceFromReply,preferenceContext } from "./lib/preferences.js";
 import { runLifeTick,latestExperiences,pendingExperienceStory,markExperienceTold } from "./lib/experiences.js";
@@ -20,6 +21,7 @@ const body=async req=>{let s="";for await(const c of req)s+=c;return s?JSON.pars
 
 async function state(){
   const partner=getPartner();
+  if(partner&&!partner.visualIdentity){ensureVisualIdentity(partner);savePartner(partner)}
   const mood=partner?dailyMood(partner):null;
   const life=partner?runLifeTick(partner,mood):null;
   const lifestyle=partner?lifeContext(partner,mood):null;
@@ -51,7 +53,7 @@ async function api(req,res,url){
   if(req.method==="POST"&&url.pathname==="/api/adult"){const b=await body(req);setSetting("adultConfirmed",Boolean(b.confirmed));return json(res,200,await state())}
   if(req.method==="POST"&&url.pathname==="/api/partner"){
     if(!getSetting("adultConfirmed",false))return json(res,403,{error:"adult_confirmation_required"});
-    const b=await body(req),p=createProfile(Array.isArray(b.interests)?b.interests:[]);
+    const b=await body(req),p=ensureVisualIdentity(createProfile(Array.isArray(b.interests)?b.interests:[]));
     savePartner(p);
     seedInitialPreferences(p);
     ensureRoutine(p);ensureSocialCircle(p);ensureGoals(p);
@@ -77,16 +79,16 @@ async function api(req,res,url){
     addMessage("user",text);
     recordEvent(text);
     learnUserPreference(text);
-    advanceRelationship(p);savePartner(p);const mood=dailyMood(p);
-    let reply,visuals=[];
-    if(/photo|photos|image|images/i.test(text)){
+    ensureVisualIdentity(p);advanceRelationship(p);savePartner(p);const mood=dailyMood(p);const lifestyle=lifeContext(p,mood);
+    let reply=deterministicReply(p,mood,lifestyle,text),visuals=[];
+    if(!reply&&/photo|photos|image|images/i.test(text)){
       const d=visualDecision(p,mood,text);
       reply=d.text;
       visuals=d.accept?selectVisuals(p,mood,d.count).map(v=>({...v,prompt:buildVisualPrompt(p,v,{})})):[];
-    }else{
-      try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(16),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",18),userPreferences:preferenceContext("user",18),lifestyle:lifeContext(p,mood)})}
+    }else if(!reply){
+      try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(10),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",10),userPreferences:preferenceContext("user",8),lifestyle})}
       catch(e){console.error("LLM:",e.message)}
-      reply=reply||fallbackReply(p,mood,text);
+      reply=sanitizeModelReply(reply,p,text)||fallbackReply(p,mood,text);
     }
     addMessage("partner",reply);
     learnPartnerPreferenceFromReply(reply);
