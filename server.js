@@ -3,7 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getSetting,setSetting,getPartner,savePartner,clearPartner,addMessage,recentMessages,addMemory,recentMemories,seedVisualSlots } from "./lib/db.js";
-import { createProfile,dailyMood,advanceRelationship,captureMemory,visualDecision } from "./lib/profile.js";
+import { createProfile,dailyMood,advanceRelationship,visualDecision } from "./lib/profile.js";
+import { recordEvent,noteInteraction,absenceState,applyAbsence,emotionalOverlay,decayEmotions,memoryContext,initiativeDecision } from "./lib/memory.js";
 import { chatWithModel,fallbackReply,modelStatus } from "./lib/model.js";
 import { selectVisuals,libraryStats } from "./lib/visual.js";
 import { imageProviderStatus,buildVisualPrompt } from "./lib/image-provider.js";
@@ -21,6 +22,9 @@ async function state(){
     partner,
     mood:partner?dailyMood(partner):null,
     messages:recentMessages(40),
+    memories:memoryContext(12),
+    emotional:emotionalOverlay(),
+    absence:partner?absenceState(partner):null,
     library:libraryStats(),
     providers:{
       llm:await modelStatus(),
@@ -38,6 +42,7 @@ async function api(req,res,url){
     if(!getSetting("adultConfirmed",false))return json(res,403,{error:"adult_confirmation_required"});
     const b=await body(req),p=createProfile(Array.isArray(b.interests)?b.interests:[]);
     savePartner(p);
+    noteInteraction();
     addMessage("partner","Salut. On ne se connaît pas encore vraiment, donc je préfère qu’on commence simplement 😄. Qu’est-ce que tu veux savoir sur moi ?");
     return json(res,201,await state());
   }
@@ -53,8 +58,11 @@ async function api(req,res,url){
   if(req.method==="POST"&&url.pathname==="/api/chat"){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
     const b=await body(req),text=String(b.text||"").trim();if(!text)return json(res,400,{error:"empty_message"});
-    const previous=recentMessages(20);addMessage("user",text);
-    const mem=captureMemory(text);if(mem)addMemory(mem.kind,mem.content,mem.weight);
+    const previous=recentMessages(20);
+    const absence=applyAbsence(p);
+    noteInteraction();
+    addMessage("user",text);
+    recordEvent(text);
     advanceRelationship(p);savePartner(p);const mood=dailyMood(p);
     let reply,visuals=[];
     if(/photo|photos|image|images/i.test(text)){
@@ -62,12 +70,22 @@ async function api(req,res,url){
       reply=d.text;
       visuals=d.accept?selectVisuals(p,mood,d.count).map(v=>({...v,prompt:buildVisualPrompt(p,v,{})})):[];
     }else{
-      try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:recentMemories(16),userText:text})}
+      try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(16),userText:text,emotional:emotionalOverlay(),absence})}
       catch(e){console.error("LLM:",e.message)}
       reply=reply||fallbackReply(p,mood,text);
     }
     addMessage("partner",reply);
+    decayEmotions();
     return json(res,200,{reply,visuals,state:await state()});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/initiative"){
+    const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
+    const mood=dailyMood(p),decision=initiativeDecision(p,mood);
+    if(!decision.should)return json(res,200,{initiative:null,reason:decision.reason,state:await state()});
+    const prompts={attention:"J’avais juste envie de venir te parler un peu.",photo:"J’ai peut-être une photo à te montrer… enfin, si j’en ai envie 😏",question:"J’ai une question qui me trotte dans la tête : qu’est-ce qui te rend vraiment heureux dans une relation ?",idea:"J’ai pensé à un truc qu’on pourrait faire différemment.",humor:"Bon, j’ai une blague. Je décline toute responsabilité si elle est nulle 😂",clarify:"J’ai repensé à un truc entre nous et j’aimerais qu’on le clarifie.",distance:"Je suis encore un peu dans ma tête aujourd’hui. Rien de dramatique, mais j’ai besoin de calme."};
+    const initiative=prompts[decision.kind]||"J’avais envie de te dire quelque chose.";
+    addMessage("partner",initiative);
+    return json(res,200,{initiative,kind:decision.kind,state:await state()});
   }
   return false;
 }
