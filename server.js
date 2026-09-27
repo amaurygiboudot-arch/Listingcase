@@ -7,6 +7,7 @@ import { createProfile,dailyMood,advanceRelationship,visualDecision } from "./li
 import { recordEvent,noteInteraction,absenceState,applyAbsence,emotionalOverlay,decayEmotions,memoryContext,initiativeDecision } from "./lib/memory.js";
 import { seedInitialPreferences,learnUserPreference,learnPartnerPreferenceFromReply,preferenceContext } from "./lib/preferences.js";
 import { runLifeTick,latestExperiences,pendingExperienceStory,markExperienceTold } from "./lib/experiences.js";
+import { ensureRoutine,ensureSocialCircle,ensureGoals,lifeContext } from "./lib/routine.js";
 import { chatWithModel,fallbackReply,modelStatus } from "./lib/model.js";
 import { selectVisuals,libraryStats } from "./lib/visual.js";
 import { imageProviderStatus,buildVisualPrompt } from "./lib/image-provider.js";
@@ -21,11 +22,13 @@ async function state(){
   const partner=getPartner();
   const mood=partner?dailyMood(partner):null;
   const life=partner?runLifeTick(partner,mood):null;
+  const lifestyle=partner?lifeContext(partner,mood):null;
   return{
     adultConfirmed:getSetting("adultConfirmed",false),
     partner,
     mood,
     life,
+    lifestyle,
     experiences:latestExperiences(10),
     pendingStory:pendingExperienceStory(),
     messages:recentMessages(40),
@@ -51,6 +54,7 @@ async function api(req,res,url){
     const b=await body(req),p=createProfile(Array.isArray(b.interests)?b.interests:[]);
     savePartner(p);
     seedInitialPreferences(p);
+    ensureRoutine(p);ensureSocialCircle(p);ensureGoals(p);
     noteInteraction();
     addMessage("partner","Salut. On ne se connaît pas encore vraiment, donc je préfère qu’on commence simplement 😄. Qu’est-ce que tu veux savoir sur moi ?");
     return json(res,201,await state());
@@ -80,7 +84,7 @@ async function api(req,res,url){
       reply=d.text;
       visuals=d.accept?selectVisuals(p,mood,d.count).map(v=>({...v,prompt:buildVisualPrompt(p,v,{})})):[];
     }else{
-      try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(16),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",18),userPreferences:preferenceContext("user",18)})}
+      try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(16),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",18),userPreferences:preferenceContext("user",18),lifestyle:lifeContext(p,mood)})}
       catch(e){console.error("LLM:",e.message)}
       reply=reply||fallbackReply(p,mood,text);
     }
@@ -97,6 +101,8 @@ async function api(req,res,url){
   if(req.method==="POST"&&url.pathname==="/api/initiative"){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
     const mood=dailyMood(p);
+    const lifestyle=lifeContext(p,mood);
+    if(lifestyle.routine.availability==="indisponible"||lifestyle.routine.attention<25)return json(res,200,{initiative:null,reason:"busy_or_asleep",state:await state()});
     const story=pendingExperienceStory();
     if(story&&!story.told&&mood.social>=45){
       const lead=story.outcome==="positif"
