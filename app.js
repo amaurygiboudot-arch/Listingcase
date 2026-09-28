@@ -109,13 +109,11 @@ function dashboard(){
   const d=appState.mood||{};
   const traits=Object.values(p.personality||{});
   const msgs=appState.messages||[];
-  const clientImageReady=Boolean(window.puter?.ai?.txt2img);
-  const puterConnected=isPuterSignedIn();
   const visuals=[
     ["Catalogue",String(appState.library?.total||0)+" emplacements"],
     ["Photos de ce personnage",String(appState.library?.available||0)],
-    ["Conversation",puterConnected?"Puter cloud + Qwen secours":(appState.providers?.llm?.configured?(appState.providers.llm.model||"Qwen local"):"moteur local")],
-    ["Génération image",appState.providers?.image?.configured?appState.providers.image.provider:(puterConnected?"Puter connecté":(clientImageReady?"Puter disponible":"non connectée"))],
+    ["Conversation",appState.providers?.llm?.configured?(appState.providers.llm.model||"modèle local"):"moteur local simple"],
+    ["Génération image",appState.providers?.image?.configured?(appState.providers.image.provider||"ComfyUI local"):"moteur local non installé"],
     ["Humeur",d.mood||"—"],
     ["Émotion persistante",appState.emotional?.tone||"neutre"]
   ];
@@ -203,7 +201,7 @@ function dashboard(){
               <h2>Conversation</h2>
               <div class="muted">Énergie ${d.energy??"—"}% • affection ${d.affection??"—"}% • sociabilité ${d.social??"—"}%</div>
             </div>
-            ${window.puter?.auth&&!puterConnected?'<button id="connectPuter" class="secondary" type="button">Connexion cloud</button>':'<span class="badge">'+(puterConnected?'Cloud actif':'Local')+'</span>'}
+            <span class="badge">100 % local</span>
           </div>
         </div>
         <div id="messages" class="messages">${msgs.map(renderMessage).join("")}</div>
@@ -223,7 +221,7 @@ function render(){
     <main class="shell">
       <div class="topbar">
         <div class="brand">Human Partner</div>
-        <div class="badge">${isPuterSignedIn()?"Cloud + local":(appState.providers?.llm?.configured?"Local Qwen":"Moteur local simple")} • SQLite</div>
+        <div class="badge">${appState.providers?.llm?.configured?"IA locale":"Moteur local simple"} • SQLite • sans cloud</div>
       </div>
       ${!appState.partner?landing():dashboard()}
     </main>
@@ -233,7 +231,6 @@ function render(){
   setTimeout(()=>{
     const m=document.querySelector("#messages");
     if(m)m.scrollTop=m.scrollHeight;
-    processPendingMedia();
   },0);
 }
 
@@ -279,42 +276,12 @@ function bind(){
     if(box)box.scrollTop=box.scrollHeight;
 
     try{
-      const visualRequest=looksVisualRequest(text);
-      if(!visualRequest&&window.puter?.auth&&!isPuterSignedIn()&&!cloudAttempted){
-        cloudAttempted=true;
-        try{
-          if(button)button.textContent="Connexion cloud…";
-          await window.puter.auth.signIn({attempt_temp_user_creation:true});
-        }catch(err){
-          console.warn("Puter sign-in unavailable, local fallback kept:",err);
-        }
-        if(button)button.textContent="Réflexion…";
-      }
-
       const out=await api("/api/chat",{
         method:"POST",
-        body:JSON.stringify({
-          text,
-          useClientModel:isPuterSignedIn(),
-          useClientImage:isPuterSignedIn()&&!appState.imageGeneration?.blocked
-        })
+        body:JSON.stringify({text})
       });
 
-      if(out.needsClientModel){
-        let cloudReply=null;
-        try{
-          cloudReply=await runPuterChat(out.generation);
-        }catch(err){
-          console.warn("Cloud chat unavailable:",err);
-        }
-        const completed=await api("/api/chat/complete",{
-          method:"POST",
-          body:JSON.stringify({pendingId:out.pendingId,reply:cloudReply})
-        });
-        appState=completed.state;
-      }else{
-        appState=out.state;
-      }
+      appState=out.state;
       render();
     }catch(err){
       pending.remove();

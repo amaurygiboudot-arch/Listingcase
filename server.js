@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getSetting,setSetting,getPartner,savePartner,clearPartner,addMessage,addMessageMedia,getMessageMedia,updateMessageMedia,recentMessages,addMemory,recentMemories,seedVisualSlots,createPendingChat,getPendingChat,deletePendingChat } from "./lib/db.js";
+import { getSetting,setSetting,getPartner,savePartner,clearPartner,addMessage,addMessageMedia,getMessageMedia,updateMessageMedia,recentMessages,addMemory,recentMemories,seedVisualSlots,createPendingChat,getPendingChat,deletePendingChat,ensurePersonId } from "./lib/db.js";
 import { createProfile,dailyMood,advanceRelationship,visualDecision,ensureVisualIdentity } from "./lib/profile.js";
 import { deterministicReply,sanitizeModelReply } from "./lib/dialogue-guard.js";
 import { recordEvent,noteInteraction,absenceState,applyAbsence,emotionalOverlay,decayEmotions,memoryContext,initiativeDecision } from "./lib/memory.js";
@@ -15,8 +15,9 @@ import { selectVisuals,selectAvailableVisuals,selectGenerationSlots,saveCharacte
 import { imageProviderStatus,buildVisualPrompt,generateVisual,importImageSource } from "./lib/image-provider.js";
 
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||8787);
+const LOCAL_ONLY=true;
 seedVisualSlots();
-const dialogueGuardVersion=2;
+const dialogueGuardVersion=3;
 if(getSetting("dialogueGuardVersion",0)<dialogueGuardVersion){
   setSetting("dialogueGuardVersion",dialogueGuardVersion);
   setSetting("dialogueContextAfter",Date.now());
@@ -28,10 +29,22 @@ const isVisualRequest=text=>/(photo|photos|image|images|montre[- ]?moi|fait voir
 
 async function state(){
   const partner=getPartner();
-  if(partner&&!partner.visualIdentity){ensureVisualIdentity(partner);savePartner(partner)}
+  if(partner){
+    let dirty=false;
+    if(!partner.personId){ensurePersonId(partner);dirty=true}
+    if(!partner.visualIdentity){ensureVisualIdentity(partner);dirty=true}
+    const canonical=getCanonicalVisual(partner);
+    if(canonical&&partner.canonicalImagePath!==canonical.file_path){
+      const migrated=saveCharacterVisual(partner,canonical.slot_id,canonical.file_path,canonical.mime_type,{canonical:true});
+      partner.canonicalImagePath=migrated.file_path;
+      dirty=true;
+    }
+    if(dirty)savePartner(partner);
+  }
   const mood=partner?dailyMood(partner):null;
   const life=partner?runLifeTick(partner,mood):null;
   const lifestyle=partner?lifeContext(partner,mood):null;
+  const imageProvider=await imageProviderStatus();
   return{
     adultConfirmed:getSetting("adultConfirmed",false),
     partner,
@@ -47,12 +60,14 @@ async function state(){
     absence:partner?absenceState(partner):null,
     library:libraryStats(partner),
     imageGeneration:{
-      blockedUntil:Number(getSetting("imageCreditsBlockedUntil",0)||0),
-      blocked:Date.now()<Number(getSetting("imageCreditsBlockedUntil",0)||0)
+      mode:"local-only",
+      configured:Boolean(imageProvider.configured),
+      provider:imageProvider.provider||"none",
+      blocked:false
     },
     providers:{
       llm:await modelStatus(),
-      image:await imageProviderStatus()
+      image:imageProvider
     }
   };
 }
@@ -64,7 +79,7 @@ async function api(req,res,url){
   if(req.method==="POST"&&url.pathname==="/api/adult"){const b=await body(req);setSetting("adultConfirmed",Boolean(b.confirmed));return json(res,200,await state())}
   if(req.method==="POST"&&url.pathname==="/api/partner"){
     if(!getSetting("adultConfirmed",false))return json(res,403,{error:"adult_confirmation_required"});
-    const b=await body(req),p=ensureVisualIdentity(createProfile(Array.isArray(b.interests)?b.interests:[]));
+    const b=await body(req),p=ensurePersonId(ensureVisualIdentity(createProfile(Array.isArray(b.interests)?b.interests:[])));
     savePartner(p);
     seedInitialPreferences(p);
     ensureRoutine(p);ensureSocialCircle(p);ensureGoals(p);
@@ -108,14 +123,21 @@ async function api(req,res,url){
           const provider=await imageProviderStatus();
           if(provider.configured){
             const slots=selectGenerationSlots(p,mood,Math.min(missing,2),requestVisual);
+            let canonicalVisual=getCanonicalVisual(p);
             for(const slot of slots){
               try{
                 const prompt=buildVisualPrompt(p,slot,requestVisual);
-                const generated=await generateVisual(p,slot,prompt);
+                const makeCanonical=!canonicalVisual;
+                const generated=await generateVisual(p,slot,prompt,{referencePath:canonicalVisual?.file_path||null});
                 if(generated){
-                  const saved=saveCharacterVisual(p,slot.id,generated.filePath,generated.mimeType,{canonical:ready.length===0});
+                  const saved=saveCharacterVisual(p,slot.id,generated.filePath,generated.mimeType,{canonical:makeCanonical});
+                  if(makeCanonical){
+                    canonicalVisual={...saved};
+                    p.canonicalImagePath=saved.file_path;
+                    savePartner(p);
+                  }
                   const url="/"+String(saved.file_path).replace(/^\/+/, "");
-                  media.push({kind:"image",status:"ready",url,alt:`Photo de ${p.name}`,visualId:slot.id,meta:{mood:slot.mood,place:slot.place,outfit:slot.outfit}});
+                  media.push({kind:"image",status:"ready",url,alt:`Photo de ${p.name}`,visualId:slot.id,meta:{mood:slot.mood,place:slot.place,outfit:slot.outfit,view:slot.view}});
                   missing--;
                 }
               }catch(e){
@@ -123,36 +145,20 @@ async function api(req,res,url){
               }
             }
           }
-          if(missing>0){
+          if(missing>0&&ready.length===0){
             const slots=selectGenerationSlots(p,mood,1,requestVisual);
             const slot=slots[0];
-            const blockedUntil=Number(getSetting("imageCreditsBlockedUntil",0)||0);
-            if(slot&&(Date.now()<blockedUntil||!Boolean(b.useClientImage))){
+            if(slot){
               media.push({
                 kind:"image",
                 status:"error",
                 url:null,
-                alt:Date.now()<blockedUntil
-                  ?"Je ne peux pas générer une nouvelle photo pour le moment."
-                  :"La génération d’images n’est pas connectée.",
-                visualId:slot.id,
-                meta:{providerBlocked:Date.now()<blockedUntil,blockedUntil,clientImageAvailable:Boolean(b.useClientImage),requestVisual}
-              });
-            }else if(slot){
-              media.push({
-                kind:"image",
-                status:"pending",
-                url:null,
-                alt:`Génération d’une photo de ${p.name}…`,
+                alt:"Je n’ai pas encore de photo cohérente pour cette demande et le moteur d’images local n’est pas prêt.",
                 visualId:slot.id,
                 meta:{
-                  prompt:buildVisualPrompt(p,slot,requestVisual),
-                  clientProvider:"puter",
-                  canonicalUrl:getCanonicalVisual(p)?.url||null,
-                  requestVisual,
-                  mood:slot.mood,
-                  place:slot.place,
-                  outfit:slot.outfit
+                  localOnly:true,
+                  imageProvider:provider.provider||"none",
+                  requestVisual
                 }
               });
             }
@@ -163,7 +169,7 @@ async function api(req,res,url){
     }else{
       reply=deterministicReply(p,mood,lifestyle,text);
       if(!reply){
-      if(Boolean(b.useClientModel)){
+      if(!LOCAL_ONLY&&Boolean(b.useClientModel)){
         const pendingId=crypto.randomUUID();
         createPendingChat(pendingId,text);
         const generation=buildCloudMessages({

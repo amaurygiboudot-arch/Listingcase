@@ -30,19 +30,25 @@ http://localhost:8787
 
 La base est créée automatiquement dans `data/human-partner.sqlite`.
 
-## Brancher un modèle local
+## Cerveau local
 
-Copier `.env.example` vers `.env` ou définir les variables dans le terminal :
+Le mode normal est 100 % local. Sur la machine de développement actuelle :
+
+```bash
+ollama pull qwen3:1.7b
+```
+
+Puis :
 
 ```
 LLM_BASE_URL=http://127.0.0.1:11434/v1
-LLM_MODEL=<nom-du-modele>
+LLM_MODEL=qwen3:1.7b
 LLM_API_KEY=
 ```
 
-Le backend utilise `POST /chat/completions`. Il peut donc être relié à un serveur local proposant une API compatible OpenAI.
+Human Partner détecte Ollama automatiquement et utilise son API native. Le modèle est préchauffé puis conservé en mémoire afin d'éviter de le recharger à chaque message.
 
-Sans modèle configuré, l'application continue de fonctionner avec un moteur de dialogue local simple.
+Sans modèle disponible, l'application conserve un moteur de dialogue local simple. Aucun fournisseur cloud n'est requis.
 
 ## API principale
 
@@ -63,7 +69,11 @@ Au premier démarrage, SQLite crée 10 000 emplacements de métadonnées :
 - 2 500 non-binaire ;
 - 2 500 androgyne / fluide.
 
-Les fichiers image réels ne sont pas générés automatiquement. Le moteur classe les emplacements selon le personnage, l'humeur, la relation et la continuité visuelle.
+Chaque personnage reçoit un `personId` stable et sa propre bibliothèque. Les photos sont filtrées par personne, cadrage, lieu, tenue, activité, humeur et moment.
+
+Les nouvelles images peuvent être générées localement par ComfyUI. Le workflow ComfyUI doit être exporté au format API et peut utiliser les placeholders `{{PROMPT}}`, `{{NEGATIVE_PROMPT}}` et `{{REFERENCE_IMAGE}}`. Aucune API image distante n'est utilisée.
+
+Si aucune photo cohérente n'existe et que ComfyUI local n'est pas prêt, l'application l'indique dans le chat au lieu de retourner une image incohérente.
 
 ## Avant une publication réelle
 

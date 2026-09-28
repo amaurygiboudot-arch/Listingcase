@@ -9,3 +9,4 @@ android/.gradle/
 android/app/build/
 library/
 android/local.properties
+data-backup-*/
