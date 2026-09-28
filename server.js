@@ -232,7 +232,13 @@ async function api(req,res,url){
     const media=getMessageMedia(mediaId);if(!media)return json(res,404,{error:"media_not_found"});
     if(media.url)return json(res,200,{ok:true,alreadyReady:true,state:await state()});
     const meta=media.meta?JSON.parse(media.meta):{};
-    updateMessageMedia(mediaId,{status:"error",alt:"La génération de l’image a échoué.",meta:{...meta,error:String(b.error||"client_generation_failed")}});
+    const error=String(b.error||"client_generation_failed");
+    const noCredits=/no credits|credits remaining|add credits/i.test(error);
+    updateMessageMedia(mediaId,{
+      status:"error",
+      alt:noCredits?"Je n’arrive pas à générer une nouvelle photo pour le moment.":"La génération de la photo a échoué.",
+      meta:{...meta,error,noCredits}
+    });
     return json(res,200,{ok:true,state:await state()});
   }
   if(req.method==="POST"&&url.pathname==="/api/life/tick"){
