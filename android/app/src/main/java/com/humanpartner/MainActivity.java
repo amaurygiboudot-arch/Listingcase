@@ -1,13 +1,16 @@
 package com.humanpartner;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Message;
 import android.net.Uri;
 import android.view.Gravity;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.webkit.WebChromeClient;
 import android.webkit.CookieManager;
 import android.webkit.WebResourceRequest;
@@ -128,12 +131,71 @@ public class MainActivity extends Activity {
         web.getSettings().setDomStorageEnabled(true);
         web.getSettings().setDefaultTextEncodingName("utf-8");
         web.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
+        web.getSettings().setSupportMultipleWindows(true);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
         web.getSettings().setDatabaseEnabled(true);
         web.getSettings().setAllowContentAccess(true);
         web.getSettings().setAllowFileAccess(false);
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog,
+                                          boolean isUserGesture, Message resultMsg) {
+                final Dialog popupDialog = new Dialog(MainActivity.this);
+                popupDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+                final WebView popupWeb = new WebView(MainActivity.this);
+                popupWeb.setBackgroundColor(Color.rgb(17, 19, 24));
+                popupWeb.getSettings().setJavaScriptEnabled(true);
+                popupWeb.getSettings().setDomStorageEnabled(true);
+                popupWeb.getSettings().setDatabaseEnabled(true);
+                popupWeb.getSettings().setDefaultTextEncodingName("utf-8");
+                popupWeb.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
+                popupWeb.getSettings().setSupportMultipleWindows(true);
+                popupWeb.getSettings().setAllowContentAccess(true);
+                popupWeb.getSettings().setAllowFileAccess(false);
+
+                CookieManager.getInstance().setAcceptCookie(true);
+                CookieManager.getInstance().setAcceptThirdPartyCookies(popupWeb, true);
+
+                popupWeb.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                        return false;
+                    }
+                });
+
+                popupWeb.setWebChromeClient(new WebChromeClient() {
+                    @Override
+                    public void onCloseWindow(WebView window) {
+                        popupDialog.dismiss();
+                    }
+                });
+
+                popupDialog.setContentView(popupWeb, new ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT));
+                popupDialog.show();
+
+                Window window = popupDialog.getWindow();
+                if (window != null) {
+                    window.setLayout(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT);
+                }
+
+                WebView.WebViewTransport transport =
+                        (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(popupWeb);
+                resultMsg.sendToTarget();
+                return true;
+            }
+
+            @Override
+            public void onCloseWindow(WebView window) {
+                super.onCloseWindow(window);
+            }
+        });
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {

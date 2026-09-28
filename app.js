@@ -82,7 +82,11 @@ function renderMedia(media){
     return `<img class="chat-image" src="${esc(media.url)}" alt="${esc(media.alt||"Photo")}" loading="lazy" />`;
   }
   if(media.status==="pending"){
-    return `<div class="media-status pending-media" data-media-id="${media.id}">📷 Génération de la photo…</div>`;
+    return `
+      <div class="media-status pending-media" data-media-id="${media.id}">
+        <div>📷 Photo prête à être générée</div>
+        <button class="secondary generate-media" data-generate-media="${media.id}" type="button">Générer la photo</button>
+      </div>`;
   }
   if(media.status==="error"){
     return `<div class="media-status">⚠️ ${esc(media.alt||"La génération de la photo a échoué.")}</div>`;
@@ -285,10 +289,35 @@ function bind(){
       render();
     }
   });
+
+  document.querySelectorAll("[data-generate-media]").forEach(btn=>{
+    btn.addEventListener("click",async()=>{
+      const mediaId=Number(btn.dataset.generateMedia);
+      const media=findMedia(mediaId);
+      if(!media||mediaJobs.has(mediaId))return;
+      btn.disabled=true;
+      btn.textContent="Connexion / génération…";
+      mediaJobs.add(mediaId);
+      try{
+        await generatePuterMedia(media,true);
+      }finally{
+        mediaJobs.delete(mediaId);
+      }
+    });
+  });
+}
+
+function findMedia(mediaId){
+  for(const m of appState.messages||[]){
+    const found=(m.media||[]).find(x=>Number(x.id)===Number(mediaId));
+    if(found)return found;
+  }
+  return null;
 }
 
 async function processPendingMedia(){
-  if(!appState.partner)return;
+  if(!appState.partner||!window.puter?.ai?.txt2img)return;
+  if(!window.puter?.auth?.isSignedIn?.())return;
   const pending=[];
   for(const m of appState.messages||[]){
     for(const media of m.media||[]){
@@ -298,17 +327,22 @@ async function processPendingMedia(){
   for(const media of pending){
     if(mediaJobs.has(media.id))continue;
     mediaJobs.add(media.id);
-    generatePuterMedia(media).finally(()=>mediaJobs.delete(media.id));
+    generatePuterMedia(media,false).finally(()=>mediaJobs.delete(media.id));
   }
 }
 
-async function generatePuterMedia(media){
+async function generatePuterMedia(media,allowSignIn=false){
   try{
     if(!window.puter?.ai?.txt2img)throw new Error("Puter n’est pas encore chargé.");
+    if(!window.puter?.auth?.isSignedIn?.()){
+      if(!allowSignIn)throw new Error("Connexion Puter nécessaire.");
+      await window.puter.auth.signIn({attempt_temp_user_creation:true});
+    }
     const prompt=media.meta?.prompt;
     if(!prompt)throw new Error("Prompt image manquant.");
 
     const image=await window.puter.ai.txt2img(prompt,{
+      provider:"gemini",
       model:"gemini-3.1-flash-image",
       quality:"512",
       ratio:{w:3,h:4}
