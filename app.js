@@ -279,10 +279,11 @@ function bind(){
     if(box)box.scrollTop=box.scrollHeight;
 
     try{
-      if(window.puter?.auth&&!isPuterSignedIn()&&!cloudAttempted){
+      const visualRequest=looksVisualRequest(text);
+      if(!visualRequest&&window.puter?.auth&&!isPuterSignedIn()&&!cloudAttempted){
         cloudAttempted=true;
         try{
-          if(button)button.textContent=looksVisualRequest(text)?"Connexion image…":"Connexion cloud…";
+          if(button)button.textContent="Connexion cloud…";
           await window.puter.auth.signIn({attempt_temp_user_creation:true});
         }catch(err){
           console.warn("Puter sign-in unavailable, local fallback kept:",err);
@@ -292,7 +293,11 @@ function bind(){
 
       const out=await api("/api/chat",{
         method:"POST",
-        body:JSON.stringify({text,useClientModel:isPuterSignedIn()})
+        body:JSON.stringify({
+          text,
+          useClientModel:isPuterSignedIn(),
+          useClientImage:isPuterSignedIn()&&!appState.imageGeneration?.blocked
+        })
       });
 
       if(out.needsClientModel){
@@ -315,7 +320,13 @@ function bind(){
       pending.remove();
       input.disabled=false;
       if(button){button.disabled=false;button.textContent="Envoyer"}
-      alert("Conversation interrompue : "+err.message);
+      const box=document.querySelector("#messages");
+      const errorBubble=document.createElement("div");
+      errorBubble.className="message partner";
+      errorBubble.textContent="⚠️ Je n’arrive pas à répondre correctement pour le moment.";
+      box?.appendChild(errorBubble);
+      if(box)box.scrollTop=box.scrollHeight;
+      console.warn("Conversation interrupted:",err);
     }
   });
 
@@ -385,6 +396,7 @@ function findMedia(mediaId){
 
 async function processPendingMedia(){
   if(!appState.partner||!window.puter?.ai?.txt2img)return;
+  if(appState.imageGeneration?.blocked)return;
   const pending=[];
   for(const m of appState.messages||[]){
     for(const media of m.media||[]){
@@ -392,16 +404,7 @@ async function processPendingMedia(){
     }
   }
   if(!pending.length)return;
-  if(!window.puter?.auth?.isSignedIn?.()){
-    if(cloudAttempted)return;
-    cloudAttempted=true;
-    try{
-      await window.puter.auth.signIn({attempt_temp_user_creation:true});
-    }catch(err){
-      console.warn("Automatic Puter sign-in for pending media failed:",err);
-      return;
-    }
-  }
+  if(!window.puter?.auth?.isSignedIn?.())return;
   for(const media of pending){
     if(mediaJobs.has(media.id))continue;
     mediaJobs.add(media.id);

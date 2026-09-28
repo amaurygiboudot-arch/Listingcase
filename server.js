@@ -46,6 +46,10 @@ async function state(){
     emotional:emotionalOverlay(),
     absence:partner?absenceState(partner):null,
     library:libraryStats(partner),
+    imageGeneration:{
+      blockedUntil:Number(getSetting("imageCreditsBlockedUntil",0)||0),
+      blocked:Date.now()<Number(getSetting("imageCreditsBlockedUntil",0)||0)
+    },
     providers:{
       llm:await modelStatus(),
       image:await imageProviderStatus()
@@ -122,7 +126,19 @@ async function api(req,res,url){
           if(missing>0){
             const slots=selectGenerationSlots(p,mood,1,requestVisual);
             const slot=slots[0];
-            if(slot){
+            const blockedUntil=Number(getSetting("imageCreditsBlockedUntil",0)||0);
+            if(slot&&(Date.now()<blockedUntil||!Boolean(b.useClientImage))){
+              media.push({
+                kind:"image",
+                status:"error",
+                url:null,
+                alt:Date.now()<blockedUntil
+                  ?"Je ne peux pas générer une nouvelle photo pour le moment."
+                  :"La génération d’images n’est pas connectée.",
+                visualId:slot.id,
+                meta:{providerBlocked:Date.now()<blockedUntil,blockedUntil,clientImageAvailable:Boolean(b.useClientImage),requestVisual}
+              });
+            }else if(slot){
               media.push({
                 kind:"image",
                 status:"pending",
@@ -233,7 +249,8 @@ async function api(req,res,url){
     if(media.url)return json(res,200,{ok:true,alreadyReady:true,state:await state()});
     const meta=media.meta?JSON.parse(media.meta):{};
     const error=String(b.error||"client_generation_failed");
-    const noCredits=/no credits|credits remaining|add credits/i.test(error);
+    const noCredits=/no credits|credits remaining|add credits|insufficient credits/i.test(error);
+    if(noCredits)setSetting("imageCreditsBlockedUntil",Date.now()+24*60*60*1000);
     updateMessageMedia(mediaId,{
       status:"error",
       alt:noCredits?"Je n’arrive pas à générer une nouvelle photo pour le moment.":"La génération de la photo a échoué.",
