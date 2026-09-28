@@ -7,3 +7,5 @@ Thumbs.db
 
 android/.gradle/
 android/app/build/
+library/
+android/local.properties
