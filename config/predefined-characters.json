@@ -1,0 +1,48 @@
+[
+  {
+    "personId": "CHLOE_001",
+    "seed": "CHLOE_001_seed_main",
+    "type": "femme",
+    "name": "Chloé",
+    "origin": "non établie",
+    "personality": {
+      "energy": "variable",
+      "sociability": "chaleureuse",
+      "directness": "douce mais franche",
+      "playfulness": "taquine",
+      "organization": "réfléchie",
+      "affection": "tendre",
+      "patience": "variable",
+      "independence": "équilibrée",
+      "adventure": "curieuse"
+    },
+    "values": [
+      "simplicité",
+      "créativité"
+    ],
+    "humor": "taquin",
+    "job": "studio de communication • contenu visuel, réseaux sociaux et projets clients",
+    "sport": "non établi",
+    "hobbies": [],
+    "modesty": "non établie",
+    "attachment": "relation proche, affectueuse et romantique",
+    "trust": 72,
+    "affinity": 78,
+    "stage": "attachement",
+    "createdAt": 1790630400000,
+    "visualIdentity": {
+      "hairColor": "blonds",
+      "eyeColor": "clairs",
+      "hair": "souples avec mèches libres",
+      "build": "féminine naturelle",
+      "height": "non établie"
+    },
+    "sourceProfile": "Chloe_Personnalite_et_Photos",
+    "knownSchedule": {
+      "workStart": 9,
+      "workEnd": 17.5,
+      "teleworkPossible": true
+    },
+    "canonicalImagePath": null
+  }
+]

@@ -21,7 +21,62 @@ import { activateCharacter,startNewCharacter,deleteActiveCharacter } from "./lib
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||8787);
 const LOCAL_ONLY=String(process.env.LOCAL_ONLY??"1")!=="0";
 const ACCESS_TOKEN=String(process.env.APP_ACCESS_TOKEN||"").trim();
+
+function seedPredefinedCharacters(){
+  const file=path.resolve(root,"config","predefined-characters.json");
+  if(!fs.existsSync(file))return 0;
+  let profiles=[];try{profiles=JSON.parse(fs.readFileSync(file,"utf8"))}catch{return 0}
+  if(!Array.isArray(profiles))return 0;
+  const insert=db.prepare("INSERT OR IGNORE INTO characters(person_id,json,created_at,updated_at) VALUES(?,?,?,?)");
+  let added=0;
+  for(const profile of profiles){
+    if(!profile?.personId||!profile?.seed||!profile?.name)continue;
+    const now=Date.now(),createdAt=Number(profile.createdAt||now);
+    const result=insert.run(profile.personId,JSON.stringify(profile),createdAt,now);
+    added+=Number(result.changes||0);
+  }
+  return added;
+}
+
 seedVisualSlots();
+seedPredefinedCharacters();
+
+function dedupeCharacterNamesOnce(){
+  if(getSetting("dedupeCharacterNamesV1",false))return 0;
+  const activeId=getPartner()?.personId||getSetting("activePersonId",null);
+  const rows=db.prepare("SELECT person_id,json,created_at FROM characters ORDER BY created_at,person_id").all();
+  const groups=new Map();
+  for(const row of rows){
+    let profile={};try{profile=JSON.parse(row.json)}catch{}
+    const key=String(profile.name||row.person_id).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(row);
+  }
+  const delSession=db.prepare("DELETE FROM character_sessions WHERE person_id=?");
+  const delVisual=db.prepare("DELETE FROM character_visuals WHERE person_id=?");
+  const delCharacter=db.prepare("DELETE FROM characters WHERE person_id=?");
+  const delScene=db.prepare("DELETE FROM settings WHERE key=?");
+  let removed=0;
+  db.exec("BEGIN");
+  try{
+    for(const group of groups.values()){
+      if(group.length<2)continue;
+      const keeper=group.find(x=>x.person_id===activeId)||group[0];
+      for(const row of group){
+        if(row.person_id===keeper.person_id)continue;
+        delSession.run(row.person_id);
+        delVisual.run(row.person_id);
+        delCharacter.run(row.person_id);
+        delScene.run(`visualScene:${row.person_id}`);
+        removed++;
+      }
+    }
+    setSetting("dedupeCharacterNamesV1",true);
+    db.exec("COMMIT");
+  }catch(e){db.exec("ROLLBACK");throw e}
+  return removed;
+}
+dedupeCharacterNamesOnce();
 const dialogueGuardVersion=3;
 if(getSetting("dialogueGuardVersion",0)<dialogueGuardVersion){
   setSetting("dialogueGuardVersion",dialogueGuardVersion);
@@ -181,7 +236,8 @@ async function api(req,res,url){
   if(req.method==="POST"&&url.pathname==="/api/adult"){const b=await body(req);setSetting("adultConfirmed",Boolean(b.confirmed));return json(res,200,await state())}
   if(req.method==="POST"&&url.pathname==="/api/partner"){
     if(!getSetting("adultConfirmed",false))return json(res,403,{error:"adult_confirmation_required"});
-    const b=await body(req),p=ensurePersonId(ensureVisualIdentity(createProfile(Array.isArray(b.interests)?b.interests:[])));
+    const existingNames=listPartners().map(x=>x.name);
+    const b=await body(req),p=ensurePersonId(ensureVisualIdentity(createProfile(Array.isArray(b.interests)?b.interests:[],existingNames)));
     startNewCharacter(p);
     ensureWorldPerson(p.personId,p.name,p.personality?.directness||"calme");
     seedInitialPreferences(p);
