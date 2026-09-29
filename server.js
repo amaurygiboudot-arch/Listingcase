@@ -296,6 +296,9 @@ async function api(req,res,url){
               }
             }
           }
+          if(generationError?.message==="canonical_visual_required"&&ready.length===0){
+            reply="Il me manque encore ma photo de référence. Choisis-la dans « Photo canonique » et je pourrai t’envoyer une image qui me ressemble vraiment.";
+          }
           if(missing>0&&ready.length===0){
             const slots=selectGenerationSlots(p,mood,1,requestVisual);
             const slot=slots[0];
@@ -305,9 +308,11 @@ async function api(req,res,url){
                   kind:"image",
                   status:"error",
                   url:null,
-                  alt:generationError
-                    ?"Je n’arrive pas à générer une nouvelle photo pour le moment."
-                    :runtimeResult?.error
+                  alt:generationError?.message==="canonical_visual_required"
+                    ?"Photo de référence manquante : choisis d’abord la photo canonique de ce personnage."
+                    :generationError
+                      ?"Je n’arrive pas à générer une nouvelle photo pour le moment."
+                      :runtimeResult?.error
                       ?"Le fournisseur d’images est indisponible."
                       :"Je n’ai pas trouvé de photo cohérente et le fournisseur d’images est indisponible.",
                   visualId:slot.id,

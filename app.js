@@ -142,9 +142,10 @@ function dashboard(){
   const d=appState.mood||{};
   const traits=Object.values(p.personality||{});
   const msgs=appState.messages||[];
+  const canonicalUrl=p.canonicalImagePath?"/"+String(p.canonicalImagePath).replace(/^\/+/, ""):"";
   const visuals=[
-    ["Catalogue",String(appState.library?.total||0)+" emplacements"],
-    ["Photos de ce personnage",String(appState.library?.available||0)],
+    ["Emplacements prévus",String(appState.library?.total||0)],
+    ["Photos enregistrées",String(appState.library?.available||0)],
     ["Conversation",appState.serverMode==="cloud"?(puterSignedIn()?"Puter cloud":"Puter à connecter"):(appState.providers?.llm?.configured?(appState.providers.llm.model||"modèle local"):"moteur local simple")],
     ["Génération image",appState.serverMode==="cloud"?(puterSignedIn()?"Puter cloud":"Puter à connecter"):(appState.providers?.image?.configured?(appState.providers.image.provider||"moteur local"):"moteur local non installé")],
     ["Humeur",d.mood||"—"],
@@ -222,18 +223,24 @@ function dashboard(){
 
         <section class="card panel" style="margin-top:18px">
           <h2>Moteur visuel</h2>
-          <div class="library">
-            ${visuals.map(([a,b])=>`<div class="visual"><strong>${esc(a)}</strong><small>${esc(b)}</small></div>`).join("")}
-            <div class="visual">
+          <div class="library engine-grid">
+            ${visuals.map(([a,b])=>`<div class="visual engine-card"><strong>${esc(a)}</strong><small>${esc(b)}</small></div>`).join("")}
+          </div>
+          <div class="canonical-panel">
+            <div class="canonical-copy">
               <strong>Photo canonique</strong>
-              <small>${p.canonicalImagePath?"Configurée • "+esc(p.canonicalImagePath):"Manquante • aucune génération ne sera utilisée comme référence par défaut"}</small>
+              <small>${p.canonicalImagePath?"Configurée et verrouillée":"Manquante • génération bloquée tant qu’aucune référence n’est choisie"}</small>
             </div>
+            <div id="canonicalPreview" class="canonical-preview">
+              ${canonicalUrl?`<img src="${esc(canonicalUrl)}?v=canonical" alt="Photo canonique de ${esc(p.name)}" />`:`<span>📷</span>`}
+            </div>
+            <input id="canonicalFile" class="canonical-file-input" type="file" accept="image/*" />
+            <div class="canonical-actions">
+              <label for="canonicalFile" class="secondary file-picker">📷 Choisir la photo de référence</label>
+              <button id="setCanonical" class="primary" type="button">Utiliser comme canonique</button>
+            </div>
+            <p id="canonicalStatus" class="muted">${p.canonicalImagePath?"La référence actuelle ne change que si tu en choisis volontairement une nouvelle.":"Choisis une photo nette et fidèle au visage du personnage."}</p>
           </div>
-          <div class="actions" style="margin-top:12px">
-            <input id="canonicalFile" type="file" accept="image/*" />
-            <button id="setCanonical" class="secondary" type="button">Définir la photo canonique</button>
-          </div>
-          <p id="canonicalStatus" class="muted">${p.canonicalImagePath?"La canonique actuelle reste verrouillée jusqu’à remplacement volontaire.":"Choisis une vraie photo de référence avant de générer de nouvelles images."}</p>
         </section>
       </div>
 
@@ -326,6 +333,20 @@ function bind(){
     }catch(err){
       e.currentTarget.disabled=false;
       console.warn("Character switch failed:",err);
+    }
+  });
+
+  document.querySelector("#canonicalFile")?.addEventListener("change",async e=>{
+    const file=e.currentTarget.files?.[0];
+    const preview=document.querySelector("#canonicalPreview");
+    const status=document.querySelector("#canonicalStatus");
+    if(!file)return;
+    try{
+      const src=await fileAsDataUri(file);
+      if(preview)preview.innerHTML=`<img src="${src}" alt="Aperçu de la photo canonique" />`;
+      if(status)status.textContent="Aperçu prêt. Valide seulement si ce visage correspond bien au personnage.";
+    }catch(err){
+      if(status)status.textContent="Impossible de lire cette image.";
     }
   });
 
