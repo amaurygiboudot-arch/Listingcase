@@ -59,6 +59,16 @@ Sans modèle disponible, l'application conserve un moteur de dialogue local simp
 - `POST /api/visual/select`
 - `POST /api/reset`
 - `GET /api/health`
+- `GET /api/world/people` et `GET /api/world/knowledge`
+- `POST /api/world/person`, `/api/world/relation`, `/api/world/event`, `/api/world/confide`, `/api/world/secret`, `/api/world/tell`
+
+## Monde social et confidentialité
+
+Le registre `world_*` conserve les personnages et leurs relations, les faits observés, les confidences, les secrets et les transmissions. Une relation ne transmet aucun fait automatiquement. Une transmission par `/api/world/tell` exige que le personnage connaisse déjà le fait ; les informations racontées portent une source et une certitude réduite. Les conversations brutes ne sont jamais copiées dans le registre social.
+
+Le personnage actif reçoit uniquement ses propres faits connus dans le contexte du modèle. Les routes sociales suivent le même contrôle d'accès que les autres routes API. Le backend reste actuellement conçu pour une seule session utilisateur ; une authentification multi-utilisateur et le chiffrement des données restent nécessaires avant une publication publique.
+
+Ce premier moteur ne décide pas encore tout seul quand un personnage révèle un secret ou lance une rumeur : le serveur doit déclencher explicitement `/api/world/tell` lors d'une action narrative. Il ne crée pas de personnages jouables supplémentaires dans l'interface actuelle.
 
 ## Bibliothèque visuelle
 

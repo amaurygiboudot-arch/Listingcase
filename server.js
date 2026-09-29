@@ -14,6 +14,7 @@ import { chatWithModel,fallbackReply,modelStatus,warmModel,unloadModel,buildClou
 import { selectVisuals,selectAvailableVisuals,selectGenerationSlots,saveCharacterVisual,libraryStats,visualRequestContext,getCanonicalVisual } from "./lib/visual.js";
 import { imageProviderStatus,buildVisualPrompt,generateVisual,importImageSource } from "./lib/image-provider.js";
 import { ensureLocalImageRuntime,localImageRuntimeInstalled,stopOwnedLocalImageRuntime } from "./lib/local-image-runtime.js";
+import { ensureWorldPerson,listWorldPeople,relatePeople,witnessEvent,confideFact,rememberFacts,keepSecret,tellFact,socialContext } from "./lib/social-world.js";
 
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||8787);
 const LOCAL_ONLY=String(process.env.LOCAL_ONLY??"1")!=="0";
@@ -100,14 +101,19 @@ const importSchema={
   social_contacts:["id","name","relation","closeness","energy","created_at"],
   goals:["id","title","category","progress","priority","status","updated_at"],
   character_visuals:["id","character_seed","slot_id","file_path","mime_type","canonical","created_at"],
-  visual_state:["id","json"]
+  visual_state:["id","json"],
+  world_people:["person_id","name","temperament"],
+  world_relations:["owner_id","other_id","kind","trust","closeness"],
+  world_facts:["fact_id","subject_id","predicate","detail","happened_at","sensitivity"],
+  world_knowledge:["owner_id","fact_id","source_id","channel","confidence","learned_at","secret"],
+  world_transmissions:["id","fact_id","speaker_id","listener_id","said_at","confidence"]
 };
 
 function importStateBundle(bundle){
   const tables=bundle?.tables||{};
   db.exec("PRAGMA foreign_keys=OFF; BEGIN");
   try{
-    for(const table of Object.keys(importSchema))db.exec(`DELETE FROM ${table}`);
+    for(const table of Object.keys(importSchema).reverse())db.exec(`DELETE FROM ${table}`);
     for(const [table,cols] of Object.entries(importSchema)){
       const rows=Array.isArray(tables[table])?tables[table]:[];
       if(!rows.length)continue;
@@ -141,11 +147,38 @@ async function api(req,res,url){
   if(req.method==="GET"&&url.pathname==="/api/health")return json(res,200,{ok:true,mode:LOCAL_ONLY?"local":"cloud",library:libraryStats(),providers:{llm:await currentLlmStatus(),image:await currentImageStatus()}});
   if(req.method==="GET"&&url.pathname==="/api/providers")return json(res,200,{llm:await currentLlmStatus(),image:await currentImageStatus()});
   if(req.method==="GET"&&url.pathname==="/api/state")return json(res,200,await state());
+  if(req.method==="GET"&&url.pathname==="/api/world/people")return json(res,200,{people:listWorldPeople()});
+  if(req.method==="GET"&&url.pathname==="/api/world/knowledge"){
+    const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
+    return json(res,200,{facts:rememberFacts(p.personId,{subjectId:url.searchParams.get("subjectId")||null})});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/world/person"){
+    const b=await body(req);return json(res,201,{person:ensureWorldPerson(b.personId,b.name,b.temperament)});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/world/relation"){
+    const b=await body(req);relatePeople(b.ownerId,b.otherId,b.kind,b);return json(res,200,{ok:true});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/world/event"){
+    const b=await body(req);return json(res,201,{factId:witnessEvent(b)});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/world/confide"){
+    const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
+    const b=await body(req);return json(res,201,{factId:confideFact(p.personId,b)});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/world/secret"){
+    const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
+    const b=await body(req);keepSecret(p.personId,b.factId,b.secret!==false);return json(res,200,{ok:true});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/world/tell"){
+    const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
+    const b=await body(req);return json(res,200,{knowledge:tellFact(p.personId,b.listenerId,b.factId,{overrideSecret:b.overrideSecret===true})});
+  }
   if(req.method==="POST"&&url.pathname==="/api/adult"){const b=await body(req);setSetting("adultConfirmed",Boolean(b.confirmed));return json(res,200,await state())}
   if(req.method==="POST"&&url.pathname==="/api/partner"){
     if(!getSetting("adultConfirmed",false))return json(res,403,{error:"adult_confirmation_required"});
     const b=await body(req),p=ensurePersonId(ensureVisualIdentity(createProfile(Array.isArray(b.interests)?b.interests:[])));
     savePartner(p);
+    ensureWorldPerson(p.personId,p.name,p.personality?.directness||"calme");
     seedInitialPreferences(p);
     ensureRoutine(p);ensureSocialCircle(p);ensureGoals(p);
     noteInteraction();
@@ -172,6 +205,8 @@ async function api(req,res,url){
     recordEvent(text);
     learnUserPreference(text);
     ensureVisualIdentity(p);advanceRelationship(p);savePartner(p);const mood=dailyMood(p);const lifestyle=lifeContext(p,mood);
+    ensureWorldPerson(p.personId,p.name,p.personality?.directness||"calme");
+    const worldKnowledge=socialContext(p.personId);
     let reply=null,visuals=[],media=[];
     if(isVisualRequest(text)){
       const d=visualDecision(p,mood,text);
@@ -278,7 +313,8 @@ async function api(req,res,url){
             absence,
             partnerPreferences:preferenceContext("partner",12),
             userPreferences:preferenceContext("user",10),
-            lifestyle
+            lifestyle,
+            worldKnowledge
           });
           return json(res,202,{
             needsClientModel:true,
@@ -288,7 +324,7 @@ async function api(req,res,url){
           });
         }
         if(LOCAL_ONLY){
-          try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(10),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",10),userPreferences:preferenceContext("user",8),lifestyle})}
+          try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(10),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",10),userPreferences:preferenceContext("user",8),lifestyle,worldKnowledge})}
           catch(e){console.error("LLM:",e.message)}
           reply=sanitizeModelReply(reply,p,text)||fallbackReply(p,mood,text);
         }else{
