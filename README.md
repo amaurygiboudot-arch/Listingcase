@@ -74,6 +74,8 @@ Ce premier moteur ne décide pas encore tout seul quand un personnage révèle u
 
 Le dernier lieu montré est conservé par personnage. Une nouvelle photo sans lieu demandé reste au même endroit pendant vingt minutes. Une demande explicite de changement de lieu trop rapide reçoit une réponse de continuité sans image ; les déplacements entre pièces du logement restent rapides, tandis qu'une plage demande au moins trente minutes depuis un autre lieu. Les images d'une même réponse restent dans le même lieu. Le lieu est mis à jour après qu'une image a réellement été affichée ou finalisée.
 
+Le dialogue reçoit aussi les métadonnées de la dernière photo réellement envoyée par ce personnage : lieu, activité, cadrage, tenue et humeur prévue. Une pose précise n'est ajoutée que si elle a été vérifiée séparément sur l'image. Le modèle de dialogue ne voit pas encore directement les pixels ; ces métadonnées ne prouvent donc pas chaque détail produit par le générateur.
+
 ## Bibliothèque visuelle
 
 Au premier démarrage, SQLite crée 10 000 emplacements de métadonnées :
