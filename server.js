@@ -15,6 +15,7 @@ import { selectVisuals,selectAvailableVisuals,selectGenerationSlots,saveCharacte
 import { imageProviderStatus,buildVisualPrompt,generateVisual,importImageSource } from "./lib/image-provider.js";
 import { ensureLocalImageRuntime,localImageRuntimeInstalled,stopOwnedLocalImageRuntime } from "./lib/local-image-runtime.js";
 import { ensureWorldPerson,listWorldPeople,relatePeople,witnessEvent,confideFact,rememberFacts,keepSecret,tellFact,socialContext } from "./lib/social-world.js";
+import { resolveVisualScene,noteVisualScene } from "./lib/scene-continuity.js";
 
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||8787);
 const LOCAL_ONLY=String(process.env.LOCAL_ONLY??"1")!=="0";
@@ -189,10 +190,12 @@ async function api(req,res,url){
   if(req.method==="POST"&&url.pathname==="/api/visual/select"){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
     const b=await body(req),m=dailyMood(p),decision=visualDecision(p,m,b.text||"photos");
-    const visuals=decision.accept?selectVisuals(p,m,decision.count):[];
+    const scene=resolveVisualScene(p,visualRequestContext(b.text||""));
+    const selected=decision.accept&&scene.allowed?selectVisuals(p,m,decision.count,scene.request):[];
+    const visuals=selected.length&&!scene.request.place?selected.filter(v=>v.place===selected[0].place):selected;
     const imageStatus=await currentImageStatus();
     const enriched=visuals.map(v=>({...v,prompt:buildVisualPrompt(p,v,{})}));
-    return json(res,200,{decision,visuals:enriched,imageProvider:imageStatus});
+    return json(res,200,{decision,scene,visuals:enriched,imageProvider:imageStatus});
   }
   if(req.method==="POST"&&url.pathname==="/api/chat"){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
@@ -210,12 +213,16 @@ async function api(req,res,url){
     let reply=null,visuals=[],media=[];
     if(isVisualRequest(text)){
       const d=visualDecision(p,mood,text);
-      const requestVisual=visualRequestContext(text);
-      reply=d.text;
-      if(d.accept){
-        const ready=selectAvailableVisuals(p,mood,d.count,requestVisual);
+      const scene=resolveVisualScene(p,visualRequestContext(text));
+      const requestVisual=scene.request;
+      reply=scene.allowed?d.text:scene.reason;
+      if(d.accept&&scene.allowed){
+        const selected=selectAvailableVisuals(p,mood,d.count,requestVisual);
+        const ready=selected.length&&!requestVisual.place?selected.filter(v=>v.place===selected[0].place):selected;
+        if(ready.length&&!requestVisual.place)requestVisual.place=ready[0].place;
         for(const v of ready){
           media.push({kind:"image",status:"ready",url:v.url,alt:`Photo de ${p.name}`,visualId:v.id,meta:{mood:v.mood,place:v.place,outfit:v.outfit}});
+          noteVisualScene(p,v.place);
         }
 
         let missing=Math.max(0,d.count-ready.length);
@@ -229,7 +236,11 @@ async function api(req,res,url){
             provider=await imageProviderStatus();
           }
           if(LOCAL_ONLY&&provider.configured){
-            const slots=selectGenerationSlots(p,mood,Math.min(missing,2),requestVisual);
+            let slots=selectGenerationSlots(p,mood,Math.min(missing,2),requestVisual);
+            if(slots.length&&!requestVisual.place){
+              requestVisual.place=slots[0].place;
+              slots=selectGenerationSlots(p,mood,Math.min(missing,2),requestVisual);
+            }
             let canonicalVisual=getCanonicalVisual(p);
             for(const slot of slots){
               try{
@@ -245,6 +256,7 @@ async function api(req,res,url){
                   }
                   const url="/"+String(saved.file_path).replace(/^\/+/, "");
                   media.push({kind:"image",status:"ready",url,alt:`Photo de ${p.name}`,visualId:slot.id,meta:{mood:slot.mood,place:slot.place,outfit:slot.outfit,view:slot.view}});
+                  noteVisualScene(p,slot.place);
                   missing--;
                 }
               }catch(e){
@@ -370,6 +382,7 @@ async function api(req,res,url){
       const imported=await importImageSource(src,slotId);
       const canonical=libraryStats(p).available===0;
       const saved=saveCharacterVisual(p,slotId,imported.filePath,imported.mimeType,{canonical});
+      noteVisualScene(p,meta.place);
       const publicUrl="/"+String(saved.file_path).replace(/^\/+/, "");
       updateMessageMedia(mediaId,{
         url:publicUrl,

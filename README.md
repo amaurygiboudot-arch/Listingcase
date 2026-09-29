@@ -70,6 +70,10 @@ Le personnage actif reçoit uniquement ses propres faits connus dans le contexte
 
 Ce premier moteur ne décide pas encore tout seul quand un personnage révèle un secret ou lance une rumeur : le serveur doit déclencher explicitement `/api/world/tell` lors d'une action narrative. Il ne crée pas de personnages jouables supplémentaires dans l'interface actuelle.
 
+## Continuité des scènes photo
+
+Le dernier lieu montré est conservé par personnage. Une nouvelle photo sans lieu demandé reste au même endroit pendant vingt minutes. Une demande explicite de changement de lieu trop rapide reçoit une réponse de continuité sans image ; les déplacements entre pièces du logement restent rapides, tandis qu'une plage demande au moins trente minutes depuis un autre lieu. Les images d'une même réponse restent dans le même lieu. Le lieu est mis à jour après qu'une image a réellement été affichée ou finalisée.
+
 ## Bibliothèque visuelle
 
 Au premier démarrage, SQLite crée 10 000 emplacements de métadonnées :
