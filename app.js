@@ -8,12 +8,14 @@ const TYPES=[
 let appState={
   adultConfirmed:false,
   partner:null,
+  characters:[],
   mood:null,
   messages:[],
   library:{total:0,available:0},
   providers:{llm:{configured:false},image:{configured:false}}
 };
 let selected=new Set();
+let creatingNew=false;
 const mediaJobs=new Set();
 
 const hashParams=new URLSearchParams(location.hash.replace(/^#/,""));
@@ -63,14 +65,15 @@ function ageGate(){
 }
 
 function onboarding(){
+  const adding=Boolean(appState.partner&&creatingNew);
   const opts=TYPES.map(([t,e])=>`
     <button class="option ${selected.has(t)?"active":""}" data-interest="${esc(t)}">${e} ${esc(t)}</button>
   `).join("");
   return `
     <div class="modal">
       <section class="card modal-card">
-        <div class="badge">Première rencontre</div>
-        <h1>Qui peut t’attirer ?</h1>
+        <div class="badge">${adding?"Nouvelle rencontre":"Première rencontre"}</div>
+        <h1>${adding?"Ajouter une nouvelle personne":"Qui peut t’attirer ?"}</h1>
         <p class="muted">On ne déduit pas ton orientation. Choisis simplement les types de personnes qui peuvent t’intéresser.</p>
         <div class="field">
           <div class="options">
@@ -79,7 +82,10 @@ function onboarding(){
           </div>
         </div>
         <div class="notice">La personnalité est générée une fois, puis reste stable. Les humeurs, goûts et la relation évoluent ensuite.</div>
-        <button id="createPartner" class="primary">Faire connaissance</button>
+        <div class="actions">
+          <button id="createPartner" class="primary">Faire connaissance</button>
+          ${adding?`<button id="cancelNewCharacter" class="secondary" type="button">Annuler</button>`:""}
+        </div>
       </section>
     </div>`;
 }
@@ -117,6 +123,20 @@ function renderMessage(m){
     </div>`;
 }
 
+function characterSwitcher(){
+  const chars=appState.characters||[];
+  if(!appState.partner)return "";
+  const options=chars.map(c=>`<option value="${esc(c.personId)}"${c.active?" selected":""}>${esc(c.name)} • ${esc(c.stage||"relation")}</option>`).join("");
+  return `
+    <div class="character-switch">
+      <label for="characterSelect">Personne active</label>
+      <div class="character-switch-row">
+        <select id="characterSelect">${options}</select>
+        <button id="newCharacter" class="secondary" type="button">+ Nouvelle personne</button>
+      </div>
+    </div>`;
+}
+
 function dashboard(){
   const p=appState.partner;
   const d=appState.mood||{};
@@ -141,6 +161,7 @@ function dashboard(){
       <div>
         <section class="card panel">
           <h2>Personnage</h2>
+          ${characterSwitcher()}
           <div class="profile">
             <div class="avatar">${({"femme":"👩","homme":"👨","non-binaire":"🧑","androgyne / fluide":"✨"}[p.type]||"🧑")}</div>
             <div>
@@ -223,7 +244,7 @@ function dashboard(){
           <button class="primary">Envoyer</button>
         </form>
         <div style="padding:0 14px 14px">
-          <button id="reset" class="danger">Recommencer avec une autre personne</button>
+          <button id="reset" class="danger">Supprimer ce personnage</button>
         </div>
       </section>
     </div>`;
@@ -238,7 +259,7 @@ function render(){
       </div>
       ${!appState.partner?landing():dashboard()}
     </main>
-    ${!appState.adultConfirmed?ageGate():(!appState.partner?onboarding():"")}
+    ${!appState.adultConfirmed?ageGate():((!appState.partner||creatingNew)?onboarding():"")}
   `;
   bind();
   setTimeout(()=>{
@@ -267,7 +288,36 @@ function bind(){
   document.querySelector("#createPartner")?.addEventListener("click",async()=>{
     const interests=[...selected].filter(x=>x!=="personnalité");
     appState=await api("/api/partner",{method:"POST",body:JSON.stringify({interests})});
+    creatingNew=false;
+    selected=new Set();
     render();
+  });
+
+  document.querySelector("#cancelNewCharacter")?.addEventListener("click",()=>{
+    creatingNew=false;
+    selected=new Set();
+    render();
+  });
+
+  document.querySelector("#newCharacter")?.addEventListener("click",()=>{
+    creatingNew=true;
+    selected=new Set();
+    render();
+  });
+
+  document.querySelector("#characterSelect")?.addEventListener("change",async e=>{
+    const personId=String(e.currentTarget.value||"");
+    if(!personId||personId===appState.partner?.personId)return;
+    e.currentTarget.disabled=true;
+    try{
+      appState=await api("/api/partner/select",{method:"POST",body:JSON.stringify({personId})});
+      creatingNew=false;
+      selected=new Set();
+      render();
+    }catch(err){
+      e.currentTarget.disabled=false;
+      console.warn("Character switch failed:",err);
+    }
   });
 
   document.querySelector("#chatForm")?.addEventListener("submit",async e=>{
@@ -325,8 +375,9 @@ function bind(){
   });
 
   document.querySelector("#reset")?.addEventListener("click",async()=>{
-    if(confirm("Supprimer ce personnage, la conversation et sa mémoire ?")){
-      appState=await api("/api/reset",{method:"POST",body:"{}"});
+    if(confirm(`Supprimer ${appState.partner?.name||"ce personnage"}, sa conversation, sa mémoire et ses photos ?`)){
+      appState=await api("/api/partner/delete",{method:"POST",body:"{}"});
+      creatingNew=false;
       selected=new Set();
       render();
     }

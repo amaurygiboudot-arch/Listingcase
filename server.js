@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { db,getSetting,setSetting,getPartner,savePartner,clearPartner,addMessage,addMessageMedia,getMessageMedia,updateMessageMedia,recentMessages,addMemory,recentMemories,seedVisualSlots,createPendingChat,getPendingChat,deletePendingChat,ensurePersonId } from "./lib/db.js";
+import { db,getSetting,setSetting,getPartner,savePartner,clearPartner,listPartners,addMessage,addMessageMedia,getMessageMedia,updateMessageMedia,recentMessages,addMemory,recentMemories,seedVisualSlots,createPendingChat,getPendingChat,deletePendingChat,ensurePersonId } from "./lib/db.js";
 import { createProfile,dailyMood,advanceRelationship,visualDecision,ensureVisualIdentity } from "./lib/profile.js";
 import { deterministicReply,sanitizeModelReply } from "./lib/dialogue-guard.js";
 import { recordEvent,noteInteraction,absenceState,applyAbsence,emotionalOverlay,decayEmotions,memoryContext,initiativeDecision } from "./lib/memory.js";
@@ -16,6 +16,7 @@ import { imageProviderStatus,buildVisualPrompt,generateVisual,importImageSource 
 import { ensureLocalImageRuntime,localImageRuntimeInstalled,stopOwnedLocalImageRuntime } from "./lib/local-image-runtime.js";
 import { ensureWorldPerson,listWorldPeople,relatePeople,witnessEvent,confideFact,rememberFacts,keepSecret,tellFact,socialContext } from "./lib/social-world.js";
 import { resolveVisualScene,noteVisualScene } from "./lib/scene-continuity.js";
+import { activateCharacter,startNewCharacter,deleteActiveCharacter } from "./lib/character-store.js";
 
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||8787);
 const LOCAL_ONLY=String(process.env.LOCAL_ONLY??"1")!=="0";
@@ -65,6 +66,7 @@ async function state(){
   return{
     adultConfirmed:getSetting("adultConfirmed",false),
     partner,
+    characters:listPartners(),
     mood,
     life,
     lifestyle,
@@ -94,6 +96,8 @@ async function state(){
 const importSchema={
   settings:["key","value"],
   partner:["id","json","created_at"],
+  characters:["person_id","json","created_at","updated_at"],
+  character_sessions:["person_id","state_json","updated_at"],
   messages:["id","role","text","created_at"],
   message_media:["id","message_id","kind","url","status","alt","visual_id","meta","created_at"],
   memories:["id","kind","content","weight","created_at"],
@@ -178,7 +182,7 @@ async function api(req,res,url){
   if(req.method==="POST"&&url.pathname==="/api/partner"){
     if(!getSetting("adultConfirmed",false))return json(res,403,{error:"adult_confirmation_required"});
     const b=await body(req),p=ensurePersonId(ensureVisualIdentity(createProfile(Array.isArray(b.interests)?b.interests:[])));
-    savePartner(p);
+    startNewCharacter(p);
     ensureWorldPerson(p.personId,p.name,p.personality?.directness||"calme");
     seedInitialPreferences(p);
     ensureRoutine(p);ensureSocialCircle(p);ensureGoals(p);
@@ -186,7 +190,17 @@ async function api(req,res,url){
     addMessage("partner","Salut. On ne se connaît pas encore vraiment, donc je préfère qu’on commence simplement 😄. Qu’est-ce que tu veux savoir sur moi ?");
     return json(res,201,await state());
   }
-  if(req.method==="POST"&&url.pathname==="/api/reset"){clearPartner();return json(res,200,await state())}
+  if(req.method==="POST"&&url.pathname==="/api/partner/select"){
+    const b=await body(req),p=activateCharacter(b.personId);
+    if(!p)return json(res,404,{error:"character_not_found"});
+    ensureWorldPerson(p.personId,p.name,p.personality?.directness||"calme");
+    return json(res,200,await state());
+  }
+  if(req.method==="POST"&&url.pathname==="/api/partner/delete"){
+    deleteActiveCharacter();
+    return json(res,200,await state());
+  }
+  if(req.method==="POST"&&url.pathname==="/api/reset"){deleteActiveCharacter();return json(res,200,await state())}
   if(req.method==="POST"&&url.pathname==="/api/visual/select"){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
     const b=await body(req),m=dailyMood(p),decision=visualDecision(p,m,b.text||"photos");
