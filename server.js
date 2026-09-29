@@ -230,6 +230,7 @@ async function api(req,res,url){
         if(missing>0){
           let provider=await currentImageStatus();
           let runtimeResult=null;
+          let generationError=null;
           let modelUnloaded=false;
           if(!provider.configured&&localImageRuntimeInstalled()){
             modelUnloaded=await unloadModel();
@@ -261,6 +262,7 @@ async function api(req,res,url){
                   missing--;
                 }
               }catch(e){
+                generationError=e;
                 console.error("IMAGE:",e.message);
               }
             }
@@ -274,14 +276,16 @@ async function api(req,res,url){
                   kind:"image",
                   status:"error",
                   url:null,
-                  alt:runtimeResult?.error
-                    ?"Je n’arrive pas à démarrer mon moteur d’images local sur cette machine."
-                    :"Je n’ai pas encore de photo cohérente pour cette demande et le moteur d’images local n’est pas prêt.",
+                  alt:generationError
+                    ?"Je n’arrive pas à générer une nouvelle photo pour le moment."
+                    :runtimeResult?.error
+                      ?"Le fournisseur d’images est indisponible."
+                      :"Je n’ai pas trouvé de photo cohérente et le fournisseur d’images est indisponible.",
                   visualId:slot.id,
                   meta:{
                     localOnly:true,
                     imageProvider:provider.provider||"none",
-                    runtime:runtimeResult,
+                    failure:generationError?"generation_failed":(provider.error||runtimeResult?.error||"provider_unavailable"),
                     requestVisual
                   }
                 });
