@@ -201,6 +201,22 @@ async function api(req,res,url){
     return json(res,200,await state());
   }
   if(req.method==="POST"&&url.pathname==="/api/reset"){deleteActiveCharacter();return json(res,200,await state())}
+  if(req.method==="POST"&&url.pathname==="/api/visual/canonical"){
+    const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
+    const b=await body(req),src=String(b.imageSrc||"");
+    if(!src)return json(res,400,{error:"canonical_image_missing"});
+    try{
+      const slotId=`CANONICAL_${p.personId}`;
+      const imported=await importImageSource(src,slotId);
+      const saved=saveCharacterVisual(p,slotId,imported.filePath,imported.mimeType,{canonical:true});
+      p.canonicalImagePath=saved.file_path;
+      savePartner(p);
+      return json(res,200,{ok:true,canonical:{url:"/"+String(saved.file_path).replace(/^\/+/, ""),filePath:saved.file_path},state:await state()});
+    }catch(e){
+      console.error("CANONICAL:",e.message);
+      return json(res,500,{error:"canonical_import_failed",message:e.message});
+    }
+  }
   if(req.method==="POST"&&url.pathname==="/api/visual/select"){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
     const b=await body(req),m=dailyMood(p),decision=visualDecision(p,m,b.text||"photos");
@@ -252,32 +268,31 @@ async function api(req,res,url){
             provider=await imageProviderStatus();
           }
           if(LOCAL_ONLY&&provider.configured){
+            if(!modelUnloaded)modelUnloaded=await unloadModel();
             let slots=selectGenerationSlots(p,mood,Math.min(missing,2),requestVisual);
             if(slots.length&&!requestVisual.place){
               requestVisual.place=slots[0].place;
               slots=selectGenerationSlots(p,mood,Math.min(missing,2),requestVisual);
             }
-            let canonicalVisual=getCanonicalVisual(p);
-            for(const slot of slots){
-              try{
-                const prompt=buildVisualPrompt(p,slot,requestVisual);
-                const makeCanonical=!canonicalVisual;
-                const generated=await generateVisual(p,slot,prompt,{referencePath:canonicalVisual?.file_path||null});
-                if(generated){
-                  const saved=saveCharacterVisual(p,slot.id,generated.filePath,generated.mimeType,{canonical:makeCanonical});
-                  if(makeCanonical){
-                    canonicalVisual={...saved};
-                    p.canonicalImagePath=saved.file_path;
-                    savePartner(p);
+            const canonicalVisual=getCanonicalVisual(p);
+            if(!canonicalVisual){
+              generationError=new Error("canonical_visual_required");
+            }else{
+              for(const slot of slots){
+                try{
+                  const prompt=buildVisualPrompt(p,slot,requestVisual);
+                  const generated=await generateVisual(p,slot,prompt,{referencePath:canonicalVisual.file_path});
+                  if(generated){
+                    const saved=saveCharacterVisual(p,slot.id,generated.filePath,generated.mimeType,{canonical:false});
+                    const url="/"+String(saved.file_path).replace(/^\/+/, "");
+                    media.push({kind:"image",status:"ready",url,alt:`Photo de ${p.name}`,visualId:slot.id,meta:{personId:p.personId,mood:slot.mood,place:slot.place,outfit:slot.outfit,view:slot.view,activity:slot.activity,moment:slot.moment}});
+                    noteVisualScene(p,slot.place);
+                    missing--;
                   }
-                  const url="/"+String(saved.file_path).replace(/^\/+/, "");
-                  media.push({kind:"image",status:"ready",url,alt:`Photo de ${p.name}`,visualId:slot.id,meta:{personId:p.personId,mood:slot.mood,place:slot.place,outfit:slot.outfit,view:slot.view,activity:slot.activity,moment:slot.moment}});
-                  noteVisualScene(p,slot.place);
-                  missing--;
+                }catch(e){
+                  generationError=e;
+                  console.error("IMAGE:",e.message);
                 }
-              }catch(e){
-                generationError=e;
-                console.error("IMAGE:",e.message);
               }
             }
           }
@@ -405,8 +420,8 @@ async function api(req,res,url){
     if(!slotId)return json(res,400,{error:"visual_slot_missing"});
     try{
       const imported=await importImageSource(src,slotId);
-      const canonical=libraryStats(p).available===0;
-      const saved=saveCharacterVisual(p,slotId,imported.filePath,imported.mimeType,{canonical});
+      const canonical=false;
+      const saved=saveCharacterVisual(p,slotId,imported.filePath,imported.mimeType,{canonical:false});
       noteVisualScene(p,meta.place);
       const publicUrl="/"+String(saved.file_path).replace(/^\/+/, "");
       updateMessageMedia(mediaId,{

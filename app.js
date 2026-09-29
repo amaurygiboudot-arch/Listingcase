@@ -224,7 +224,16 @@ function dashboard(){
           <h2>Moteur visuel</h2>
           <div class="library">
             ${visuals.map(([a,b])=>`<div class="visual"><strong>${esc(a)}</strong><small>${esc(b)}</small></div>`).join("")}
+            <div class="visual">
+              <strong>Photo canonique</strong>
+              <small>${p.canonicalImagePath?"Configurée • "+esc(p.canonicalImagePath):"Manquante • aucune génération ne sera utilisée comme référence par défaut"}</small>
+            </div>
           </div>
+          <div class="actions" style="margin-top:12px">
+            <input id="canonicalFile" type="file" accept="image/*" />
+            <button id="setCanonical" class="secondary" type="button">Définir la photo canonique</button>
+          </div>
+          <p id="canonicalStatus" class="muted">${p.canonicalImagePath?"La canonique actuelle reste verrouillée jusqu’à remplacement volontaire.":"Choisis une vraie photo de référence avant de générer de nouvelles images."}</p>
         </section>
       </div>
 
@@ -317,6 +326,25 @@ function bind(){
     }catch(err){
       e.currentTarget.disabled=false;
       console.warn("Character switch failed:",err);
+    }
+  });
+
+  document.querySelector("#setCanonical")?.addEventListener("click",async()=>{
+    const input=document.querySelector("#canonicalFile");
+    const button=document.querySelector("#setCanonical");
+    const status=document.querySelector("#canonicalStatus");
+    const file=input?.files?.[0];
+    if(!file){if(status)status.textContent="Choisis d’abord une image.";return}
+    if(button)button.disabled=true;
+    if(status)status.textContent="Import de la photo canonique…";
+    try{
+      const imageSrc=await fileAsDataUri(file);
+      const out=await api("/api/visual/canonical",{method:"POST",body:JSON.stringify({imageSrc})});
+      appState=out.state;
+      render();
+    }catch(err){
+      if(button)button.disabled=false;
+      if(status)status.textContent="Échec de l’import : "+(err?.message||"erreur");
     }
   });
 
@@ -434,6 +462,13 @@ function findMedia(mediaId){
   }
   return null;
 }
+
+const fileAsDataUri=file=>new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onload=()=>resolve(String(reader.result||""));
+  reader.onerror=()=>reject(reader.error||new Error("image_read_failed"));
+  reader.readAsDataURL(file);
+});
 
 async function imageSourceAsDataUri(src){
   if(String(src||"").startsWith("data:"))return src;
