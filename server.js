@@ -3,19 +3,21 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getSetting,setSetting,getPartner,savePartner,clearPartner,addMessage,addMessageMedia,getMessageMedia,updateMessageMedia,recentMessages,addMemory,recentMemories,seedVisualSlots,createPendingChat,getPendingChat,deletePendingChat,ensurePersonId } from "./lib/db.js";
+import { db,getSetting,setSetting,getPartner,savePartner,clearPartner,addMessage,addMessageMedia,getMessageMedia,updateMessageMedia,recentMessages,addMemory,recentMemories,seedVisualSlots,createPendingChat,getPendingChat,deletePendingChat,ensurePersonId } from "./lib/db.js";
 import { createProfile,dailyMood,advanceRelationship,visualDecision,ensureVisualIdentity } from "./lib/profile.js";
 import { deterministicReply,sanitizeModelReply } from "./lib/dialogue-guard.js";
 import { recordEvent,noteInteraction,absenceState,applyAbsence,emotionalOverlay,decayEmotions,memoryContext,initiativeDecision } from "./lib/memory.js";
 import { seedInitialPreferences,learnUserPreference,learnPartnerPreferenceFromReply,preferenceContext } from "./lib/preferences.js";
 import { runLifeTick,latestExperiences,pendingExperienceStory,markExperienceTold } from "./lib/experiences.js";
 import { ensureRoutine,ensureSocialCircle,ensureGoals,lifeContext } from "./lib/routine.js";
-import { chatWithModel,fallbackReply,modelStatus,warmModel,buildCloudMessages } from "./lib/model.js";
+import { chatWithModel,fallbackReply,modelStatus,warmModel,unloadModel,buildCloudMessages } from "./lib/model.js";
 import { selectVisuals,selectAvailableVisuals,selectGenerationSlots,saveCharacterVisual,libraryStats,visualRequestContext,getCanonicalVisual } from "./lib/visual.js";
 import { imageProviderStatus,buildVisualPrompt,generateVisual,importImageSource } from "./lib/image-provider.js";
+import { ensureLocalImageRuntime,localImageRuntimeInstalled,stopOwnedLocalImageRuntime } from "./lib/local-image-runtime.js";
 
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||8787);
-const LOCAL_ONLY=true;
+const LOCAL_ONLY=String(process.env.LOCAL_ONLY??"1")!=="0";
+const ACCESS_TOKEN=String(process.env.APP_ACCESS_TOKEN||"").trim();
 seedVisualSlots();
 const dialogueGuardVersion=3;
 if(getSetting("dialogueGuardVersion",0)<dialogueGuardVersion){
@@ -25,7 +27,20 @@ if(getSetting("dialogueGuardVersion",0)<dialogueGuardVersion){
 
 const json=(res,status,data)=>{res.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store"});res.end(JSON.stringify(data))};
 const body=async req=>{let s="";for await(const c of req)s+=c;return s?JSON.parse(s):{}};
+const apiAuthorized=req=>{
+  if(!ACCESS_TOKEN)return true;
+  const direct=String(req.headers["x-app-token"]||"");
+  const auth=String(req.headers.authorization||"");
+  const bearer=auth.startsWith("Bearer ")?auth.slice(7):"";
+  const supplied=direct||bearer;
+  if(!supplied||supplied.length!==ACCESS_TOKEN.length)return false;
+  try{return crypto.timingSafeEqual(Buffer.from(supplied),Buffer.from(ACCESS_TOKEN))}catch{return false}
+};
 const isVisualRequest=text=>/(photo|photos|image|images|montre[- ]?moi|fait voir|fais voir|je peux te voir|voir de toi|voir ton|voir ta|ton corps|ton corp|ta tenue|ton apparence|à quoi tu ressembles|a quoi tu ressembles)/i.test(String(text||""));
+const cloudLlmStatus=()=>({configured:true,provider:"puter-client",model:"gemini-3.1-flash-lite",client:true});
+const cloudImageStatus=()=>({configured:true,provider:"puter-client",client:true,local:false});
+const currentLlmStatus=()=>LOCAL_ONLY?modelStatus():Promise.resolve(cloudLlmStatus());
+const currentImageStatus=()=>LOCAL_ONLY?imageProviderStatus():Promise.resolve(cloudImageStatus());
 
 async function state(){
   const partner=getPartner();
@@ -44,7 +59,7 @@ async function state(){
   const mood=partner?dailyMood(partner):null;
   const life=partner?runLifeTick(partner,mood):null;
   const lifestyle=partner?lifeContext(partner,mood):null;
-  const imageProvider=await imageProviderStatus();
+  const imageProvider=await currentImageStatus();
   return{
     adultConfirmed:getSetting("adultConfirmed",false),
     partner,
@@ -59,22 +74,72 @@ async function state(){
     emotional:emotionalOverlay(),
     absence:partner?absenceState(partner):null,
     library:libraryStats(partner),
+    serverMode:LOCAL_ONLY?"local":"cloud",
+    cloudClientAllowed:!LOCAL_ONLY,
     imageGeneration:{
-      mode:"local-only",
+      mode:LOCAL_ONLY?"local-only":"hybrid-cloud",
       configured:Boolean(imageProvider.configured),
       provider:imageProvider.provider||"none",
       blocked:false
     },
     providers:{
-      llm:await modelStatus(),
+      llm:await currentLlmStatus(),
       image:imageProvider
     }
   };
 }
 
+const importSchema={
+  settings:["key","value"],
+  partner:["id","json","created_at"],
+  messages:["id","role","text","created_at"],
+  message_media:["id","message_id","kind","url","status","alt","visual_id","meta","created_at"],
+  memories:["id","kind","content","weight","created_at"],
+  preferences:["owner","topic","score","confidence","reason","exposures","updated_at"],
+  experiences:["id","slot","topic","kind","outcome","intensity","note","created_at"],
+  social_contacts:["id","name","relation","closeness","energy","created_at"],
+  goals:["id","title","category","progress","priority","status","updated_at"],
+  character_visuals:["id","character_seed","slot_id","file_path","mime_type","canonical","created_at"],
+  visual_state:["id","json"]
+};
+
+function importStateBundle(bundle){
+  const tables=bundle?.tables||{};
+  db.exec("PRAGMA foreign_keys=OFF; BEGIN");
+  try{
+    for(const table of Object.keys(importSchema))db.exec(`DELETE FROM ${table}`);
+    for(const [table,cols] of Object.entries(importSchema)){
+      const rows=Array.isArray(tables[table])?tables[table]:[];
+      if(!rows.length)continue;
+      const placeholders=cols.map(()=>"?").join(",");
+      const insert=db.prepare(`INSERT INTO ${table}(${cols.join(",")}) VALUES(${placeholders})`);
+      for(const row of rows)insert.run(...cols.map(c=>row[c]??null));
+    }
+    db.exec("COMMIT; PRAGMA foreign_keys=ON");
+  }catch(e){
+    try{db.exec("ROLLBACK; PRAGMA foreign_keys=ON")}catch{}
+    throw e;
+  }
+
+  for(const file of Array.isArray(bundle?.files)?bundle.files:[]){
+    const rel=String(file.path||"").replace(/\\/g,"/");
+    if(!/^library\/[A-Za-z0-9_./-]+$/.test(rel)||rel.includes(".."))continue;
+    const target=path.resolve(root,rel);
+    if(!target.startsWith(root))continue;
+    fs.mkdirSync(path.dirname(target),{recursive:true});
+    fs.writeFileSync(target,Buffer.from(String(file.base64||""),"base64"));
+  }
+}
+
 async function api(req,res,url){
-  if(req.method==="GET"&&url.pathname==="/api/health")return json(res,200,{ok:true,library:libraryStats(),providers:{llm:await modelStatus(),image:await imageProviderStatus()}});
-  if(req.method==="GET"&&url.pathname==="/api/providers")return json(res,200,{llm:await modelStatus(),image:await imageProviderStatus()});
+  if(req.method==="POST"&&url.pathname==="/api/admin/import-state"){
+    if(String(process.env.MIGRATION_ENABLED||"0")!=="1")return json(res,403,{error:"migration_disabled"});
+    const bundle=await body(req);
+    importStateBundle(bundle);
+    return json(res,200,{ok:true,state:await state()});
+  }
+  if(req.method==="GET"&&url.pathname==="/api/health")return json(res,200,{ok:true,mode:LOCAL_ONLY?"local":"cloud",library:libraryStats(),providers:{llm:await currentLlmStatus(),image:await currentImageStatus()}});
+  if(req.method==="GET"&&url.pathname==="/api/providers")return json(res,200,{llm:await currentLlmStatus(),image:await currentImageStatus()});
   if(req.method==="GET"&&url.pathname==="/api/state")return json(res,200,await state());
   if(req.method==="POST"&&url.pathname==="/api/adult"){const b=await body(req);setSetting("adultConfirmed",Boolean(b.confirmed));return json(res,200,await state())}
   if(req.method==="POST"&&url.pathname==="/api/partner"){
@@ -92,7 +157,7 @@ async function api(req,res,url){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
     const b=await body(req),m=dailyMood(p),decision=visualDecision(p,m,b.text||"photos");
     const visuals=decision.accept?selectVisuals(p,m,decision.count):[];
-    const imageStatus=await imageProviderStatus();
+    const imageStatus=await currentImageStatus();
     const enriched=visuals.map(v=>({...v,prompt:buildVisualPrompt(p,v,{})}));
     return json(res,200,{decision,visuals:enriched,imageProvider:imageStatus});
   }
@@ -120,8 +185,15 @@ async function api(req,res,url){
 
         let missing=Math.max(0,d.count-ready.length);
         if(missing>0){
-          const provider=await imageProviderStatus();
-          if(provider.configured){
+          let provider=await currentImageStatus();
+          let runtimeResult=null;
+          let modelUnloaded=false;
+          if(!provider.configured&&localImageRuntimeInstalled()){
+            modelUnloaded=await unloadModel();
+            runtimeResult=await ensureLocalImageRuntime();
+            provider=await imageProviderStatus();
+          }
+          if(LOCAL_ONLY&&provider.configured){
             const slots=selectGenerationSlots(p,mood,Math.min(missing,2),requestVisual);
             let canonicalVisual=getCanonicalVisual(p);
             for(const slot of slots){
@@ -149,51 +221,79 @@ async function api(req,res,url){
             const slots=selectGenerationSlots(p,mood,1,requestVisual);
             const slot=slots[0];
             if(slot){
-              media.push({
-                kind:"image",
-                status:"error",
-                url:null,
-                alt:"Je n’ai pas encore de photo cohérente pour cette demande et le moteur d’images local n’est pas prêt.",
-                visualId:slot.id,
-                meta:{
-                  localOnly:true,
-                  imageProvider:provider.provider||"none",
-                  requestVisual
-                }
-              });
+              if(LOCAL_ONLY){
+                media.push({
+                  kind:"image",
+                  status:"error",
+                  url:null,
+                  alt:runtimeResult?.error
+                    ?"Je n’arrive pas à démarrer mon moteur d’images local sur cette machine."
+                    :"Je n’ai pas encore de photo cohérente pour cette demande et le moteur d’images local n’est pas prêt.",
+                  visualId:slot.id,
+                  meta:{
+                    localOnly:true,
+                    imageProvider:provider.provider||"none",
+                    runtime:runtimeResult,
+                    requestVisual
+                  }
+                });
+              }else{
+                media.push({
+                  kind:"image",
+                  status:"pending",
+                  url:null,
+                  alt:`Génération d’une photo de ${p.name}…`,
+                  visualId:slot.id,
+                  meta:{
+                    clientProvider:"puter",
+                    prompt:buildVisualPrompt(p,slot,requestVisual),
+                    requestVisual,
+                    mood:slot.mood,
+                    place:slot.place,
+                    outfit:slot.outfit,
+                    view:slot.view
+                  }
+                });
+              }
             }
           }
+          if(runtimeResult?.ready&&runtimeResult.mode!=="existing")await stopOwnedLocalImageRuntime();
+          if(modelUnloaded)warmModel().catch(e=>console.error("LLM rewarm:",e.message));
         }
       }
       visuals=media;
     }else{
       reply=deterministicReply(p,mood,lifestyle,text);
       if(!reply){
-      if(!LOCAL_ONLY&&Boolean(b.useClientModel)){
-        const pendingId=crypto.randomUUID();
-        createPendingChat(pendingId,text);
-        const generation=buildCloudMessages({
-          profile:p,
-          mood,
-          messages:previous,
-          memories:memoryContext(12),
-          userText:text,
-          emotional:emotionalOverlay(),
-          absence,
-          partnerPreferences:preferenceContext("partner",12),
-          userPreferences:preferenceContext("user",10),
-          lifestyle
-        });
-        return json(res,202,{
-          needsClientModel:true,
-          pendingId,
-          generation:{model:"gemini-3.1-flash-lite",messages:generation},
-          state:await state()
-        });
-      }
-      try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(10),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",10),userPreferences:preferenceContext("user",8),lifestyle})}
-      catch(e){console.error("LLM:",e.message)}
-      reply=sanitizeModelReply(reply,p,text)||fallbackReply(p,mood,text);
+        if(!LOCAL_ONLY&&Boolean(b.useClientModel)){
+          const pendingId=crypto.randomUUID();
+          createPendingChat(pendingId,text);
+          const generation=buildCloudMessages({
+            profile:p,
+            mood,
+            messages:previous,
+            memories:memoryContext(12),
+            userText:text,
+            emotional:emotionalOverlay(),
+            absence,
+            partnerPreferences:preferenceContext("partner",12),
+            userPreferences:preferenceContext("user",10),
+            lifestyle
+          });
+          return json(res,202,{
+            needsClientModel:true,
+            pendingId,
+            generation:{model:"gemini-3.1-flash-lite",messages:generation},
+            state:await state()
+          });
+        }
+        if(LOCAL_ONLY){
+          try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(10),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",10),userPreferences:preferenceContext("user",8),lifestyle})}
+          catch(e){console.error("LLM:",e.message)}
+          reply=sanitizeModelReply(reply,p,text)||fallbackReply(p,mood,text);
+        }else{
+          reply=fallbackReply(p,mood,text);
+        }
       }
     }
 
@@ -309,6 +409,7 @@ http.createServer(async(req,res)=>{
   try{
     const url=new URL(req.url,`http://${req.headers.host||"localhost"}`);
     if(url.pathname.startsWith("/api/")){
+      if(url.pathname!=="/api/health"&&!apiAuthorized(req))return json(res,401,{error:"unauthorized"});
       const handled=await api(req,res,url);
       if(handled!==false)return;
       return json(res,404,{error:"not_found"});
@@ -319,4 +420,7 @@ http.createServer(async(req,res)=>{
     console.error(e);
     json(res,500,{error:"server_error",message:e.message});
   }
-}).listen(port,()=>{console.log(`Human Partner running on http://localhost:${port}`); warmModel().then(ok=>console.log(`LLM warmup: ${ok?"ready":"skipped"}`)).catch(e=>console.error("LLM warmup:",e.message));});
+}).listen(port,()=>{
+  console.log(`Human Partner running on http://localhost:${port} (${LOCAL_ONLY?"local":"cloud"})`);
+  if(LOCAL_ONLY)warmModel().then(ok=>console.log(`LLM warmup: ${ok?"ready":"skipped"}`)).catch(e=>console.error("LLM warmup:",e.message));
+});

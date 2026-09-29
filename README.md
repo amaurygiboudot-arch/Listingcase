@@ -71,9 +71,13 @@ Au premier démarrage, SQLite crée 10 000 emplacements de métadonnées :
 
 Chaque personnage reçoit un `personId` stable et sa propre bibliothèque. Les photos sont filtrées par personne, cadrage, lieu, tenue, activité, humeur et moment.
 
-Les nouvelles images peuvent être générées localement par ComfyUI. Le workflow ComfyUI doit être exporté au format API et peut utiliser les placeholders `{{PROMPT}}`, `{{NEGATIVE_PROMPT}}` et `{{REFERENCE_IMAGE}}`. Aucune API image distante n'est utilisée.
+Le moteur image principal est maintenant `stable-diffusion.cpp` en CPU, avec DreamShaper-7 LCM quantifié. Il est lancé à la demande pour économiser la RAM. Avant une génération, Human Partner libère temporairement Qwen3, génère la photo localement, puis réchauffe Qwen3.
 
-Si aucune photo cohérente n'existe et que ComfyUI local n'est pas prêt, l'application l'indique dans le chat au lieu de retourner une image incohérente.
+Le moteur choisit un cadrage adapté à la demande (portrait, selfie, three-quarter, fullbody, miroir) et réutilise la photo canonique du personnage en img2img quand elle existe afin de conserver au mieux son identité.
+
+ComfyUI reste disponible comme moteur local alternatif. Aucune API image distante n'est nécessaire.
+
+Si aucune photo cohérente n'existe et qu'aucun moteur local n'est disponible, l'application l'indique dans le chat au lieu de retourner une image incohérente.
 
 ## Avant une publication réelle
 

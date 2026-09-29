@@ -14,13 +14,25 @@ let appState={
   providers:{llm:{configured:false},image:{configured:false}}
 };
 let selected=new Set();
-let cloudAttempted=false;
 const mediaJobs=new Set();
-const isPuterSignedIn=()=>Boolean(window.puter?.auth?.isSignedIn?.());
-const looksVisualRequest=text=>/(photo|photos|image|images|montre[- ]?moi|fait voir|fais voir|je peux te voir|voir de toi|voir ton|voir ta|ton corps|ton corp|ta tenue|ton apparence|à quoi tu ressembles|a quoi tu ressembles)/i.test(String(text||""));
+
+const hashParams=new URLSearchParams(location.hash.replace(/^#/,""));
+const hashToken=hashParams.get("token")||"";
+if(hashToken){
+  localStorage.setItem("hpAccessToken",hashToken);
+  history.replaceState(null,"",location.pathname+location.search);
+}
+const appAccessToken=hashToken||localStorage.getItem("hpAccessToken")||"";
+const puterReady=()=>Boolean(window.puter?.ai);
+const puterSignedIn=()=>Boolean(window.puter?.auth?.isSignedIn?.());
 
 const api=async(path,options={})=>{
-  const r=await fetch(path,{headers:{"content-type":"application/json"},...options});
+  const headers={
+    "content-type":"application/json",
+    ...(appAccessToken?{"x-app-token":appAccessToken}:{}),
+    ...(options.headers||{})
+  };
+  const r=await fetch(path,{...options,headers});
   const d=await r.json();
   if(!r.ok)throw new Error(d.message||d.error||"api_error");
   return d;
@@ -87,7 +99,8 @@ function renderMedia(media){
   if(media.status==="pending"){
     return `
       <div class="media-status pending-media" data-media-id="${media.id}">
-        <div>📷 Génération de la photo…</div>
+        <div>📷 Photo prête à être générée</div>
+        <button class="secondary generate-media" data-generate-media="${media.id}" type="button">Générer la photo</button>
       </div>`;
   }
   if(media.status==="error"){
@@ -112,8 +125,8 @@ function dashboard(){
   const visuals=[
     ["Catalogue",String(appState.library?.total||0)+" emplacements"],
     ["Photos de ce personnage",String(appState.library?.available||0)],
-    ["Conversation",appState.providers?.llm?.configured?(appState.providers.llm.model||"modèle local"):"moteur local simple"],
-    ["Génération image",appState.providers?.image?.configured?(appState.providers.image.provider||"ComfyUI local"):"moteur local non installé"],
+    ["Conversation",appState.serverMode==="cloud"?(puterSignedIn()?"Puter cloud":"Puter à connecter"):(appState.providers?.llm?.configured?(appState.providers.llm.model||"modèle local"):"moteur local simple")],
+    ["Génération image",appState.serverMode==="cloud"?(puterSignedIn()?"Puter cloud":"Puter à connecter"):(appState.providers?.image?.configured?(appState.providers.image.provider||"moteur local"):"moteur local non installé")],
     ["Humeur",d.mood||"—"],
     ["Émotion persistante",appState.emotional?.tone||"neutre"]
   ];
@@ -201,7 +214,7 @@ function dashboard(){
               <h2>Conversation</h2>
               <div class="muted">Énergie ${d.energy??"—"}% • affection ${d.affection??"—"}% • sociabilité ${d.social??"—"}%</div>
             </div>
-            <span class="badge">100 % local</span>
+            <span class="badge">${appState.serverMode==="cloud"?"Cloud sécurisé":"100 % local"}</span>
           </div>
         </div>
         <div id="messages" class="messages">${msgs.map(renderMessage).join("")}</div>
@@ -221,7 +234,7 @@ function render(){
     <main class="shell">
       <div class="topbar">
         <div class="brand">Human Partner</div>
-        <div class="badge">${appState.providers?.llm?.configured?"IA locale":"Moteur local simple"} • SQLite • sans cloud</div>
+        <div class="badge">${appState.serverMode==="cloud"?"Cloud sécurisé • SQLite":((appState.providers?.llm?.configured?"IA locale":"Moteur local simple")+" • SQLite")}</div>
       </div>
       ${!appState.partner?landing():dashboard()}
     </main>
@@ -231,6 +244,7 @@ function render(){
   setTimeout(()=>{
     const m=document.querySelector("#messages");
     if(m)m.scrollTop=m.scrollHeight;
+    processPendingMedia();
   },0);
 }
 
@@ -276,12 +290,25 @@ function bind(){
     if(box)box.scrollTop=box.scrollHeight;
 
     try{
+      let useClientModel=false;
+      if(appState.cloudClientAllowed&&puterReady()){
+        if(!puterSignedIn()&&window.puter?.auth?.signIn){
+          try{await window.puter.auth.signIn({attempt_temp_user_creation:true})}catch{}
+        }
+        useClientModel=puterSignedIn()&&Boolean(window.puter?.ai?.chat);
+      }
+
       const out=await api("/api/chat",{
         method:"POST",
-        body:JSON.stringify({text})
+        body:JSON.stringify({text,useClientModel})
       });
 
-      appState=out.state;
+      if(out.needsClientModel){
+        const completed=await completeClientChat(out);
+        appState=completed.state;
+      }else{
+        appState=out.state;
+      }
       render();
     }catch(err){
       pending.remove();
@@ -294,20 +321,6 @@ function bind(){
       box?.appendChild(errorBubble);
       if(box)box.scrollTop=box.scrollHeight;
       console.warn("Conversation interrupted:",err);
-    }
-  });
-
-  document.querySelector("#connectPuter")?.addEventListener("click",async e=>{
-    const btn=e.currentTarget;
-    btn.disabled=true;
-    btn.textContent="Connexion…";
-    try{
-      await window.puter.auth.signIn({attempt_temp_user_creation:true});
-      render();
-    }catch(err){
-      btn.disabled=false;
-      btn.textContent="Connexion cloud";
-      alert("Connexion Puter annulée ou impossible.");
     }
   });
 
@@ -328,146 +341,106 @@ function bind(){
       btn.textContent="Connexion / génération…";
       mediaJobs.add(mediaId);
       try{
-        await generatePuterMedia(media,true);
+        if(!puterSignedIn()&&window.puter?.auth?.signIn){
+          await window.puter.auth.signIn({attempt_temp_user_creation:true});
+        }
+        await generateCloudMedia(media);
+      }catch(err){
+        console.warn("Image cloud:",err);
       }finally{
         mediaJobs.delete(mediaId);
       }
     });
   });
+
 }
 
-async function runPuterChat(generation){
-  if(!window.puter?.ai?.chat)throw new Error("Puter chat indisponible.");
-  const response=await window.puter.ai.chat(generation.messages,{
-    model:generation.model||"gemini-3.1-flash-lite",
-    normalize:true
-  });
-
-  const content=response?.message?.content;
-  if(typeof content==="string"&&content.trim())return content.trim();
-  if(Array.isArray(content)){
-    const text=content.map(part=>part?.text||part?.content||"").join("").trim();
-    if(text)return text;
+async function completeClientChat(out){
+  try{
+    if(!window.puter?.ai?.chat)throw new Error("cloud_chat_unavailable");
+    const response=await window.puter.ai.chat(
+      out.generation.messages,
+      {model:out.generation.model,normalize:true}
+    );
+    const reply=String(response?.message?.content||"").trim();
+    return await api("/api/chat/complete",{
+      method:"POST",
+      body:JSON.stringify({pendingId:out.pendingId,reply})
+    });
+  }catch(err){
+    console.warn("Cloud chat failed:",err);
+    return await api("/api/chat/complete",{
+      method:"POST",
+      body:JSON.stringify({pendingId:out.pendingId,reply:""})
+    });
   }
-  if(typeof response?.text==="string"&&response.text.trim())return response.text.trim();
-  throw new Error("Réponse cloud vide.");
 }
 
 function findMedia(mediaId){
-  for(const m of appState.messages||[]){
-    const found=(m.media||[]).find(x=>Number(x.id)===Number(mediaId));
+  for(const message of appState.messages||[]){
+    const found=(message.media||[]).find(x=>Number(x.id)===Number(mediaId));
     if(found)return found;
   }
   return null;
 }
 
-async function processPendingMedia(){
-  if(!appState.partner||!window.puter?.ai?.txt2img)return;
-  if(appState.imageGeneration?.blocked)return;
-  const pending=[];
-  for(const m of appState.messages||[]){
-    for(const media of m.media||[]){
-      if(media.status==="pending"&&media.meta?.clientProvider==="puter")pending.push(media);
-    }
-  }
-  if(!pending.length)return;
-  if(!window.puter?.auth?.isSignedIn?.())return;
-  for(const media of pending){
-    if(mediaJobs.has(media.id))continue;
-    mediaJobs.add(media.id);
-    generatePuterMedia(media,false).finally(()=>mediaJobs.delete(media.id));
-  }
-}
-
-async function urlToDataUri(url){
-  const r=await fetch(url,{cache:"no-store"});
-  if(!r.ok)throw new Error("Référence visuelle introuvable.");
+async function imageSourceAsDataUri(src){
+  if(String(src||"").startsWith("data:"))return src;
+  const r=await fetch(src);
+  if(!r.ok)throw new Error("image_download_failed");
   const blob=await r.blob();
   return await new Promise((resolve,reject)=>{
     const reader=new FileReader();
     reader.onload=()=>resolve(String(reader.result||""));
-    reader.onerror=()=>reject(reader.error||new Error("Lecture image impossible."));
+    reader.onerror=()=>reject(reader.error||new Error("image_read_failed"));
     reader.readAsDataURL(blob);
   });
 }
 
-async function generatePuterMedia(media,allowSignIn=false){
+async function generateCloudMedia(media){
   try{
-    if(!window.puter?.ai?.txt2img)throw new Error("Puter n’est pas encore chargé.");
-    if(!window.puter?.auth?.isSignedIn?.()){
-      if(!allowSignIn)throw new Error("Connexion Puter nécessaire.");
-      await window.puter.auth.signIn({attempt_temp_user_creation:true});
-    }
-    const prompt=media.meta?.prompt;
-    if(!prompt)throw new Error("Prompt image manquant.");
+    if(!window.puter?.ai?.txt2img)throw new Error("cloud_image_unavailable");
+    if(!puterSignedIn())throw new Error("cloud_signin_required");
+    const prompt=String(media.meta?.prompt||"").trim();
+    if(!prompt)throw new Error("image_prompt_missing");
 
-    let referenceImage=null;
-    if(media.meta?.canonicalUrl){
-      try{referenceImage=await urlToDataUri(media.meta.canonicalUrl)}catch(err){console.warn("Canonical image unavailable:",err)}
-    }
-
-    const imageOptions={
+    const image=await window.puter.ai.txt2img(prompt,{
       provider:"gemini",
       model:"gemini-3.1-flash-image",
       quality:"512",
       ratio:{w:3,h:4}
-    };
-    if(referenceImage)imageOptions.input_image=referenceImage;
-
-    const finalPrompt=referenceImage
-      ?prompt+", preserve the exact same face, identity and recognizable person from the reference image; change only scene, pose, outfit and expression as requested"
-      :prompt;
-
-    let image;
-    try{
-      image=await window.puter.ai.txt2img(finalPrompt,imageOptions);
-    }catch(primaryError){
-      if(!referenceImage)throw primaryError;
-      console.warn("Gemini image edit failed, trying OpenAI image edit:",primaryError);
-      image=await window.puter.ai.txt2img(finalPrompt,{
-        provider:"openai",
-        model:"gpt-image-2",
-        quality:"low",
-        ratio:{w:3,h:4},
-        input_image:referenceImage
-      });
-    }
-
-    let src=image?.src||image?.url||image?.image_url||image?.data?.[0]?.url||image?.data?.[0]?.image_url||"";
-    if(!src&&typeof image==="string")src=image;
-    if(!src&&image instanceof Blob){
-      src=await new Promise((resolve,reject)=>{
-        const reader=new FileReader();
-        reader.onload=()=>resolve(String(reader.result||""));
-        reader.onerror=()=>reject(reader.error||new Error("Lecture image impossible."));
-        reader.readAsDataURL(image);
-      });
-    }
-    if(!src)throw new Error("Aucune image reçue.");
+    });
+    const src=image?.src||String(image||"");
+    if(!src)throw new Error("image_source_missing");
+    const imageSrc=await imageSourceAsDataUri(src);
 
     const out=await api("/api/media/complete",{
       method:"POST",
-      body:JSON.stringify({mediaId:media.id,imageSrc:src})
+      body:JSON.stringify({mediaId:media.id,imageSrc})
     });
     appState=out.state;
     render();
   }catch(err){
-    let errorText;
-    try{
-      errorText=err?.message||err?.error?.message||err?.code||err?.errorCode||JSON.stringify(err);
-    }catch{
-      errorText=String(err);
-    }
+    const errorText=err?.message||err?.code||err?.errorCode||String(err);
     try{
       const out=await api("/api/media/fail",{
         method:"POST",
-        body:JSON.stringify({mediaId:media.id,error:String(errorText||"client_generation_failed")})
+        body:JSON.stringify({mediaId:media.id,error:errorText})
       });
       appState=out.state;
       render();
-    }catch{
-      const el=document.querySelector(`[data-media-id="${media.id}"]`);
-      if(el)el.textContent="⚠️ Génération de la photo impossible.";
+    }catch{}
+    throw err;
+  }
+}
+
+async function processPendingMedia(){
+  if(!appState.cloudClientAllowed||!puterSignedIn()||!window.puter?.ai?.txt2img)return;
+  for(const message of appState.messages||[]){
+    for(const media of message.media||[]){
+      if(media.status!=="pending"||media.meta?.clientProvider!=="puter"||mediaJobs.has(media.id))continue;
+      mediaJobs.add(media.id);
+      generateCloudMedia(media).finally(()=>mediaJobs.delete(media.id));
     }
   }
 }
