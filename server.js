@@ -101,7 +101,7 @@ const importSchema={
   experiences:["id","slot","topic","kind","outcome","intensity","note","created_at"],
   social_contacts:["id","name","relation","closeness","energy","created_at"],
   goals:["id","title","category","progress","priority","status","updated_at"],
-  character_visuals:["id","character_seed","slot_id","file_path","mime_type","canonical","created_at"],
+  character_visuals:["id","person_id","character_seed","slot_id","file_path","mime_type","canonical","created_at"],
   visual_state:["id","json"],
   world_people:["person_id","name","temperament"],
   world_relations:["owner_id","other_id","kind","trust","closeness"],
@@ -222,7 +222,7 @@ async function api(req,res,url){
         const ready=selected.length&&!requestVisual.place?selected.filter(v=>v.place===selected[0].place):selected;
         if(ready.length&&!requestVisual.place)requestVisual.place=ready[0].place;
         for(const v of ready){
-          media.push({kind:"image",status:"ready",url:v.url,alt:`Photo de ${p.name}`,visualId:v.id,meta:{mood:v.mood,place:v.place,outfit:v.outfit,view:v.view,activity:v.activity,moment:v.moment}});
+          media.push({kind:"image",status:"ready",url:v.url,alt:`Photo de ${p.name}`,visualId:v.id,meta:{personId:p.personId,mood:v.mood,place:v.place,outfit:v.outfit,view:v.view,activity:v.activity,moment:v.moment}});
           noteVisualScene(p,v.place);
         }
 
@@ -257,7 +257,7 @@ async function api(req,res,url){
                     savePartner(p);
                   }
                   const url="/"+String(saved.file_path).replace(/^\/+/, "");
-                  media.push({kind:"image",status:"ready",url,alt:`Photo de ${p.name}`,visualId:slot.id,meta:{mood:slot.mood,place:slot.place,outfit:slot.outfit,view:slot.view,activity:slot.activity,moment:slot.moment}});
+                  media.push({kind:"image",status:"ready",url,alt:`Photo de ${p.name}`,visualId:slot.id,meta:{personId:p.personId,mood:slot.mood,place:slot.place,outfit:slot.outfit,view:slot.view,activity:slot.activity,moment:slot.moment}});
                   noteVisualScene(p,slot.place);
                   missing--;
                 }
@@ -283,6 +283,7 @@ async function api(req,res,url){
                       :"Je n’ai pas trouvé de photo cohérente et le fournisseur d’images est indisponible.",
                   visualId:slot.id,
                   meta:{
+                    personId:p.personId,
                     localOnly:true,
                     imageProvider:provider.provider||"none",
                     failure:generationError?"generation_failed":(provider.error||runtimeResult?.error||"provider_unavailable"),
@@ -297,6 +298,7 @@ async function api(req,res,url){
                   alt:`Génération d’une photo de ${p.name}…`,
                   visualId:slot.id,
                   meta:{
+                    personId:p.personId,
                     clientProvider:"puter",
                     prompt:buildVisualPrompt(p,slot,requestVisual),
                     requestVisual,
@@ -380,10 +382,11 @@ async function api(req,res,url){
     const b=await body(req),mediaId=Number(b.mediaId),src=String(b.imageSrc||"");
     const media=getMessageMedia(mediaId);
     if(!media)return json(res,404,{error:"media_not_found"});
+    const meta=media.meta?JSON.parse(media.meta):{};
+    if(meta.personId&&meta.personId!==p.personId)return json(res,409,{error:"media_owner_mismatch"});
     if(media.status==="ready"&&media.url)return json(res,200,{ok:true,alreadyReady:true,state:await state()});
     if(media.status!=="pending"&&media.url)return json(res,200,{ok:true,alreadyReady:true,state:await state()});
     if(media.status!=="pending")return json(res,409,{error:"media_not_pending"});
-    const meta=media.meta?JSON.parse(media.meta):{};
     const slotId=media.visual_id||meta.slotId;
     if(!slotId)return json(res,400,{error:"visual_slot_missing"});
     try{
@@ -407,10 +410,12 @@ async function api(req,res,url){
     }
   }
   if(req.method==="POST"&&url.pathname==="/api/media/fail"){
+    const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
     const b=await body(req),mediaId=Number(b.mediaId);
     const media=getMessageMedia(mediaId);if(!media)return json(res,404,{error:"media_not_found"});
-    if(media.url)return json(res,200,{ok:true,alreadyReady:true,state:await state()});
     const meta=media.meta?JSON.parse(media.meta):{};
+    if(meta.personId&&meta.personId!==p.personId)return json(res,409,{error:"media_owner_mismatch"});
+    if(media.url)return json(res,200,{ok:true,alreadyReady:true,state:await state()});
     const error=String(b.error||"client_generation_failed");
     const noCredits=/no credits|credits remaining|add credits|insufficient credits/i.test(error);
     if(noCredits)setSetting("imageCreditsBlockedUntil",Date.now()+24*60*60*1000);
