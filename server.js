@@ -599,7 +599,7 @@ async function api(req,res,url){
       }
       visuals=media;
     }else{
-      reply=deterministicReply(p,mood,lifestyle,text);
+      reply=deterministicReply(p,mood,lifestyle,text,preferenceContext("partner",18));
       if(!reply){
         if(!LOCAL_ONLY&&Boolean(b.useClientModel)){
           const pendingId=crypto.randomUUID();
