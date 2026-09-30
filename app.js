@@ -144,6 +144,7 @@ function dashboard(){
   const msgs=appState.messages||[];
   const canonicalUrl=p.canonicalImagePath?"/"+String(p.canonicalImagePath).replace(/^\/+/, ""):"";
   const living=appState.livingIdentity||null;
+  const canonicalPersona=appState.canonicalPersona||null;
   const livingState=living?.currentState||{};
   const visuals=[
     ["Emplacements prévus",String(appState.library?.total||0)],
@@ -194,6 +195,30 @@ function dashboard(){
             ${(appState.preferences?.partner||[]).slice(0,8).map(x=>`<span class="chip">goût: ${esc(x.topic)} • ${esc(x.label)}</span>`).join("")}
           </div>
         </section>
+
+        ${canonicalPersona?`
+        <section class="card panel" style="margin-top:18px">
+          <h2>Chloé canonique</h2>
+          <div class="library engine-grid">
+            <div class="visual engine-card">
+              <strong>Relation</strong>
+              <small>${esc(canonicalPersona.relationship?.status||"établie")}</small>
+            </div>
+            <div class="visual engine-card">
+              <strong>Dynamique</strong>
+              <small>${esc(canonicalPersona.sharedDynamic||"familière")}</small>
+            </div>
+            <div class="visual engine-card">
+              <strong>Voix</strong>
+              <small>${esc(canonicalPersona.voice?.address||"tutoiement")} • ${esc(canonicalPersona.voice?.length||"messages courts")}</small>
+            </div>
+            <div class="visual engine-card">
+              <strong>Version canonique</strong>
+              <small>${esc(canonicalPersona.version||"—")}</small>
+            </div>
+          </div>
+          <p class="muted">Ce profil fixe la continuité de Chloé avec Amaury. L’identité vivante peut évoluer autour de ce socle sans le remplacer.</p>
+        </section>`:""}
 
         ${living?`
         <section class="card panel" style="margin-top:18px">

@@ -17,7 +17,8 @@ import { ensureLocalImageRuntime,localImageRuntimeInstalled,stopOwnedLocalImageR
 import { ensureWorldPerson,listWorldPeople,relatePeople,witnessEvent,confideFact,rememberFacts,keepSecret,tellFact,socialContext } from "./lib/social-world.js";
 import { resolveVisualScene,noteVisualScene } from "./lib/scene-continuity.js";
 import { activateCharacter,startNewCharacter,deleteActiveCharacter } from "./lib/character-store.js";
-import { ensureLivingIdentity,updateLivingCurrentState,recordClassifiedLivingEvent,syncLivingPreference,livingContext } from "./lib/living-identity.js";
+import { ensureLivingIdentity,updateLivingCurrentState,recordClassifiedLivingEvent,syncLivingPreference,livingContext,seedLivingMemory } from "./lib/living-identity.js";
+import { canonicalPersonaPublic,canonicalRelationshipMemory } from "./lib/canonical-persona.js";
 import { startRemoteTunnel } from "./lib/remote-tunnel.js";
 
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||8787);
@@ -55,6 +56,8 @@ function seedPredefinedCharacters(){
       }catch{}
     }
     ensureLivingIdentity(effective);
+    const canonicalMemory=canonicalRelationshipMemory(effective);
+    if(canonicalMemory)seedLivingMemory(effective,canonicalMemory);
     const active=getPartner();
     if(active?.personId===effective.personId){
       let changed=false;
@@ -177,6 +180,7 @@ async function state(){
     mood,
     life,
     lifestyle,
+    canonicalPersona:partner?canonicalPersonaPublic(partner):null,
     livingIdentity,
     experiences:latestExperiences(10),
     pendingStory:pendingExperienceStory(),
