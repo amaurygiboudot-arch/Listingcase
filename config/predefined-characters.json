@@ -30,6 +30,9 @@
     "affinity": 78,
     "stage": "attachement",
     "createdAt": 1790630400000,
+    "bodyIdentity": {
+      "anatomy": "féminine"
+    },
     "visualIdentity": {
       "hairColor": "blonds",
       "eyeColor": "clairs",

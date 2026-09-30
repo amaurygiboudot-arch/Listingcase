@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { db,getSetting,setSetting,getPartner,savePartner,clearPartner,listPartners,addMessage,addMessageMedia,getMessageMedia,updateMessageMedia,recentMessages,addMemory,recentMemories,seedVisualSlots,createPendingChat,getPendingChat,deletePendingChat,ensurePersonId } from "./lib/db.js";
-import { createProfile,dailyMood,advanceRelationship,visualDecision,ensureVisualIdentity } from "./lib/profile.js";
+import { createProfile,dailyMood,advanceRelationship,visualDecision,ensureVisualIdentity,ensureBodyIdentity } from "./lib/profile.js";
 import { deterministicReply,sanitizeModelReply } from "./lib/dialogue-guard.js";
 import { recordEvent,noteInteraction,absenceState,applyAbsence,emotionalOverlay,decayEmotions,memoryContext,initiativeDecision } from "./lib/memory.js";
 import { seedInitialPreferences,learnUserPreference,learnPartnerPreferenceFromReply,preferenceContext } from "./lib/preferences.js";
@@ -125,6 +125,7 @@ async function state(){
     let dirty=false;
     if(!partner.personId){ensurePersonId(partner);dirty=true}
     if(!partner.visualIdentity){ensureVisualIdentity(partner);dirty=true}
+    if(!partner.bodyIdentity){ensureBodyIdentity(partner);dirty=true}
     const canonical=getCanonicalVisual(partner);
     if(canonical&&partner.canonicalImagePath!==canonical.file_path){
       const migrated=saveCharacterVisual(partner,canonical.slot_id,canonical.file_path,canonical.mime_type,{canonical:true});
@@ -323,7 +324,7 @@ async function api(req,res,url){
     addMessage("user",text);
     recordEvent(text);
     learnUserPreference(text);
-    ensureVisualIdentity(p);advanceRelationship(p);savePartner(p);const mood=dailyMood(p);const lifestyle=lifeContext(p,mood);
+    ensureVisualIdentity(p);ensureBodyIdentity(p);advanceRelationship(p);savePartner(p);const mood=dailyMood(p);const lifestyle=lifeContext(p,mood);
     ensureWorldPerson(p.personId,p.name,p.personality?.directness||"calme");
     const worldKnowledge=socialContext(p.personId);
     const photoContext=lastSentVisualContext(p);
