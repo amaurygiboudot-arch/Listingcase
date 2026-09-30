@@ -26,6 +26,7 @@ test("le prompt canonique interdit le retour au premier contact",()=>{
   assert.match(prompt,/Amaury/);
   assert.match(prompt,/ton d'assistant générique/i);
   assert.match(prompt,/ne pas inventer/i);
+  assert.ok(prompt.includes("ne boit pas d’alcool"));
 });
 
 test("un autre personnage ne reçoit pas la personnalité de Chloé",()=>{
