@@ -17,6 +17,7 @@ import { ensureLocalImageRuntime,localImageRuntimeInstalled,stopOwnedLocalImageR
 import { ensureWorldPerson,listWorldPeople,relatePeople,witnessEvent,confideFact,rememberFacts,keepSecret,tellFact,socialContext } from "./lib/social-world.js";
 import { resolveVisualScene,noteVisualScene } from "./lib/scene-continuity.js";
 import { activateCharacter,startNewCharacter,deleteActiveCharacter } from "./lib/character-store.js";
+import { ensureLivingIdentity,updateLivingCurrentState,recordClassifiedLivingEvent,syncLivingPreference,livingContext } from "./lib/living-identity.js";
 import { startRemoteTunnel } from "./lib/remote-tunnel.js";
 
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||8787);
@@ -31,12 +32,37 @@ function seedPredefinedCharacters(){
   let profiles=[];try{profiles=JSON.parse(fs.readFileSync(file,"utf8"))}catch{return 0}
   if(!Array.isArray(profiles))return 0;
   const insert=db.prepare("INSERT OR IGNORE INTO characters(person_id,json,created_at,updated_at) VALUES(?,?,?,?)");
+  const get=db.prepare("SELECT json FROM characters WHERE person_id=?");
+  const update=db.prepare("UPDATE characters SET json=?,updated_at=? WHERE person_id=?");
+  const structural=["livingIdentityEnabled","livingIdentityVersion","livingIdentitySource","familyId"];
   let added=0;
   for(const profile of profiles){
     if(!profile?.personId||!profile?.seed||!profile?.name)continue;
     const now=Date.now(),createdAt=Number(profile.createdAt||now);
     const result=insert.run(profile.personId,JSON.stringify(profile),createdAt,now);
     added+=Number(result.changes||0);
+    const stored=get.get(profile.personId);
+    let effective=profile;
+    if(stored){
+      try{
+        const current=JSON.parse(stored.json),next={...current};
+        let changed=false;
+        for(const key of structural){
+          if(next[key]===undefined&&profile[key]!==undefined){next[key]=profile[key];changed=true}
+        }
+        if(changed)update.run(JSON.stringify(next),now,profile.personId);
+        effective=next;
+      }catch{}
+    }
+    ensureLivingIdentity(effective);
+    const active=getPartner();
+    if(active?.personId===effective.personId){
+      let changed=false;
+      for(const key of structural){
+        if(active[key]===undefined&&effective[key]!==undefined){active[key]=effective[key];changed=true}
+      }
+      if(changed)savePartner(active);
+    }
   }
   return added;
 }
@@ -137,6 +163,12 @@ async function state(){
   const mood=partner?dailyMood(partner):null;
   const life=partner?runLifeTick(partner,mood):null;
   const lifestyle=partner?lifeContext(partner,mood):null;
+  let livingIdentity=null;
+  if(partner?.livingIdentityEnabled){
+    ensureLivingIdentity(partner);
+    updateLivingCurrentState(partner,{mood});
+    livingIdentity=livingContext(partner);
+  }
   const imageProvider=await currentImageStatus();
   return{
     adultConfirmed:getSetting("adultConfirmed",false),
@@ -145,6 +177,7 @@ async function state(){
     mood,
     life,
     lifestyle,
+    livingIdentity,
     experiences:latestExperiences(10),
     pendingStory:pendingExperienceStory(),
     messages:recentMessages(40),
@@ -186,7 +219,14 @@ const importSchema={
   world_relations:["owner_id","other_id","kind","trust","closeness"],
   world_facts:["fact_id","subject_id","predicate","detail","happened_at","sensitivity"],
   world_knowledge:["owner_id","fact_id","source_id","channel","confidence","learned_at","secret"],
-  world_transmissions:["id","fact_id","speaker_id","listener_id","said_at","confidence"]
+  world_transmissions:["id","fact_id","speaker_id","listener_id","said_at","confidence"],
+  families:["family_id","family_history_json","common_traits_json","created_at","updated_at"],
+  living_identity:["person_id","family_id","individual_seed","temperament_seed","origin_json","personality_json","past_json","created_at","updated_at"],
+  living_events:["event_id","person_id","happened_at","category","people_json","description","emotion","intensity","importance","consequences","relation_impact_json","personality_impact_json","certainty","source"],
+  living_memories:["memory_id","person_id","kind","content","emotional_weight","certainty","source","created_at"],
+  living_preferences:["person_id","category","value","strength","evidence_count","reason","first_observed_at","last_confirmed_at"],
+  living_current_state:["person_id","mood","energy","stress","social_need","active_needs_json","active_interests_json","updated_at"],
+  living_evolution:["id","person_id","change_type","change_json","cause_event_id","created_at"]
 };
 
 function importStateBundle(bundle){
@@ -306,13 +346,29 @@ async function api(req,res,url){
   }
   if(req.method==="POST"&&url.pathname==="/api/visual/select"){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
-    const b=await body(req),m=dailyMood(p),decision=visualDecision(p,m,b.text||"photos");
-    const scene=resolveVisualScene(p,visualRequestContext(b.text||""));
-    const selected=decision.accept&&scene.allowed?selectVisuals(p,m,decision.count,scene.request):[];
-    const visuals=selected.length&&!scene.request.place?selected.filter(v=>v.place===selected[0].place):selected;
+    const b=await body(req),text=String(b.text||"photos"),m=dailyMood(p),decision=visualDecision(p,m,text);
+    const rawRequest=visualRequestContext(text);
+    const hasExplicitScene=Boolean(rawRequest.place||rawRequest.outfit||rawRequest.activity||rawRequest.moment);
+    const scene=hasExplicitScene?resolveVisualScene(p,rawRequest):{allowed:true,request:{...rawRequest}};
+    const desiredCount=!/\bphotos\b/i.test(text)?1:decision.count;
+    let visuals=decision.accept&&scene.allowed?selectAvailableVisuals(p,m,desiredCount,scene.request):[];
+    if(decision.accept&&scene.allowed&&visuals.length<desiredCount&&!hasExplicitScene){
+      const canonical=getCanonicalVisual(p);
+      if(canonical&&!visuals.some(v=>v.url===canonical.url)){
+        visuals.push({
+          id:canonical.slot_id,
+          file_path:canonical.file_path,
+          mime_type:canonical.mime_type,
+          url:canonical.url,
+          canonical:true,
+          needsGeneration:false,
+          view:rawRequest.view||null
+        });
+      }
+    }
     const imageStatus=await currentImageStatus();
-    const enriched=visuals.map(v=>({...v,prompt:buildVisualPrompt(p,v,{})}));
-    return json(res,200,{decision,scene,visuals:enriched,imageProvider:imageStatus});
+    const enriched=visuals.slice(0,desiredCount).map(v=>({...v,prompt:v.needsGeneration?buildVisualPrompt(p,v,{}):null}));
+    return json(res,200,{decision:{...decision,count:desiredCount},scene,visuals:enriched,imageProvider:imageStatus});
   }
   if(req.method==="POST"&&url.pathname==="/api/chat"){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
@@ -322,28 +378,55 @@ async function api(req,res,url){
     const absence=applyAbsence(p);
     noteInteraction();
     addMessage("user",text);
-    recordEvent(text);
+    const classifiedEvent=recordEvent(text);
     learnUserPreference(text);
     ensureVisualIdentity(p);ensureBodyIdentity(p);advanceRelationship(p);savePartner(p);const mood=dailyMood(p);const lifestyle=lifeContext(p,mood);
+    let livingIdentity=null;
+    if(p.livingIdentityEnabled){
+      ensureLivingIdentity(p);
+      updateLivingCurrentState(p,{mood});
+      if(classifiedEvent)recordClassifiedLivingEvent(p,text,classifiedEvent);
+      livingIdentity=livingContext(p);
+    }
     ensureWorldPerson(p.personId,p.name,p.personality?.directness||"calme");
     const worldKnowledge=socialContext(p.personId);
     const photoContext=lastSentVisualContext(p);
     let reply=null,visuals=[],media=[];
     if(isVisualRequest(text)){
       const d=visualDecision(p,mood,text);
-      const scene=resolveVisualScene(p,visualRequestContext(text));
+      const rawVisualRequest=visualRequestContext(text);
+      const hasExplicitScene=Boolean(rawVisualRequest.place||rawVisualRequest.outfit||rawVisualRequest.activity||rawVisualRequest.moment);
+      const scene=hasExplicitScene?resolveVisualScene(p,rawVisualRequest):{allowed:true,request:{...rawVisualRequest}};
       const requestVisual=scene.request;
+      const desiredCount=!/\bphotos\b/i.test(text)?1:d.count;
       reply=scene.allowed?d.text:scene.reason;
       if(d.accept&&scene.allowed){
-        const selected=selectAvailableVisuals(p,mood,d.count,requestVisual);
+        const selected=selectAvailableVisuals(p,mood,desiredCount,requestVisual);
         const ready=selected.length&&!requestVisual.place?selected.filter(v=>v.place===selected[0].place):selected;
-        if(ready.length&&!requestVisual.place)requestVisual.place=ready[0].place;
         for(const v of ready){
           media.push({kind:"image",status:"ready",url:v.url,alt:`Photo de ${p.name}`,visualId:v.id,meta:{personId:p.personId,mood:v.mood,place:v.place,outfit:v.outfit,view:v.view,activity:v.activity,moment:v.moment}});
           noteVisualScene(p,v.place);
         }
 
-        let missing=Math.max(0,d.count-ready.length);
+        let missing=Math.max(0,desiredCount-ready.length);
+        if(missing>0&&!hasExplicitScene){
+          const canonicalVisual=getCanonicalVisual(p);
+          if(canonicalVisual&&!media.some(item=>item.url===canonicalVisual.url)){
+            media.push({
+              kind:"image",
+              status:"ready",
+              url:canonicalVisual.url,
+              alt:`Photo de ${p.name}`,
+              visualId:canonicalVisual.slot_id,
+              meta:{
+                personId:p.personId,
+                canonical:true,
+                view:rawVisualRequest.view||null
+              }
+            });
+            missing--;
+          }
+        }
         if(missing>0){
           let provider=await currentImageStatus();
           let runtimeResult=null;
@@ -457,7 +540,8 @@ async function api(req,res,url){
             userPreferences:preferenceContext("user",10),
             lifestyle,
             worldKnowledge,
-            photoContext
+            photoContext,
+            livingIdentity
           });
           return json(res,202,{
             needsClientModel:true,
@@ -467,7 +551,7 @@ async function api(req,res,url){
           });
         }
         if(LOCAL_ONLY){
-          try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(10),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",10),userPreferences:preferenceContext("user",8),lifestyle,worldKnowledge,photoContext})}
+          try{reply=await chatWithModel({profile:p,mood,messages:previous,memories:memoryContext(10),userText:text,emotional:emotionalOverlay(),absence,partnerPreferences:preferenceContext("partner",10),userPreferences:preferenceContext("user",8),lifestyle,worldKnowledge,photoContext,livingIdentity})}
           catch(e){console.error("LLM:",e.message)}
           reply=sanitizeModelReply(reply,p,text)||fallbackReply(p,mood,text);
         }else{
@@ -478,7 +562,8 @@ async function api(req,res,url){
 
     const partnerMessageId=addMessage("partner",reply);
     for(const item of media)addMessageMedia(partnerMessageId,item);
-    learnPartnerPreferenceFromReply(reply);
+    const learnedPreference=learnPartnerPreferenceFromReply(reply);
+    if(p.livingIdentityEnabled&&learnedPreference)syncLivingPreference(p,learnedPreference,reply);
     decayEmotions();
     return json(res,200,{reply,visuals,state:await state()});
   }
@@ -493,7 +578,8 @@ async function api(req,res,url){
     if(!reply)reply=fallbackReply(p,mood,pending.user_text);
 
     addMessage("partner",reply);
-    learnPartnerPreferenceFromReply(reply);
+    const learnedPreference=learnPartnerPreferenceFromReply(reply);
+    if(p.livingIdentityEnabled&&learnedPreference)syncLivingPreference(p,learnedPreference,reply);
     decayEmotions();
     deletePendingChat(pendingId);
     return json(res,200,{reply,state:await state()});

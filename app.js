@@ -143,6 +143,8 @@ function dashboard(){
   const traits=Object.values(p.personality||{});
   const msgs=appState.messages||[];
   const canonicalUrl=p.canonicalImagePath?"/"+String(p.canonicalImagePath).replace(/^\/+/, ""):"";
+  const living=appState.livingIdentity||null;
+  const livingState=living?.currentState||{};
   const visuals=[
     ["Emplacements prévus",String(appState.library?.total||0)],
     ["Photos enregistrées",String(appState.library?.available||0)],
@@ -192,6 +194,35 @@ function dashboard(){
             ${(appState.preferences?.partner||[]).slice(0,8).map(x=>`<span class="chip">goût: ${esc(x.topic)} • ${esc(x.label)}</span>`).join("")}
           </div>
         </section>
+
+        ${living?`
+        <section class="card panel" style="margin-top:18px">
+          <h2>Identité vivante</h2>
+          <div class="library engine-grid">
+            <div class="visual engine-card">
+              <strong>État courant</strong>
+              <small>${esc(livingState.mood||"non établi")} • énergie ${livingState.energy==null?"—":Math.round(livingState.energy*100)+"%"}</small>
+            </div>
+            <div class="visual engine-card">
+              <strong>Événements vécus</strong>
+              <small>${esc(living.counts?.events??0)} enregistrés</small>
+            </div>
+            <div class="visual engine-card">
+              <strong>Souvenirs propres</strong>
+              <small>${esc(living.counts?.memories??0)} persistants</small>
+            </div>
+            <div class="visual engine-card">
+              <strong>Préférences apprises</strong>
+              <small>${esc(living.counts?.preferences??0)} avec preuves</small>
+            </div>
+          </div>
+          <div class="chips" style="margin-top:12px">
+            <span class="chip">person_id: ${esc(living.identity?.personId||p.personId)}</span>
+            <span class="chip">seed individuel: ${esc(living.identity?.individualSeed||"—")}</span>
+            <span class="chip">seed tempérament: ${esc(living.identity?.temperamentSeed||"—")}</span>
+          </div>
+          <p class="muted">Les changements sont enregistrés comme des deltas : l’identité complète de ${esc(p.name)} n’est jamais régénérée à chaque message.</p>
+        </section>`:""}
 
         <section class="card panel" style="margin-top:18px">
           <h2>Journée & vie perso</h2>

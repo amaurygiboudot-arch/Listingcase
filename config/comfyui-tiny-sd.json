@@ -2,7 +2,7 @@
   "4": {
     "class_type": "CheckpointLoaderSimple",
     "inputs": {
-      "ckpt_name": "segmind_tiny-sd.safetensors"
+      "ckpt_name": "DreamShaper_8_pruned.safetensors"
     }
   },
   "6": {
@@ -30,8 +30,8 @@
     "inputs": {
       "image": ["10", 0],
       "upscale_method": "lanczos",
-      "width": 384,
-      "height": 512,
+      "width": 320,
+      "height": 448,
       "crop": "center"
     }
   },
@@ -45,7 +45,7 @@
     "class_type": "KSampler",
     "inputs": {
       "seed": 123456789,
-      "steps": 12,
+      "steps": 8,
       "cfg": 5.5,
       "sampler_name": "euler",
       "scheduler": "normal",
@@ -53,7 +53,7 @@
       "positive": ["6", 0],
       "negative": ["7", 0],
       "latent_image": ["12", 0],
-      "denoise": 0.58
+      "denoise": 0.48
     }
   },
   "8": {

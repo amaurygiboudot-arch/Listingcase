@@ -41,6 +41,10 @@
       "height": "non établie"
     },
     "sourceProfile": "Chloe_Personnalite_et_Photos",
+    "livingIdentityEnabled": true,
+    "livingIdentityVersion": 1,
+    "livingIdentitySource": "HumanPartner_JSON_Generatif_Identite_Vivante_2026-09-30",
+    "familyId": null,
     "knownSchedule": {
       "workStart": 9,
       "workEnd": 17.5,
