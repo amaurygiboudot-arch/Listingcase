@@ -89,6 +89,7 @@ if(getSetting("dialogueGuardVersion",0)<dialogueGuardVersion){
 const json=(res,status,data)=>{res.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store"});res.end(JSON.stringify(data))};
 const body=async req=>{let s="";for await(const c of req)s+=c;return s?JSON.parse(s):{}};
 const apiAuthorized=req=>{
+  if(isDirectLanRequest(req))return true;
   if(!ACCESS_TOKEN)return true;
   const direct=String(req.headers["x-app-token"]||"");
   const auth=String(req.headers.authorization||"");
