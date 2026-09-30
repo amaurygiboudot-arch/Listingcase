@@ -29,6 +29,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
     private static final String PREFS = "human_partner";
     private static final String KEY_BACKEND = "backend_url";
+    private static final String DEFAULT_BACKEND = "http://192.168.1.32:8787";
     private static final int FILE_CHOOSER_REQUEST = 4107;
 
     private ValueCallback<Uri[]> filePathCallback;
@@ -41,14 +42,8 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
 
-        String saved = prefs.getString(KEY_BACKEND, "");
-        if (saved == null || saved.trim().isEmpty()) {
-            showSetup();
-        } else {
-            String fixed = normalize(saved);
-            if (!fixed.equals(saved)) prefs.edit().putString(KEY_BACKEND, fixed).apply();
-            showWeb(fixed);
-        }
+        prefs.edit().putString(KEY_BACKEND, DEFAULT_BACKEND).apply();
+        showWeb(DEFAULT_BACKEND);
     }
 
     private TextView text(String value, float size) {
@@ -244,11 +239,10 @@ public class MainActivity extends Activity {
             public void onReceivedError(WebView view, WebResourceRequest request,
                                         android.webkit.WebResourceError error) {
                 if (request.isForMainFrame()) {
-                    prefs.edit().remove(KEY_BACKEND).apply();
                     Toast.makeText(MainActivity.this,
-                            "Backend inaccessible. Je te ramène aux réglages.",
-                            Toast.LENGTH_LONG).show();
-                    view.postDelayed(() -> showSetup(), 350);
+                            "Connexion au cerveau en cours…",
+                            Toast.LENGTH_SHORT).show();
+                    view.postDelayed(() -> view.loadUrl(DEFAULT_BACKEND + "?retry=" + System.currentTimeMillis()), 3000);
                 }
             }
         });
@@ -278,8 +272,7 @@ public class MainActivity extends Activity {
                 web.goBack();
                 return;
             }
-            prefs.edit().remove(KEY_BACKEND).apply();
-            showSetup();
+            moveTaskToBack(true);
             return;
         }
         super.onBackPressed();
