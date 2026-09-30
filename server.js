@@ -74,6 +74,49 @@ function seedPredefinedCharacters(){
 seedVisualSlots();
 seedPredefinedCharacters();
 
+function seedChloeReferenceVisuals(){
+  const row=db.prepare("SELECT json FROM characters WHERE person_id=?").get("CHLOE_001");
+  if(!row)return 0;
+  let profile=null;try{profile=JSON.parse(row.json)}catch{return 0}
+  if(!profile?.seed)return 0;
+  const refs=[
+    {
+      id:"CANONICAL_CHLOE_001",
+      file:"library/CHLOE_001_Chloe/CHLOE_001_Chloe_canonical_v02.jpg",
+      mood:"calme",place:"bureau",moment:"après-midi",weather:"intérieur",
+      outfit:"travail",hair:"attachée",activity:"travail",view:"fullbody",canonical:1
+    },
+    {
+      id:"REF_CHLOE_001_V01",
+      file:"library/CHLOE_001_Chloe/CHLOE_001_Chloe_canonical_v01.jpg",
+      mood:"tendre",place:"chambre",moment:"soir",weather:"intérieur",
+      outfit:"maison",hair:"attachée",activity:"repos",view:"fullbody",canonical:0
+    }
+  ];
+  const asset=db.prepare(`INSERT INTO visual_assets
+    (id,type,origin,mood,place,moment,weather,outfit,hair,activity,relationship,view,file_path,available)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+    ON CONFLICT(id) DO UPDATE SET
+      type=excluded.type,origin=excluded.origin,mood=excluded.mood,place=excluded.place,
+      moment=excluded.moment,weather=excluded.weather,outfit=excluded.outfit,hair=excluded.hair,
+      activity=excluded.activity,relationship=excluded.relationship,view=excluded.view,
+      file_path=excluded.file_path,available=1`);
+  const visual=db.prepare(`INSERT OR IGNORE INTO character_visuals
+    (person_id,character_seed,slot_id,file_path,mime_type,canonical,created_at)
+    VALUES(?,?,?,?,?,?,?)`);
+  let added=0;
+  for(const ref of refs){
+    const abs=path.resolve(root,ref.file);
+    if(!fs.existsSync(abs))continue;
+    asset.run(ref.id,profile.type,profile.origin,ref.mood,ref.place,ref.moment,ref.weather,
+      ref.outfit,ref.hair,ref.activity,profile.stage,ref.view,ref.file);
+    const result=visual.run(profile.personId,profile.seed,ref.id,ref.file,"image/jpeg",ref.canonical,Date.now());
+    added+=Number(result.changes||0);
+  }
+  return added;
+}
+seedChloeReferenceVisuals();
+
 function dedupeCharacterNamesOnce(){
   if(getSetting("dedupeCharacterNamesV1",false))return 0;
   const activeId=getPartner()?.personId||getSetting("activePersonId",null);
@@ -143,7 +186,7 @@ const isDirectLanRequest=req=>{
   if(req.headers["cf-connecting-ip"]||req.headers["x-forwarded-for"]||req.headers["x-real-ip"])return false;
   return isPrivateIp(req.socket?.remoteAddress);
 };
-const isVisualRequest=text=>/(photo|photos|image|images|montre[- ]?moi|fait voir|fais voir|je peux te voir|voir de toi|voir ton|voir ta|ton corps|ton corp|ta tenue|ton apparence|à quoi tu ressembles|a quoi tu ressembles)/i.test(String(text||""));
+const isVisualRequest=text=>/(photo|photos|image|images|montre[- ]?moi|montre\s+(?:ton|ta|tes)|fait voir|fais voir|je peux te voir|voir de toi|voir\s+(?:ton|ta|tes)|ton corps|ton corp|ta tenue|ton apparence|visage|portrait|selfie|poitrine|seins?|buste|décolleté|decollete|fesses|de dos|vue de dos|à quoi tu ressembles|a quoi tu ressembles)/i.test(String(text||""));
 const cloudLlmStatus=()=>({configured:true,provider:"puter-client",model:"gemini-3.1-flash-lite",client:true});
 const cloudImageStatus=()=>({configured:true,provider:"puter-client",client:true,local:false});
 const currentLlmStatus=()=>LOCAL_ONLY?modelStatus():Promise.resolve(cloudLlmStatus());
@@ -410,7 +453,7 @@ async function api(req,res,url){
     const p=getPartner();if(!p)return json(res,404,{error:"no_partner"});
     const b=await body(req),text=String(b.text||"photos"),m=dailyMood(p),decision=visualDecision(p,m,text);
     const rawRequest=visualRequestContext(text);
-    const hasExplicitScene=Boolean(rawRequest.place||rawRequest.outfit||rawRequest.activity||rawRequest.moment);
+    const hasExplicitScene=Object.keys(rawRequest).length>0;
     const scene=hasExplicitScene?resolveVisualScene(p,rawRequest):{allowed:true,request:{...rawRequest}};
     const desiredCount=!/\bphotos\b/i.test(text)?1:decision.count;
     let visuals=decision.accept&&scene.allowed?selectAvailableVisuals(p,m,desiredCount,scene.request):[];
@@ -457,7 +500,7 @@ async function api(req,res,url){
     if(isVisualRequest(text)){
       const d=visualDecision(p,mood,text);
       const rawVisualRequest=visualRequestContext(text);
-      const hasExplicitScene=Boolean(rawVisualRequest.place||rawVisualRequest.outfit||rawVisualRequest.activity||rawVisualRequest.moment);
+      const hasExplicitScene=Object.keys(rawVisualRequest).length>0;
       const scene=hasExplicitScene?resolveVisualScene(p,rawVisualRequest):{allowed:true,request:{...rawVisualRequest}};
       const requestVisual=scene.request;
       const desiredCount=!/\bphotos\b/i.test(text)?1:d.count;
