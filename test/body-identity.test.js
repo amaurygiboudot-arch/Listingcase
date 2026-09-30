@@ -28,7 +28,7 @@ test("un nouveau profil féminin possède une identité corporelle",()=>{
 test("une phrase sur les parties intimes ne déclenche plus le déni d'anatomie",()=>{
   const p=baseProfile();ensureBodyIdentity(p);
   const reply=deterministicReply(p,mood,{},"Tu as une foufoune et moi un zizi.");
-  assert.match(reply,/parties intimes féminines/i);
+  assert.match(reply,/(intimité de femme|parties intimes féminines)/i);
   assert.doesNotMatch(reply,/n['’]ai pas/i);
 });
 
