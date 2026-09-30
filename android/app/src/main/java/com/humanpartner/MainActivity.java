@@ -26,10 +26,19 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+
 public class MainActivity extends Activity {
     private static final String PREFS = "human_partner";
     private static final String KEY_BACKEND = "backend_url";
-    private static final String DEFAULT_BACKEND = "http://192.168.1.32:8787";
+    private static final String KEY_TOKEN = "access_token";
+    private static final String LOCAL_BACKEND = "http://192.168.1.32:8787";
+    private static final String DISCOVERY_URL = "https://raw.githubusercontent.com/amaurygiboudot-arch/Listingcase/main/remote-endpoint.json";
     private static final int FILE_CHOOSER_REQUEST = 4107;
 
     private ValueCallback<Uri[]> filePathCallback;
@@ -41,9 +50,138 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        connectAutomatically();
+    }
 
-        prefs.edit().putString(KEY_BACKEND, DEFAULT_BACKEND).apply();
-        showWeb(DEFAULT_BACKEND);
+    private void connectAutomatically() {
+        showConnecting("Connexion à ton PC…");
+        new Thread(() -> {
+            String token = prefs.getString(KEY_TOKEN, "");
+            String backend = "";
+
+            if (isReachable(LOCAL_BACKEND)) {
+                if (token == null || token.isEmpty()) {
+                    token = pairLocally();
+                    if (token != null && !token.isEmpty()) {
+                        prefs.edit().putString(KEY_TOKEN, token).apply();
+                    }
+                }
+                backend = LOCAL_BACKEND;
+            } else {
+                backend = fetchRemoteEndpoint();
+            }
+
+            final String resolvedBackend = backend == null ? "" : backend.trim();
+            final String resolvedToken = token == null ? "" : token.trim();
+
+            if (!resolvedBackend.isEmpty() && !resolvedToken.isEmpty() && isReachable(resolvedBackend)) {
+                prefs.edit().putString(KEY_BACKEND, resolvedBackend).apply();
+                runOnUiThread(() -> showWeb(resolvedBackend, resolvedToken));
+            } else {
+                runOnUiThread(() -> {
+                    showConnecting(resolvedToken.isEmpty()
+                            ? "Première connexion sécurisée nécessaire à la maison…"
+                            : "Ton PC est hors ligne. Nouvelle tentative automatique…");
+                    if (root != null) {
+                        root.postDelayed(this::connectAutomatically, 5000);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void showConnecting(String message) {
+        root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 90, 40, 40);
+        root.setGravity(Gravity.CENTER);
+        root.setBackgroundColor(Color.rgb(17, 19, 24));
+
+        TextView title = text("Human Partner", 30);
+        title.setGravity(Gravity.CENTER);
+        root.addView(title, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView status = text("\n" + message, 16);
+        status.setGravity(Gravity.CENTER);
+        root.addView(status, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        setContentView(root);
+    }
+
+    private boolean isReachable(String backend) {
+        if (backend == null || backend.trim().isEmpty()) return false;
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(backend + "/api/health?ts=" + System.currentTimeMillis()).openConnection();
+            c.setConnectTimeout(1800);
+            c.setReadTimeout(2200);
+            c.setUseCaches(false);
+            return c.getResponseCode() >= 200 && c.getResponseCode() < 300;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
+    private String pairLocally() {
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(LOCAL_BACKEND + "/api/pair").openConnection();
+            c.setRequestMethod("POST");
+            c.setDoOutput(true);
+            c.setConnectTimeout(2000);
+            c.setReadTimeout(3000);
+            c.getOutputStream().write("{}".getBytes(StandardCharsets.UTF_8));
+            if (c.getResponseCode() != 200) return "";
+            return jsonString(readAll(c.getInputStream()), "token");
+        } catch (Exception e) {
+            return "";
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
+    private String fetchRemoteEndpoint() {
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(DISCOVERY_URL + "?ts=" + System.currentTimeMillis()).openConnection();
+            c.setConnectTimeout(2500);
+            c.setReadTimeout(3500);
+            c.setUseCaches(false);
+            if (c.getResponseCode() != 200) return "";
+            return jsonString(readAll(c.getInputStream()), "url");
+        } catch (Exception e) {
+            return "";
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
+    private String readAll(InputStream in) throws Exception {
+        StringBuilder out = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) out.append(line);
+        }
+        return out.toString();
+    }
+
+    private String jsonString(String json, String key) {
+        String source = json == null ? "" : json;
+        String needle = "\"" + key + "\"";
+        int keyPos = source.indexOf(needle);
+        if (keyPos < 0) return "";
+        int colon = source.indexOf(':', keyPos + needle.length());
+        if (colon < 0) return "";
+        int start = source.indexOf('"', colon + 1);
+        if (start < 0) return "";
+        int end = source.indexOf('"', start + 1);
+        if (end < 0) return "";
+        return source.substring(start + 1, end);
     }
 
     private TextView text(String value, float size) {
@@ -126,6 +264,10 @@ public class MainActivity extends Activity {
     }
 
     private void showWeb(String backend) {
+        showWeb(backend, prefs.getString(KEY_TOKEN, ""));
+    }
+
+    private void showWeb(String backend, String token) {
         web = new WebView(this);
         web.setBackgroundColor(Color.rgb(17, 19, 24));
         web.getSettings().setJavaScriptEnabled(true);
@@ -242,11 +384,13 @@ public class MainActivity extends Activity {
                     Toast.makeText(MainActivity.this,
                             "Connexion au cerveau en cours…",
                             Toast.LENGTH_SHORT).show();
-                    view.postDelayed(() -> view.loadUrl(DEFAULT_BACKEND + "?retry=" + System.currentTimeMillis()), 3000);
+                    view.postDelayed(MainActivity.this::connectAutomatically, 3000);
                 }
             }
         });
-        web.loadUrl(backend);
+        String base = backend == null ? "" : backend.replaceAll("/+$", "");
+        String target = (token == null || token.isEmpty()) ? base : base + "/#token=" + Uri.encode(token);
+        web.loadUrl(target);
         setContentView(web);
     }
 

@@ -17,10 +17,13 @@ import { ensureLocalImageRuntime,localImageRuntimeInstalled,stopOwnedLocalImageR
 import { ensureWorldPerson,listWorldPeople,relatePeople,witnessEvent,confideFact,rememberFacts,keepSecret,tellFact,socialContext } from "./lib/social-world.js";
 import { resolveVisualScene,noteVisualScene } from "./lib/scene-continuity.js";
 import { activateCharacter,startNewCharacter,deleteActiveCharacter } from "./lib/character-store.js";
+import { startRemoteTunnel } from "./lib/remote-tunnel.js";
 
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||8787);
 const LOCAL_ONLY=String(process.env.LOCAL_ONLY??"1")!=="0";
-const ACCESS_TOKEN=String(process.env.APP_ACCESS_TOKEN||"").trim();
+const ENV_ACCESS_TOKEN=String(process.env.APP_ACCESS_TOKEN||"").trim();
+const ACCESS_TOKEN=ENV_ACCESS_TOKEN||getSetting("appAccessToken","")||crypto.randomBytes(32).toString("base64url");
+if(!ENV_ACCESS_TOKEN&&!getSetting("appAccessToken",""))setSetting("appAccessToken",ACCESS_TOKEN);
 
 function seedPredefinedCharacters(){
   const file=path.resolve(root,"config","predefined-characters.json");
@@ -90,9 +93,24 @@ const apiAuthorized=req=>{
   const direct=String(req.headers["x-app-token"]||"");
   const auth=String(req.headers.authorization||"");
   const bearer=auth.startsWith("Bearer ")?auth.slice(7):"";
-  const supplied=direct||bearer;
+  const cookieHeader=String(req.headers.cookie||"");
+  const cookiePart=cookieHeader.split(";").map(x=>x.trim()).find(x=>x.startsWith("hp_session="))||"";
+  let cookieToken="";
+  try{cookieToken=decodeURIComponent(cookiePart.slice("hp_session=".length))}catch{}
+  const supplied=direct||bearer||cookieToken;
   if(!supplied||supplied.length!==ACCESS_TOKEN.length)return false;
   try{return crypto.timingSafeEqual(Buffer.from(supplied),Buffer.from(ACCESS_TOKEN))}catch{return false}
+};
+
+const isPrivateIp=raw=>{
+  const ip=String(raw||"").replace(/^::ffff:/,"");
+  if(ip==="::1"||ip==="127.0.0.1")return true;
+  if(/^10\./.test(ip)||/^192\.168\./.test(ip))return true;
+  const m=ip.match(/^172\.(\d+)\./);return Boolean(m&&Number(m[1])>=16&&Number(m[1])<=31);
+};
+const isDirectLanRequest=req=>{
+  if(req.headers["cf-connecting-ip"]||req.headers["x-forwarded-for"]||req.headers["x-real-ip"])return false;
+  return isPrivateIp(req.socket?.remoteAddress);
 };
 const isVisualRequest=text=>/(photo|photos|image|images|montre[- ]?moi|fait voir|fais voir|je peux te voir|voir de toi|voir ton|voir ta|ton corps|ton corp|ta tenue|ton apparence|à quoi tu ressembles|a quoi tu ressembles)/i.test(String(text||""));
 const cloudLlmStatus=()=>({configured:true,provider:"puter-client",model:"gemini-3.1-flash-lite",client:true});
@@ -198,6 +216,10 @@ function importStateBundle(bundle){
 }
 
 async function api(req,res,url){
+  if(req.method==="POST"&&url.pathname==="/api/pair"){
+    if(!isDirectLanRequest(req))return json(res,403,{error:"pairing_requires_local_network"});
+    return json(res,200,{ok:true,token:ACCESS_TOKEN});
+  }
   if(req.method==="POST"&&url.pathname==="/api/admin/import-state"){
     if(String(process.env.MIGRATION_ENABLED||"0")!=="1")return json(res,403,{error:"migration_disabled"});
     const bundle=await body(req);
@@ -205,6 +227,13 @@ async function api(req,res,url){
     return json(res,200,{ok:true,state:await state()});
   }
   if(req.method==="GET"&&url.pathname==="/api/health")return json(res,200,{ok:true,mode:LOCAL_ONLY?"local":"cloud",library:libraryStats(),providers:{llm:await currentLlmStatus(),image:await currentImageStatus()}});
+  if(req.method==="POST"&&url.pathname==="/api/session"){
+    const secure=String(req.headers["x-forwarded-proto"]||"").toLowerCase()==="https"||Boolean(req.headers["cf-connecting-ip"]);
+    const cookie=`hp_session=${encodeURIComponent(ACCESS_TOKEN)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${secure?"; Secure":""}`;
+    res.writeHead(200,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","set-cookie":cookie});
+    res.end(JSON.stringify({ok:true}));
+    return;
+  }
   if(req.method==="GET"&&url.pathname==="/api/providers")return json(res,200,{llm:await currentLlmStatus(),image:await currentImageStatus()});
   if(req.method==="GET"&&url.pathname==="/api/state")return json(res,200,await state());
   if(req.method==="GET"&&url.pathname==="/api/world/people")return json(res,200,{people:listWorldPeople()});
@@ -550,6 +579,11 @@ async function api(req,res,url){
 const types={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".webp":"image/webp",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg"};
 function staticFile(req,res,url){
   let rel=url.pathname==="/"?"index.html":url.pathname.slice(1);
+  if(rel.startsWith("library/")&&!apiAuthorized(req)){
+    res.writeHead(401,{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"});
+    res.end("Unauthorized");
+    return true;
+  }
   rel=path.normalize(rel).replace(/^(\.\.(\/|\\|$))+/,"");
   const f=path.join(root,rel);
   if(!f.startsWith(root)||!fs.existsSync(f)||fs.statSync(f).isDirectory())return false;
@@ -561,7 +595,7 @@ http.createServer(async(req,res)=>{
   try{
     const url=new URL(req.url,`http://${req.headers.host||"localhost"}`);
     if(url.pathname.startsWith("/api/")){
-      if(url.pathname!=="/api/health"&&!apiAuthorized(req))return json(res,401,{error:"unauthorized"});
+      if(url.pathname!=="/api/health"&&url.pathname!=="/api/pair"&&!apiAuthorized(req))return json(res,401,{error:"unauthorized"});
       const handled=await api(req,res,url);
       if(handled!==false)return;
       return json(res,404,{error:"not_found"});
@@ -574,5 +608,8 @@ http.createServer(async(req,res)=>{
   }
 }).listen(port,()=>{
   console.log(`Human Partner running on http://localhost:${port} (${LOCAL_ONLY?"local":"cloud"})`);
-  if(LOCAL_ONLY)warmModel().then(ok=>console.log(`LLM warmup: ${ok?"ready":"skipped"}`)).catch(e=>console.error("LLM warmup:",e.message));
+  if(LOCAL_ONLY){
+    startRemoteTunnel(port);
+    warmModel().then(ok=>console.log(`LLM warmup: ${ok?"ready":"skipped"}`)).catch(e=>console.error("LLM warmup:",e.message));
+  }
 });

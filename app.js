@@ -565,13 +565,26 @@ async function pollInitiative(){
 
 setInterval(pollInitiative,5*60*1000);
 
-refresh().catch(err=>{
+async function bootstrap(){
+  if(appAccessToken){
+    try{
+      await fetch("/api/session",{
+        method:"POST",
+        headers:{"x-app-token":appAccessToken},
+        credentials:"include"
+      });
+    }catch{}
+  }
+  return refresh();
+}
+
+bootstrap().catch(err=>{
   document.querySelector("#app").innerHTML=`
     <main class="shell">
       <section class="card hero">
-        <h1>Backend indisponible</h1>
+        <h1>Connexion au cerveau en cours…</h1>
         <p>${esc(err.message)}</p>
-        <p class="muted">Lance <code>npm start</code> dans le dépôt.</p>
+        <p class="muted">L’application réessaiera automatiquement.</p>
       </section>
     </main>`;
 });
