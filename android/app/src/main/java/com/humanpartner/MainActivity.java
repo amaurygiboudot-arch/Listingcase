@@ -3,6 +3,8 @@ package com.humanpartner;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.Intent;
+import android.content.ActivityNotFoundException;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -14,8 +16,10 @@ import android.view.Window;
 import android.webkit.WebChromeClient;
 import android.webkit.CookieManager;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.ValueCallback;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -25,7 +29,9 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
     private static final String PREFS = "human_partner";
     private static final String KEY_BACKEND = "backend_url";
+    private static final int FILE_CHOOSER_REQUEST = 4107;
 
+    private ValueCallback<Uri[]> filePathCallback;
     private LinearLayout root;
     private SharedPreferences prefs;
     private WebView web;
@@ -130,6 +136,8 @@ public class MainActivity extends Activity {
         web.getSettings().setJavaScriptEnabled(true);
         web.getSettings().setDomStorageEnabled(true);
         web.getSettings().setDefaultTextEncodingName("utf-8");
+        web.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
+        web.clearCache(true);
         web.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
         web.getSettings().setSupportMultipleWindows(true);
         CookieManager.getInstance().setAcceptCookie(true);
@@ -138,6 +146,36 @@ public class MainActivity extends Activity {
         web.getSettings().setAllowContentAccess(true);
         web.getSettings().setAllowFileAccess(false);
         web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView webView,
+                                             ValueCallback<Uri[]> filePathCallbackParam,
+                                             FileChooserParams fileChooserParams) {
+                if (filePathCallback != null) {
+                    filePathCallback.onReceiveValue(null);
+                }
+                filePathCallback = filePathCallbackParam;
+                Intent intent;
+                try {
+                    intent = fileChooserParams.createIntent();
+                } catch (Exception e) {
+                    filePathCallback = null;
+                    Toast.makeText(MainActivity.this,
+                            "Impossible d’ouvrir le sélecteur de fichiers.",
+                            Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+                try {
+                    startActivityForResult(intent, FILE_CHOOSER_REQUEST);
+                    return true;
+                } catch (ActivityNotFoundException e) {
+                    filePathCallback = null;
+                    Toast.makeText(MainActivity.this,
+                            "Aucune application ne peut choisir cette image.",
+                            Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+            }
+
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog,
                                           boolean isUserGesture, Message resultMsg) {
@@ -216,6 +254,19 @@ public class MainActivity extends Activity {
         });
         web.loadUrl(backend);
         setContentView(web);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == FILE_CHOOSER_REQUEST) {
+            if (filePathCallback != null) {
+                Uri[] results = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+                filePathCallback.onReceiveValue(results);
+                filePathCallback = null;
+            }
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
     }
 
     @Override
