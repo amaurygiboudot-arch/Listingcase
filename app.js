@@ -103,6 +103,13 @@ function renderMedia(media){
     return `<img class="chat-image" src="${esc(media.url)}?v=${encodeURIComponent(media.id||0)}" alt="${esc(media.alt||"Photo")}" loading="eager" />`;
   }
   if(media.status==="pending"){
+    if(media.meta?.localProvider){
+      return `
+        <div class="media-status pending-media" data-media-id="${media.id}">
+          <div>📷 Génération en cours sur ton PC…</div>
+          <small>La photo apparaîtra ici automatiquement dès qu’elle sera prête.</small>
+        </div>`;
+    }
     return `
       <div class="media-status pending-media" data-media-id="${media.id}">
         <div>📷 Photo prête à être générée</div>
@@ -620,6 +627,16 @@ async function pollInitiative(){
 }
 
 setInterval(pollInitiative,5*60*1000);
+
+async function pollPendingLocalMedia(){
+  if(document.hidden||!appState.partner)return;
+  const pending=(appState.messages||[]).some(message=>
+    (message.media||[]).some(media=>media.status==="pending"&&media.meta?.localProvider)
+  );
+  if(!pending)return;
+  try{await refresh()}catch{}
+}
+setInterval(pollPendingLocalMedia,3000);
 
 async function bootstrap(){
   if(appAccessToken){

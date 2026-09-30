@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DATA_DIR=fs.mkdtempSync(path.join(os.tmpdir(),"human-partner-characters-"));
 const dbmod=await import("../lib/db.js");
 const store=await import("../lib/character-store.js");
-const {db,savePartner,getPartner,addMessage,recentMessages,addMemory,recentMemories,setSetting,getSetting,listPartners}=dbmod;
+const {db,savePartner,getPartner,addMessage,addMessageMedia,recentMessages,addMemory,recentMemories,setSetting,getSetting,listPartners}=dbmod;
 
 const chloe={personId:"F0001",seed:"seed-chloe",name:"Chloé",type:"femme",origin:"Europe",stage:"affinité",createdAt:1};
 const maya={personId:"F0002",seed:"seed-maya",name:"Maya",type:"femme",origin:"Europe",stage:"premier contact",createdAt:2};
@@ -43,6 +43,32 @@ test("chaque personnage récupère sa conversation, sa mémoire et son état",()
   const people=listPartners();
   assert.deepEqual(people.map(x=>x.personId),[chloe.personId,maya.personId]);
   assert.equal(people.find(x=>x.personId===maya.personId).active,true);
+});
+
+test("une photo en arrière-plan peut terminer même après un changement de personnage",()=>{
+  assert.equal(getPartner().personId,maya.personId);
+  const messageId=addMessage("partner","photo en cours");
+  const mediaId=addMessageMedia(messageId,{
+    kind:"image",status:"pending",url:null,alt:"Génération…",visualId:"IMG_TEST",
+    meta:{personId:maya.personId,localProvider:"test"}
+  });
+
+  store.activateCharacter(chloe.personId);
+  assert.equal(getPartner().personId,chloe.personId);
+
+  store.updateCharacterMedia(maya.personId,mediaId,{
+    status:"ready",
+    url:"/library/maya-test.jpg",
+    alt:"Photo de Maya",
+    visualId:"IMG_TEST",
+    meta:{personId:maya.personId,completedAt:123}
+  });
+
+  store.activateCharacter(maya.personId);
+  const media=recentMessages(10).flatMap(x=>x.media||[]).find(x=>x.id===mediaId);
+  assert.equal(media.status,"ready");
+  assert.equal(media.url,"/library/maya-test.jpg");
+  assert.equal(media.meta.completedAt,123);
 });
 
 test("supprimer l'actif conserve l'autre personnage",()=>{

@@ -17,6 +17,7 @@ import { ensureLocalImageRuntime,localImageRuntimeInstalled,stopOwnedLocalImageR
 import { ensureWorldPerson,listWorldPeople,relatePeople,witnessEvent,confideFact,rememberFacts,keepSecret,tellFact,socialContext } from "./lib/social-world.js";
 import { resolveVisualScene,noteVisualScene } from "./lib/scene-continuity.js";
 import { activateCharacter,startNewCharacter,deleteActiveCharacter } from "./lib/character-store.js";
+import { enqueueLocalMediaGeneration,localMediaQueueStatus } from "./lib/local-media-queue.js";
 import { ensureLivingIdentity,updateLivingCurrentState,recordClassifiedLivingEvent,syncLivingPreference,livingContext,seedLivingMemory } from "./lib/living-identity.js";
 import { canonicalPersonaPublic,canonicalRelationshipMemory } from "./lib/canonical-persona.js";
 import { startRemoteTunnel } from "./lib/remote-tunnel.js";
@@ -148,6 +149,60 @@ const cloudImageStatus=()=>({configured:true,provider:"puter-client",client:true
 const currentLlmStatus=()=>LOCAL_ONLY?modelStatus():Promise.resolve(cloudLlmStatus());
 const currentImageStatus=()=>LOCAL_ONLY?imageProviderStatus():Promise.resolve(cloudImageStatus());
 
+function repairStaleGenericPhotoErrors(profile){
+  if(!profile?.personId)return 0;
+  const key=`photoErrorRepairV3:${profile.personId}`;
+  if(getSetting(key,false))return 0;
+  const canonical=getCanonicalVisual(profile);
+  if(!canonical)return 0;
+  const rows=db.prepare("SELECT id,message_id,meta FROM message_media WHERE kind='image' AND status='error' AND url IS NULL ORDER BY id").all();
+  const previousUser=db.prepare("SELECT id,text FROM messages WHERE id<? AND role='user' ORDER BY id DESC LIMIT 1");
+  let fixed=0,removed=0;
+  const remove=db.prepare("DELETE FROM message_media WHERE id=?");
+  for(const row of rows){
+    const user=previousUser.get(row.message_id);
+    let meta={};try{meta=row.meta?JSON.parse(row.meta):{}}catch{}
+    if(user&&!isVisualRequest(user.text)&&meta.imageProvider==="comfyui-local"&&meta.failure==="generation_failed"){
+      remove.run(row.id);
+      removed++;
+      continue;
+    }
+    if(!user||!isVisualRequest(user.text))continue;
+    const request=visualRequestContext(user.text);
+    if(Object.keys(request).length)continue;
+    updateMessageMedia(row.id,{
+      url:canonical.url,
+      status:"ready",
+      alt:`Photo de ${profile.name}`,
+      visualId:canonical.slot_id,
+      meta:{...meta,canonical:true,repairedFromHistoricalFailure:true,repairedAt:Date.now()}
+    });
+    fixed++;
+  }
+  setSetting(key,true);
+  return fixed+removed;
+}
+
+function resumePendingLocalMedia(profile){
+  if(!profile?.personId)return 0;
+  let resumed=0;
+  for(const message of recentMessages(100)){
+    for(const media of message.media||[]){
+      const meta=media.meta||{};
+      if(media.status!=="pending"||!meta.localProvider||!meta.slot||!meta.prompt||!meta.referencePath)continue;
+      if(enqueueLocalMediaGeneration({
+        personId:profile.personId,
+        mediaId:media.id,
+        profile:JSON.parse(JSON.stringify(profile)),
+        slot:meta.slot,
+        prompt:meta.prompt,
+        referencePath:meta.referencePath
+      }))resumed++;
+    }
+  }
+  return resumed;
+}
+
 async function state(){
   const partner=getPartner();
   if(partner){
@@ -162,6 +217,8 @@ async function state(){
       dirty=true;
     }
     if(dirty)savePartner(partner);
+    repairStaleGenericPhotoErrors(partner);
+    resumePendingLocalMedia(partner);
   }
   const mood=partner?dailyMood(partner):null;
   const life=partner?runLifeTick(partner,mood):null;
@@ -194,6 +251,7 @@ async function state(){
     cloudClientAllowed:!LOCAL_ONLY,
     imageGeneration:{
       mode:LOCAL_ONLY?"local-only":"hybrid-cloud",
+      queue:localMediaQueueStatus(),
       configured:Boolean(imageProvider.configured),
       provider:imageProvider.provider||"none",
       blocked:false
@@ -434,71 +492,29 @@ async function api(req,res,url){
         if(missing>0){
           let provider=await currentImageStatus();
           let runtimeResult=null;
-          let generationError=null;
-          let modelUnloaded=false;
-          if(!provider.configured&&localImageRuntimeInstalled()){
-            modelUnloaded=await unloadModel();
+          if(LOCAL_ONLY&&!provider.configured&&localImageRuntimeInstalled()){
             runtimeResult=await ensureLocalImageRuntime();
             provider=await imageProviderStatus();
           }
-          if(LOCAL_ONLY&&provider.configured){
-            if(!modelUnloaded)modelUnloaded=await unloadModel();
-            let slots=selectGenerationSlots(p,mood,Math.min(missing,2),requestVisual);
-            if(slots.length&&!requestVisual.place){
-              requestVisual.place=slots[0].place;
-              slots=selectGenerationSlots(p,mood,Math.min(missing,2),requestVisual);
-            }
-            const canonicalVisual=getCanonicalVisual(p);
+          let slots=selectGenerationSlots(p,mood,Math.min(missing,2),requestVisual);
+          if(slots.length&&!requestVisual.place){
+            requestVisual.place=slots[0].place;
+            slots=selectGenerationSlots(p,mood,Math.min(missing,2),requestVisual);
+          }
+          const canonicalVisual=getCanonicalVisual(p);
+          if(LOCAL_ONLY){
             if(!canonicalVisual){
-              generationError=new Error("canonical_visual_required");
-            }else{
+              if(ready.length===0)reply="Il me manque encore ma photo de référence. Choisis-la dans « Photo canonique » et je pourrai t’envoyer une image qui me ressemble vraiment.";
+              const slot=slots[0];
+              if(slot&&ready.length===0)media.push({
+                kind:"image",status:"error",url:null,
+                alt:"Photo de référence manquante : choisis d’abord la photo canonique de ce personnage.",
+                visualId:slot.id,
+                meta:{personId:p.personId,localOnly:true,failure:"canonical_visual_required",requestVisual}
+              });
+            }else if(provider.configured){
               for(const slot of slots){
-                try{
-                  const prompt=buildVisualPrompt(p,slot,requestVisual);
-                  const generated=await generateVisual(p,slot,prompt,{referencePath:canonicalVisual.file_path});
-                  if(generated){
-                    const saved=saveCharacterVisual(p,slot.id,generated.filePath,generated.mimeType,{canonical:false});
-                    const url="/"+String(saved.file_path).replace(/^\/+/, "");
-                    media.push({kind:"image",status:"ready",url,alt:`Photo de ${p.name}`,visualId:slot.id,meta:{personId:p.personId,mood:slot.mood,place:slot.place,outfit:slot.outfit,view:slot.view,activity:slot.activity,moment:slot.moment}});
-                    noteVisualScene(p,slot.place);
-                    missing--;
-                  }
-                }catch(e){
-                  generationError=e;
-                  console.error("IMAGE:",e.message);
-                }
-              }
-            }
-          }
-          if(generationError?.message==="canonical_visual_required"&&ready.length===0){
-            reply="Il me manque encore ma photo de référence. Choisis-la dans « Photo canonique » et je pourrai t’envoyer une image qui me ressemble vraiment.";
-          }
-          if(missing>0&&ready.length===0){
-            const slots=selectGenerationSlots(p,mood,1,requestVisual);
-            const slot=slots[0];
-            if(slot){
-              if(LOCAL_ONLY){
-                media.push({
-                  kind:"image",
-                  status:"error",
-                  url:null,
-                  alt:generationError?.message==="canonical_visual_required"
-                    ?"Photo de référence manquante : choisis d’abord la photo canonique de ce personnage."
-                    :generationError
-                      ?"Je n’arrive pas à générer une nouvelle photo pour le moment."
-                      :runtimeResult?.error
-                      ?"Le fournisseur d’images est indisponible."
-                      :"Je n’ai pas trouvé de photo cohérente et le fournisseur d’images est indisponible.",
-                  visualId:slot.id,
-                  meta:{
-                    personId:p.personId,
-                    localOnly:true,
-                    imageProvider:provider.provider||"none",
-                    failure:generationError?"generation_failed":(provider.error||runtimeResult?.error||"provider_unavailable"),
-                    requestVisual
-                  }
-                });
-              }else{
+                const prompt=buildVisualPrompt(p,slot,requestVisual);
                 media.push({
                   kind:"image",
                   status:"pending",
@@ -507,22 +523,35 @@ async function api(req,res,url){
                   visualId:slot.id,
                   meta:{
                     personId:p.personId,
-                    clientProvider:"puter",
-                    prompt:buildVisualPrompt(p,slot,requestVisual),
-                    requestVisual,
-                    mood:slot.mood,
-                    place:slot.place,
-                    outfit:slot.outfit,
-                    view:slot.view,
-                    activity:slot.activity,
-                    moment:slot.moment
+                    localOnly:true,
+                    localProvider:provider.provider||"local",
+                    imageProvider:provider.provider||"local",
+                    prompt,
+                    referencePath:canonicalVisual.file_path,
+                    requestVisual:{...requestVisual},
+                    slot:{...slot}
                   }
                 });
               }
+            }else if(ready.length===0){
+              const slot=slots[0];
+              if(slot)media.push({
+                kind:"image",status:"error",url:null,
+                alt:"Le fournisseur d’images est indisponible.",
+                visualId:slot.id,
+                meta:{personId:p.personId,localOnly:true,imageProvider:provider.provider||"none",failure:provider.error||runtimeResult?.error||"provider_unavailable",requestVisual}
+              });
+            }
+          }else{
+            for(const slot of slots){
+              media.push({
+                kind:"image",status:"pending",url:null,
+                alt:`Génération d’une photo de ${p.name}…`,
+                visualId:slot.id,
+                meta:{personId:p.personId,clientProvider:"puter",prompt:buildVisualPrompt(p,slot,requestVisual),requestVisual:{...requestVisual},mood:slot.mood,place:slot.place,outfit:slot.outfit,view:slot.view,activity:slot.activity,moment:slot.moment}
+              });
             }
           }
-          if(runtimeResult?.ready&&runtimeResult.mode!=="existing")await stopOwnedLocalImageRuntime();
-          if(modelUnloaded)warmModel().catch(e=>console.error("LLM rewarm:",e.message));
         }
       }
       visuals=media;
@@ -565,7 +594,23 @@ async function api(req,res,url){
     }
 
     const partnerMessageId=addMessage("partner",reply);
-    for(const item of media)addMessageMedia(partnerMessageId,item);
+    const queuedLocalMedia=[];
+    for(const item of media){
+      const mediaId=addMessageMedia(partnerMessageId,item);
+      if(item.status==="pending"&&item.meta?.localProvider&&item.meta?.slot&&item.meta?.prompt&&item.meta?.referencePath){
+        queuedLocalMedia.push({mediaId,item});
+      }
+    }
+    for(const queued of queuedLocalMedia){
+      enqueueLocalMediaGeneration({
+        personId:p.personId,
+        mediaId:queued.mediaId,
+        profile:JSON.parse(JSON.stringify(p)),
+        slot:queued.item.meta.slot,
+        prompt:queued.item.meta.prompt,
+        referencePath:queued.item.meta.referencePath
+      });
+    }
     const learnedPreference=learnPartnerPreferenceFromReply(reply);
     if(p.livingIdentityEnabled&&learnedPreference)syncLivingPreference(p,learnedPreference,reply);
     decayEmotions();
