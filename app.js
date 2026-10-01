@@ -98,6 +98,15 @@ function landing(){
     </section>`;
 }
 
+function generationElapsed(media){
+  const started=Number(media?.meta?.startedAt||0);
+  if(!started)return"";
+  const seconds=Math.max(0,Math.floor((Date.now()-started)/1000));
+  if(seconds<60)return`${seconds}s`;
+  const minutes=Math.floor(seconds/60),rest=seconds%60;
+  return`${minutes} min ${String(rest).padStart(2,"0")} s`;
+}
+
 function renderMedia(media){
   if(media.status==="ready"&&media.url){
     return `<img class="chat-image" src="${esc(media.url)}?v=${encodeURIComponent(media.id||0)}" alt="${esc(media.alt||"Photo")}" loading="eager" />`;
@@ -107,7 +116,7 @@ function renderMedia(media){
       return `
         <div class="media-status pending-media" data-media-id="${media.id}">
           <div>📷 Génération en cours sur ton PC…</div>
-          <small>La photo apparaîtra ici automatiquement dès qu’elle sera prête.</small>
+          <small>${generationElapsed(media)?`Temps écoulé : ${generationElapsed(media)} • `:""}La photo apparaîtra ici automatiquement dès qu’elle sera prête.</small>
         </div>`;
     }
     return `

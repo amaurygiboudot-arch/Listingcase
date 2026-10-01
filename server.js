@@ -226,6 +226,13 @@ function repairStaleGenericPhotoErrors(profile){
   return fixed+removed;
 }
 
+function hasPendingLocalImage(personId){
+  if(!personId)return false;
+  return recentMessages(100).some(message=>(message.media||[]).some(media=>
+    media.status==="pending"&&media.meta?.personId===personId&&media.meta?.localProvider
+  ));
+}
+
 function resumePendingLocalMedia(profile){
   if(!profile?.personId)return 0;
   let resumed=0;
@@ -239,7 +246,8 @@ function resumePendingLocalMedia(profile){
         profile:JSON.parse(JSON.stringify(profile)),
         slot:meta.slot,
         prompt:meta.prompt,
-        referencePath:meta.referencePath
+        referencePath:meta.referencePath,
+        requestVisual:meta.requestVisual||{}
       }))resumed++;
     }
   }
@@ -514,7 +522,12 @@ async function api(req,res,url){
         }
 
         let missing=Math.max(0,desiredCount-ready.length);
-        if(missing>0&&!hasExplicitScene){
+        const alreadyGenerating=hasPendingLocalImage(p.personId);
+        if(missing>0&&!hasExplicitScene&&alreadyGenerating){
+          reply="Je t’en prépare déjà une 😏. Elle apparaîtra ici dès qu’elle sera prête.";
+          missing=0;
+        }
+        if(missing>0&&!hasExplicitScene&&!alreadyGenerating){
           const canonicalVisual=getCanonicalVisual(p);
           if(canonicalVisual&&!media.some(item=>item.url===canonicalVisual.url)){
             media.push({
@@ -569,6 +582,7 @@ async function api(req,res,url){
                     localOnly:true,
                     localProvider:provider.provider||"local",
                     imageProvider:provider.provider||"local",
+                    startedAt:Date.now(),
                     prompt,
                     referencePath:canonicalVisual.file_path,
                     requestVisual:{...requestVisual},
@@ -651,7 +665,8 @@ async function api(req,res,url){
         profile:JSON.parse(JSON.stringify(p)),
         slot:queued.item.meta.slot,
         prompt:queued.item.meta.prompt,
-        referencePath:queued.item.meta.referencePath
+        referencePath:queued.item.meta.referencePath,
+        requestVisual:queued.item.meta.requestVisual||{}
       });
     }
     const learnedPreference=learnPartnerPreferenceFromReply(reply);
