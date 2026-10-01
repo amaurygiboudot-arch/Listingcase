@@ -812,6 +812,8 @@ http.createServer(async(req,res)=>{
   console.log(`Human Partner running on http://localhost:${port} (${LOCAL_ONLY?"local":"cloud"})`);
   if(LOCAL_ONLY){
     startRemoteTunnel(port);
-    warmModel().then(ok=>console.log(`LLM warmup: ${ok?"ready":"skipped"}`)).catch(e=>console.error("LLM warmup:",e.message));
+    if(String(process.env.LLM_WARMUP_ON_START||"0")==="1"){
+      warmModel().then(ok=>console.log(`LLM warmup: ${ok?"ready":"skipped"}`)).catch(e=>console.error("LLM warmup:",e.message));
+    }
   }
 });
