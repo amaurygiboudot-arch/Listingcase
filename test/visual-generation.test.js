@@ -22,6 +22,17 @@ test("une demande explicite sans slot préindexé crée un slot cohérent",()=>{
   assert.equal(db.prepare("SELECT place FROM visual_assets WHERE id=?").get(slot.id).place,request.place);
 });
 
+test("les lieux explicites usuels sont reconnus avant la continuité automatique",()=>{
+  const bureau=visualRequestContext("Montre moi une photo de toi au bureau en tenue élégante");
+  assert.equal(bureau.place,"bureau");
+  assert.equal(bureau.activity,"travail");
+  assert.equal(bureau.outfit,"élégant");
+
+  const douche=visualRequestContext("Montre moi une photo dans la douche");
+  assert.equal(douche.place,"sdb");
+  assert.equal(douche.activity,"selfcare");
+});
+
 test("les demandes de vue précises conservent focus et pose",()=>{
   const chest=visualRequestContext("As-tu une photo où je peux voir ta poitrine ?");
   assert.equal(chest.view,"halfbody");
