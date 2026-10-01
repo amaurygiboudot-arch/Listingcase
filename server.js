@@ -11,7 +11,7 @@ import { seedInitialPreferences,learnUserPreference,learnPartnerPreferenceFromRe
 import { runLifeTick,latestExperiences,pendingExperienceStory,markExperienceTold } from "./lib/experiences.js";
 import { ensureRoutine,ensureSocialCircle,ensureGoals,lifeContext } from "./lib/routine.js";
 import { chatWithModel,fallbackReply,modelStatus,warmModel,unloadModel,buildCloudMessages } from "./lib/model.js";
-import { selectVisuals,selectAvailableVisuals,selectGenerationSlots,saveCharacterVisual,libraryStats,visualRequestContext,getCanonicalVisual,lastSentVisualContext } from "./lib/visual.js";
+import { selectVisuals,selectAvailableVisuals,selectGenerationSlots,saveCharacterVisual,libraryStats,visualRequestContext,getCanonicalVisual,lastSentVisualContext,referencedSentVisualContext } from "./lib/visual.js";
 import { imageProviderStatus,buildVisualPrompt,generateVisual,importImageSource } from "./lib/image-provider.js";
 import { ensureLocalImageRuntime,localImageRuntimeInstalled,stopOwnedLocalImageRuntime } from "./lib/local-image-runtime.js";
 import { ensureWorldPerson,listWorldPeople,relatePeople,witnessEvent,confideFact,rememberFacts,keepSecret,tellFact,socialContext } from "./lib/social-world.js";
@@ -187,6 +187,13 @@ const isDirectLanRequest=req=>{
   return isPrivateIp(req.socket?.remoteAddress);
 };
 const isVisualRequest=text=>/(photo|photos|image|images|montre[- ]?moi|montre\s+(?:ton|ta|tes)|fait voir|fais voir|je peux te voir|voir de toi|voir\s+(?:ton|ta|tes)|ton corps|ton corp|ta tenue|ton apparence|visage|portrait|selfie|poitrine|seins?|buste|décolleté|decollete|fesses|de dos|vue de dos|à quoi tu ressembles|a quoi tu ressembles)/i.test(String(text||""));
+const isVisualReferenceOnly=text=>{
+  const s=String(text||"");
+  const mentions=/(photo|image|celle|celle-ci|celle là|celle-la)/i.test(s);
+  const describes=/(où|ou|dans laquelle|sur laquelle|avec|dans (?:ta|ton|le|la)|quand tu|où tu)/i.test(s);
+  const asksNew=/(montre[- ]?moi|montre\s+(?:ton|ta|tes)|envoie|renvoie|fait voir|fais voir|génère|genere|crée|cree|prends? (?:une )?photo|je veux te voir|je peux te voir)/i.test(s);
+  return mentions&&describes&&!asksNew;
+};
 const cloudLlmStatus=()=>({configured:true,provider:"puter-client",model:"gemini-3.1-flash-lite",client:true});
 const cloudImageStatus=()=>({configured:true,provider:"puter-client",client:true,local:false});
 const currentLlmStatus=()=>LOCAL_ONLY?modelStatus():Promise.resolve(cloudLlmStatus());
@@ -503,9 +510,9 @@ async function api(req,res,url){
     }
     ensureWorldPerson(p.personId,p.name,p.personality?.directness||"calme");
     const worldKnowledge=socialContext(p.personId);
-    const photoContext=lastSentVisualContext(p);
+    const photoContext=referencedSentVisualContext(p,text)||lastSentVisualContext(p);
     let reply=null,visuals=[],media=[];
-    if(isVisualRequest(text)){
+    if(isVisualRequest(text)&&!isVisualReferenceOnly(text)){
       const d=visualDecision(p,mood,text);
       const rawVisualRequest=visualRequestContext(text);
       const hasExplicitScene=Object.keys(rawVisualRequest).length>0;
