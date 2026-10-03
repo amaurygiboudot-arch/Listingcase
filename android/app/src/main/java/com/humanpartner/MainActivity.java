@@ -37,8 +37,8 @@ public class MainActivity extends Activity {
     private static final String PREFS = "human_partner";
     private static final String KEY_BACKEND = "backend_url";
     private static final String KEY_TOKEN = "access_token";
+    private static final String PRIVATE_BACKEND = "http://eductor.tail1f0a15.ts.net:8787";
     private static final String LOCAL_BACKEND = "http://192.168.1.32:8787";
-    private static final String DISCOVERY_URL = "https://raw.githubusercontent.com/amaurygiboudot-arch/Listingcase/main/remote-endpoint.json";
     private static final int FILE_CHOOSER_REQUEST = 4107;
 
     private ValueCallback<Uri[]> filePathCallback;
@@ -59,16 +59,17 @@ public class MainActivity extends Activity {
             String token = prefs.getString(KEY_TOKEN, "");
             String backend = "";
 
-            if (isReachable(LOCAL_BACKEND)) {
-                if (token == null || token.isEmpty()) {
-                    token = pairLocally();
-                    if (token != null && !token.isEmpty()) {
-                        prefs.edit().putString(KEY_TOKEN, token).apply();
-                    }
-                }
+            if (isReachable(PRIVATE_BACKEND)) {
+                backend = PRIVATE_BACKEND;
+            } else if (isReachable(LOCAL_BACKEND)) {
                 backend = LOCAL_BACKEND;
-            } else {
-                backend = fetchRemoteEndpoint();
+            }
+
+            if (!backend.isEmpty() && (token == null || token.isEmpty())) {
+                token = pairWithBackend(backend);
+                if (token != null && !token.isEmpty()) {
+                    prefs.edit().putString(KEY_TOKEN, token).apply();
+                }
             }
 
             final String resolvedBackend = backend == null ? "" : backend.trim();
@@ -127,10 +128,10 @@ public class MainActivity extends Activity {
         }
     }
 
-    private String pairLocally() {
+    private String pairWithBackend(String backend) {
         HttpURLConnection c = null;
         try {
-            c = (HttpURLConnection) new URL(LOCAL_BACKEND + "/api/pair").openConnection();
+            c = (HttpURLConnection) new URL(backend + "/api/pair").openConnection();
             c.setRequestMethod("POST");
             c.setDoOutput(true);
             c.setConnectTimeout(2000);
@@ -138,22 +139,6 @@ public class MainActivity extends Activity {
             c.getOutputStream().write("{}".getBytes(StandardCharsets.UTF_8));
             if (c.getResponseCode() != 200) return "";
             return jsonString(readAll(c.getInputStream()), "token");
-        } catch (Exception e) {
-            return "";
-        } finally {
-            if (c != null) c.disconnect();
-        }
-    }
-
-    private String fetchRemoteEndpoint() {
-        HttpURLConnection c = null;
-        try {
-            c = (HttpURLConnection) new URL(DISCOVERY_URL + "?ts=" + System.currentTimeMillis()).openConnection();
-            c.setConnectTimeout(2500);
-            c.setReadTimeout(3500);
-            c.setUseCaches(false);
-            if (c.getResponseCode() != 200) return "";
-            return jsonString(readAll(c.getInputStream()), "url");
         } catch (Exception e) {
             return "";
         } finally {

@@ -24,6 +24,7 @@ import { startRemoteTunnel } from "./lib/remote-tunnel.js";
 
 const root=path.dirname(fileURLToPath(import.meta.url)),port=Number(process.env.PORT||8787);
 const LOCAL_ONLY=String(process.env.LOCAL_ONLY??"1")!=="0";
+const REMOTE_TUNNEL=String(process.env.REMOTE_TUNNEL??"0")==="1";
 const ENV_ACCESS_TOKEN=String(process.env.APP_ACCESS_TOKEN||"").trim();
 const ACCESS_TOKEN=ENV_ACCESS_TOKEN||getSetting("appAccessToken","")||crypto.randomBytes(32).toString("base64url");
 if(!ENV_ACCESS_TOKEN&&!getSetting("appAccessToken",""))setSetting("appAccessToken",ACCESS_TOKEN);
@@ -180,6 +181,8 @@ const isPrivateIp=raw=>{
   const ip=String(raw||"").replace(/^::ffff:/,"");
   if(ip==="::1"||ip==="127.0.0.1")return true;
   if(/^10\./.test(ip)||/^192\.168\./.test(ip))return true;
+  const tailscale=ip.match(/^100\.(\d+)\./);
+  if(tailscale&&Number(tailscale[1])>=64&&Number(tailscale[1])<=127)return true;
   const m=ip.match(/^172\.(\d+)\./);return Boolean(m&&Number(m[1])>=16&&Number(m[1])<=31);
 };
 const isDirectLanRequest=req=>{
@@ -778,7 +781,7 @@ async function api(req,res,url){
   return false;
 }
 
-const types={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".webp":"image/webp",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg"};
+const types={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".webp":"image/webp",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".apk":"application/vnd.android.package-archive"};
 function staticFile(req,res,url){
   let rel=url.pathname==="/"?"index.html":url.pathname.slice(1);
   if(rel.startsWith("library/")&&!apiAuthorized(req)){
@@ -811,7 +814,7 @@ http.createServer(async(req,res)=>{
 }).listen(port,()=>{
   console.log(`Human Partner running on http://localhost:${port} (${LOCAL_ONLY?"local":"cloud"})`);
   if(LOCAL_ONLY){
-    startRemoteTunnel(port);
+    if(REMOTE_TUNNEL)startRemoteTunnel(port);
     if(String(process.env.LLM_WARMUP_ON_START||"0")==="1"){
       warmModel().then(ok=>console.log(`LLM warmup: ${ok?"ready":"skipped"}`)).catch(e=>console.error("LLM warmup:",e.message));
     }
