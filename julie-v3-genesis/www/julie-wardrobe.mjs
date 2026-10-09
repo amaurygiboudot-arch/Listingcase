@@ -11,8 +11,8 @@ const COLORS=Object.freeze({
   vert:{upper:0x769b84,lower:0x456b62}
 });
 const REGION=Object.freeze({
-  upper:{minY:1.055,maxY:1.395,maxX:.297,maxZ:.255},
-  lower:{minY:.705,maxY:1.064,maxX:.300,maxZ:.258}
+  upper:{minY:.915,maxY:1.405,maxX:.297,maxZ:.255},
+  lower:{minY:.705,maxY:1.083,maxX:.300,maxZ:.258}
 });
 export function selectFabricIndices(geometry,name){
   const pos=geometry?.attributes?.position,idx=geometry?.index;
@@ -36,7 +36,7 @@ export function selectFabricIndices(geometry,name){
   }
   return result;
 }
-function fittedGeometry(original,indices){
+function fittedGeometry(original,indices,offset=.006){
   const clone=original.clone();
   // Un vêtement ne peut pas se déclarer corps humain Genesis.
   clone.userData={...clone.userData,julieWardrobeSurface:true,julieFemaleTopologyCleaned:false};
@@ -44,14 +44,14 @@ function fittedGeometry(original,indices){
   clone.clearGroups();
   const touched=new Set(indices);
   const pos=clone.attributes.position,normal=clone.attributes.normal;
-  // Relief de tissu d'environ 6 mm : évite le scintillement de la peau dessous.
+  // Haut placé 9 mm à l'extérieur du bas pour cacher les coutures et éviter les croisements.
   for(const i of touched){
     const x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);
     if(normal){
-      pos.setXYZ(i,x+normal.getX(i)*.006,y+normal.getY(i)*.006,z+normal.getZ(i)*.006);
+      pos.setXYZ(i,x+normal.getX(i)*offset,y+normal.getY(i)*offset,z+normal.getZ(i)*offset);
     }else{
       const magnitude=Math.max(.03,Math.hypot(x,z));
-      pos.setXYZ(i,x+x/magnitude*.006,y,z+z/magnitude*.006);
+      pos.setXYZ(i,x+x/magnitude*offset,y,z+z/magnitude*offset);
     }
   }
   pos.needsUpdate=true;
@@ -79,7 +79,7 @@ export function attachJulieWardrobe(THREE,root,{outfit='rose'}={}){
       color:COLORS.rose[kind],roughness:.94,metalness:0,
       side:THREE.DoubleSide,transparent:false,depthWrite:true
     });
-    const garment=new THREE.SkinnedMesh(fittedGeometry(geometry,indices),mat);
+    const garment=new THREE.SkinnedMesh(fittedGeometry(geometry,indices,kind==='upper'?.009:.006),mat);
     garment.name=kind==='upper'?'julie-top-fitted':'julie-short-fitted';
     garment.bindMode=source.bindMode;
     garment.position.copy(source.position);
