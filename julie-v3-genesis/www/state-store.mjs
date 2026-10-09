@@ -53,11 +53,14 @@ const memKey=m=>JSON.stringify([m.kind||'',m.at,m.text]);
 export function mergeImport(current,external){
   const before=parseJulieState(current);
   const incoming=parseJulieState(external);
-  const cutoff=before.deletedBefore;
-  const msgSeen=new Set(before.messages.map(msgKey));
-  const memSeen=new Set(before.memories.map(memKey));
-  const messages=before.messages.map(m=>({...m}));
-  const memories=before.memories.map(m=>({...m}));
+  // Conserver aussi les suppressions connues de la sauvegarde importee.
+  const cutoff=Math.max(before.deletedBefore,incoming.deletedBefore);
+  const messages=before.messages.filter(m=>!(cutoff>0&&stamp(m.at)<=cutoff)).map(m=>({...m}));
+  const memories=before.memories.filter(m=>!(cutoff>0&&stamp(m.at)<=cutoff)).map(m=>({...m}));
+  const removedMessages=before.messages.length-messages.length;
+  const removedMemories=before.memories.length-memories.length;
+  const msgSeen=new Set(messages.map(msgKey));
+  const memSeen=new Set(memories.map(memKey));
   let blocked=0,addedMessages=0,addedMemories=0;
   for(const item of incoming.messages){
     const m={...item};
@@ -73,9 +76,9 @@ export function mergeImport(current,external){
   }
   messages.sort((a,b)=>stamp(a.at)-stamp(b.at));
   memories.sort((a,b)=>stamp(a.at)-stamp(b.at));
-  const merged={...before,messages,memories};
+  const merged={...before,deletedBefore:cutoff,messages,memories};
   checkCapacity(merged);
-  return {state:merged,addedMessages,addedMemories,blocked};
+  return {state:merged,addedMessages,addedMemories,removedMessages,removedMemories,blocked};
 }
 export function eraseDemoHistory(current,at=Date.now()){
   const state=parseJulieState(current);

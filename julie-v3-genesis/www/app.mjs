@@ -112,7 +112,9 @@ $('#clear-data').addEventListener('click',()=>{
 function importOlderMemories(raw){
   if(typeof raw!=='string'||new TextEncoder().encode(raw).length>MAX_STATE_BYTES)throw new Error('Export trop volumineux');
   const merged=mergeImport(saved,raw);
-  const msg=`Ajouter ${merged.addedMessages} messages et ${merged.addedMemories} souvenirs ? Les données actuelles seront conservées. ${merged.blocked} entrées antérieurement supprimées resteront effacées.`;
+  const removals=merged.removedMessages+merged.removedMemories;
+  const warning=removals?` ATTENTION : la sauvegarde contient une suppression plus récente ; ${merged.removedMessages} messages et ${merged.removedMemories} souvenirs déjà présents sur cet appareil seraient aussi retirés.`:' Les données actuelles non supprimées seront conservées.';
+  const msg=`Ajouter ${merged.addedMessages} messages et ${merged.addedMemories} souvenirs ?${warning} ${merged.blocked} entrées antérieurement supprimées resteront effacées. Confirmer l'importation ?`;
   if(!confirm(msg))return false;
   if(!persist(merged.state))return false;
   renderChat();showMemories();
