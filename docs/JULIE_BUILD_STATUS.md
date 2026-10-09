@@ -1,7 +1,7 @@
 # Dernière compilation JULIE vérifiée
 
-Commit source : d8250c1cc27f08c4b96533627589d8e15bfb3fd7
-Exécution : https://github.com/amaurygiboudot-arch/Listingcase/actions/runs/37928778421
+Commit source : e2bc74493ae417ac3e1f175682d21e7b74c81abf
+Exécution : https://github.com/amaurygiboudot-arch/Listingcase/actions/runs/37930242408
 Tests : morphologie, mémoire, mises à jour signées, maillage humain et APK Android
 Artefact : Julie-Android-APK
 Statut : compilation et publication réussies
