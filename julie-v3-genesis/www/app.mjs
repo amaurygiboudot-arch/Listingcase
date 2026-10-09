@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
 
-const APP_VERSION = '0.3.1';
+const APP_VERSION = '0.3.2';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -343,5 +343,66 @@ $('#btn-wave')?.addEventListener('click',()=>{
 $('#btn-outfit')?.addEventListener('click',()=>{
   $('#julie-line').textContent='« Je garde cette tenue pour le premier modèle humain. Les vêtements personnalisables arriveront après. 😉 »';
 });
+
+// Appels natifs réservés aux ressources WebView locales. Aucune URL de mise
+// à jour fournie par le HTML, les messages ou le réseau n'est exécutée ici.
+const updater=typeof window.JulieUpdater==='object'?window.JulieUpdater:null;
+const updateStatus=$('#update-status');
+const updateCheck=$('#update-check');
+const updateDownload=$('#update-download');
+const updateInstall=$('#update-install');
+const updateAutomatic=$('#auto-updates');
+if(updater){
+  try{
+    updateAutomatic.checked=updater.automaticDownloadsEnabled()===true;
+    $('#installed-version').textContent=updater.currentVersion()||APP_VERSION;
+  }catch(e){console.warn('Gestionnaire de mises à jour indisponible',e)}
+}else{
+  updateStatus.textContent='La recherche de mises à jour est disponible uniquement dans l’application Android.';
+  updateAutomatic.disabled=true;updateCheck.disabled=true;
+}
+window.JulieUpdateEvent=(raw)=>{
+  try{
+    const event=JSON.parse(raw);
+    const kind=String(event.status||'');
+    updateStatus.textContent=String(event.message||'Mise à jour : informations indisponibles.').slice(0,350);
+    if(kind==='checking'||kind==='current'||kind==='no_release'){
+      updateDownload.hidden=true;updateInstall.hidden=true;
+    }else if(kind==='available'||kind==='wifi'||kind==='error'){
+      updateDownload.hidden=!(event.versionCode&&event.version);
+      updateInstall.hidden=true;
+    }else if(kind==='downloading'){
+      updateDownload.hidden=true;updateInstall.hidden=true;
+    }else if(kind==='ready'){
+      updateDownload.hidden=true;updateInstall.hidden=false;
+    }else if(kind==='blocked'){
+      updateDownload.hidden=true;updateInstall.hidden=true;
+    }else if(kind==='installing'||kind==='permission'){
+      updateDownload.hidden=true;updateInstall.hidden=(kind!=='permission');
+    }
+  }catch(e){updateStatus.textContent='Information de mise à jour illisible ; aucune installation lancée.';}
+};
+updateAutomatic.addEventListener('change',()=>{
+  if(!updater)return;
+  try{updater.setAutomaticDownloadsEnabled(updateAutomatic.checked);}
+  catch(e){updateAutomatic.checked=!updateAutomatic.checked;}
+});
+updateCheck.addEventListener('click',()=>{
+  if(updater)updater.checkForUpdates();
+});
+updateDownload.addEventListener('click',()=>{
+  if(!updater)return;
+  if(confirm('Julie va télécharger une APK sur Internet. Si tu utilises tes données mobiles, le téléchargement peut consommer plusieurs Mo. Continuer ?'))
+    updater.downloadUpdate();
+});
+updateInstall.addEventListener('click',()=>{
+  if(!updater)return;
+  if(confirm('Installer cette mise à jour ? Android affichera une confirmation. Les données de Julie ne seront pas effacées si la signature correspond.'))
+    updater.installUpdate();
+});
+window.addEventListener('load',()=>{
+  if(updater)try{updater.checkOnLaunch();}catch(e){console.warn('Recherche automatique non disponible',e);}
+});
+
 renderChat();
 initScene();
