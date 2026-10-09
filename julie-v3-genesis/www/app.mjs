@@ -347,7 +347,7 @@ $('#btn-outfit')?.addEventListener('click',()=>{
 // Appels natifs réservés aux ressources WebView locales. Aucune URL de mise
 // à jour fournie par le HTML, les messages ou le réseau n'est exécutée ici.
 const updater=typeof window.JulieUpdater==='object'?window.JulieUpdater:null;
-const updateStatus=$('#update-status');
+const updateNotice=$('#update-status');
 const updateCheck=$('#update-check');
 const updateDownload=$('#update-download');
 const updateInstall=$('#update-install');
@@ -358,14 +358,14 @@ if(updater){
     $('#installed-version').textContent=updater.currentVersion()||APP_VERSION;
   }catch(e){console.warn('Gestionnaire de mises à jour indisponible',e)}
 }else{
-  updateStatus.textContent='La recherche de mises à jour est disponible uniquement dans l’application Android.';
+  updateNotice.textContent='La recherche de mises à jour est disponible uniquement dans l’application Android.';
   updateAutomatic.disabled=true;updateCheck.disabled=true;
 }
 window.JulieUpdateEvent=(raw)=>{
   try{
     const event=JSON.parse(raw);
     const kind=String(event.status||'');
-    updateStatus.textContent=String(event.message||'Mise à jour : informations indisponibles.').slice(0,350);
+    updateNotice.textContent=String(event.message||'Mise à jour : informations indisponibles.').slice(0,350);
     if(kind==='checking'||kind==='current'||kind==='no_release'){
       updateDownload.hidden=true;updateInstall.hidden=true;
     }else if(kind==='available'||kind==='wifi'||kind==='error'){
@@ -380,7 +380,7 @@ window.JulieUpdateEvent=(raw)=>{
     }else if(kind==='installing'||kind==='permission'){
       updateDownload.hidden=true;updateInstall.hidden=(kind!=='permission');
     }
-  }catch(e){updateStatus.textContent='Information de mise à jour illisible ; aucune installation lancée.';}
+  }catch(e){updateNotice.textContent='Information de mise à jour illisible ; aucune installation lancée.';}
 };
 updateAutomatic.addEventListener('change',()=>{
   if(!updater)return;
