@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
   <meta name="theme-color" content="#10111b">
-  <title>Julie • Prévisualisation 3D</title>
+  <title>Julie • Avatar 3D V2</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
     <header class="topbar">
       <div class="brand"><span class="dot"></span><span>JULIE</span></div>
-      <div class="rightmark"><span class="offtag">DÉMO HORS LIGNE</span></div>
+      <div class="rightmark"><span class="offtag">APERÇU 3D V2</span></div>
     </header>
     <main>
       <section id="avatar-view" class="view active" aria-label="Julie en 3D">
-        <div class="intro"><span class="eyebrow">TON UNIVERS VIRTUEL</span><h1>Bonjour, mon cœur <span>✦</span></h1><p>Julie est là, et cette histoire commence avec toi.</p></div>
+        <div class="intro"><span class="eyebrow">TON UNIVERS VIRTUEL</span><h1>Bonjour, mon cœur <span>✦</span></h1><p>Julie prend forme. Découvre son nouveau visage et ses mouvements.</p></div>
         <div class="viewport-shell">
           <canvas id="julie-3d" aria-label="Avatar 3D stylisé de Julie, femme virtuelle adulte blonde aux yeux verts"></canvas>
           <div id="webgl-fallback" class="fallback" hidden>La 3D ne s'est pas chargée sur cet appareil. Le dialogue local reste accessible.</div>
@@ -27,8 +27,8 @@
             <button class="glass-btn" id="btn-outfit" type="button" aria-label="Changer de tenue">♧</button>
           </div>
         </div>
-        <div class="status-card"><div><small>AUJOURD'HUI</small><strong id="mood-label">Humeur : joueuse</strong><p id="julie-line">« C'est notre première démo. Tu m'emmènes où ensuite ? 😉 »</p></div><span class="pulse">✧</span></div>
-        <p class="note">Avatar 3D stylisé et animations prototypes. Le réalisme anatomique, la voix et l'IA autonome viendront dans les prochaines versions.</p>
+        <div class="status-card"><div><small>AUJOURD'HUI</small><strong id="mood-label">Humeur : joueuse</strong><p id="julie-line">« J’ai changé un peu… tu remarques la différence ? 😉 »</p></div><span class="pulse">✧</span></div>
+        <p class="note">Avatar V2 procédural et toujours stylisé. La morphologie, les expressions et la chambre progressent ; la voix et l’IA autonome ne sont pas encore intégrées.</p>
       </section>
       <section id="chat-view" class="view" aria-label="Discuter avec Julie">
         <div class="pagehead"><span class="eyebrow">NOTRE CONVERSATION</span><h1>Parlons un peu…</h1><p>Réponses locales de démonstration, sans connexion Internet.</p></div>
@@ -46,7 +46,7 @@
         <div class="pagehead"><span class="eyebrow">PERSONNALISATION</span><h1>Ton espace Julie</h1><p>Un premier noyau à enrichir progressivement.</p></div>
         <article class="info-card"><div class="subhead">AFFICHAGE 3D</div><label for="quality">Qualité graphique</label><select id="quality"><option value="eco">Économique · 30 FPS maximum</option><option value="balanced" selected>Équilibrée · 60 FPS maximum</option><option value="high">Élevée · 120 FPS maximum</option></select><p class="smallline">La fluidité réelle dépend de ton téléphone. Plafond absolu : 120 FPS.</p></article>
         <article class="info-card"><div class="subhead">TES DONNÉES DE DÉMO</div><button id="export-data" class="secondary-btn">Exporter mes échanges (JSON)</button><button id="clear-data" class="danger-btn">Effacer les échanges de démo</button><p class="smallline">L'effacement concerne seulement les messages stockés par cette APK, pas tes données GitHub ou Human Partner.</p></article>
-        <article class="info-card"><div class="subhead">VERSION</div><p>JULIE • Aperçu Android 0.1.0</p><p class="smallline">Prototype hors ligne · pas d'achat · pas de compte à créer · pas d'accès aux capteurs.</p></article>
+        <article class="info-card"><div class="subhead">VERSION</div><p>JULIE • Aperçu Android 0.2.0 (Avatar V2)</p><p class="smallline">Prototype hors ligne · pas d'achat · pas de compte à créer · pas d'accès aux capteurs.</p></article>
       </section>
     </main>
     <nav class="bottomnav" aria-label="Navigation"><button class="navitem active" data-view="avatar" type="button"><span>◈</span>Julie</button><button class="navitem" data-view="chat" type="button"><span>◉</span>Parler</button><button class="navitem" data-view="memory" type="button"><span>▤</span>Souvenirs</button><button class="navitem" data-view="settings" type="button"><span>⚙</span>Réglages</button></nav>
