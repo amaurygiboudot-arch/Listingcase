@@ -134,6 +134,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { fitHumanModel, clampFps, rendererDpr, isAuthorizedAssetUrl } from './avatar-utils.mjs';
 import { adaptEveDerivedFemaleMesh, normalizeGenesisMaterials } from './eve-derived.mjs';
 import { stripGenesisConstructionHelpers } from './genesis-body-cleanup.mjs';
+import { cleanGenesisFemaleAnatomy } from './genesis-female-topology.mjs';
 
 const MODEL_URL = './models/julie_genesis_human.glb';
 const canvas = $('#julie-3d');
