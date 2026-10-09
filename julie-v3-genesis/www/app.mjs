@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
 
-const APP_VERSION = '0.3.2';
+const APP_VERSION = '0.3.3';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -133,6 +133,7 @@ $('#import-data')?.addEventListener('click',()=>{
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { fitHumanModel, clampFps, rendererDpr, isAuthorizedAssetUrl } from './avatar-utils.mjs';
 import { adaptEveDerivedFemaleMesh, normalizeGenesisMaterials } from './eve-derived.mjs';
+import { stripGenesisConstructionHelpers } from './genesis-body-cleanup.mjs';
 
 const MODEL_URL = './models/julie_genesis_human.glb';
 const canvas = $('#julie-3d');
@@ -154,7 +155,7 @@ let orbitDirection = 1;
 let modelStats = null;
 
 function updateStatus(message) {
-  if (assetStatus) assetStatus.textContent = message;
+  if (assetStatus){assetStatus.hidden=false;assetStatus.textContent=message;}
 }
 function material(color, roughness=0.92) {
   return new THREE.MeshStandardMaterial({color, roughness, metalness:0});
@@ -230,9 +231,12 @@ async function loadHuman(){
     const root = gltf.scene;
     modelStats=inspectMaterialsAndRetainTextures(root);
     if(modelStats.skinned===0)throw new Error('Le GLB n’a pas de maillage articulé');
+    // Genesis cache ces coquilles de fitting : Julie doit reproduire ce nettoyage
+    // avant de féminiser la vraie peau, sinon les jambes ressemblent à une jupe.
+    const anatomyCleanup=stripGenesisConstructionHelpers(root);
     const femaleAdaptation=adaptEveDerivedFemaleMesh(root);
     const genesisMaterials=normalizeGenesisMaterials(THREE,root);
-    console.info('JULIE V3 — base humaine Genesis adaptée',femaleAdaptation,genesisMaterials);
+    console.info('JULIE — anatomie Genesis propre',anatomyCleanup,femaleAdaptation,genesisMaterials);
     const fitted=fitHumanModel(THREE,root,{heightMeters:1.75});
     avatar=new THREE.Group();
     avatar.name='JULIE_001_genesis_eve_derived_base';
@@ -245,7 +249,9 @@ async function loadHuman(){
     action.clampWhenFinished=false;
     action.play();
     loadedHuman=true;
-    updateStatus(`Maillage Genesis chargé • ${Math.round(fitted.height*100)} cm • ${idle.duration.toFixed(1)} s`);
+    updateStatus(`Corps Genesis nettoyé • ${Math.round(fitted.height*100)} cm • ${anatomyCleanup.removedComponents} coquilles retirées`);
+    // Après le chargement, dégager les pieds et les jambes pour l’inspection 3D.
+    window.setTimeout(()=>{if(loadedHuman&&assetStatus)assetStatus.hidden=true;},6500);
     $('#julie-line').textContent='« J’apprends à habiter un véritable avatar humain. Mon histoire et mes souvenirs restent les miens. 💕 »';
     console.info('JULIE V3: Genesis modèle chargé', {triangles:modelStats.triangles,bones:modelStats.skinned,clip:idle.name});
   }catch(err){
