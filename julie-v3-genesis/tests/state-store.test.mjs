@@ -32,6 +32,19 @@ test('Effacement protégé contre une ancienne restauration',()=>{
   const newer=appendConversation(erased,'Salut','Bonjour',1100);
   assert.equal(mergeImport(newer,prior).state.messages.length,2);
 });
+test('Une suppression issue d\'un autre export se propage sans résurrection',()=>{
+  const before=appendConversation(createInitialState(100),'Salut','Bonjour',120);
+  const deletedElsewhere=eraseDemoHistory(before,1000);
+  const result=mergeImport(before,deletedElsewhere);
+  assert.equal(result.state.id,JULIE_ID);
+  assert.equal(result.state.deletedBefore,1000);
+  assert.equal(result.state.messages.length,0);
+  assert.equal(result.removedMessages,2);
+  assert.equal(result.removedMemories,0);
+  assert.equal(mergeImport(result.state,before).state.messages.length,0);
+  const later=appendConversation(result.state,'Nouveau','Coucou',2000);
+  assert.equal(mergeImport(later,before).state.messages.length,2);
+});
 test('Données invalides : aucune importation partielle',()=>{
   const state=createInitialState(10);
   assert.throws(()=>mergeImport(state,{id:'EVE_001',messages:[],memories:[]}));
