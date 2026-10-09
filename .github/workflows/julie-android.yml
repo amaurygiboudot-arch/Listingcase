@@ -270,17 +270,35 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p docs
-          {
-            echo '# Dernière compilation JULIE vérifiée'
-            echo
-            echo "Commit source : $GITHUB_SHA"
-            echo "Exécution : https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            echo 'Tests : morphologie, mémoire, mise à jour, topologie Genesis sur vrai GLB, APK Android'
-            echo 'Artefact : Julie-Android-APK'
-            echo 'Statut : compilation et publication réussies'
-          } > docs/JULIE_BUILD_STATUS.md
-          git add -- docs/JULIE_BUILD_STATUS.md
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m 'ci(julie): enregistrer build Android réussi'
-          git push origin HEAD:julie-v1
+          # Plusieurs builds peuvent terminer pendant que la branche avance.
+          # Ne jamais échouer uniquement parce qu'un commit plus récent est arrivé.
+          # Aucune source de l'application n'est réécrite par cette étape.
+          for attempt in 1 2 3 4; do
+            git fetch --no-tags origin julie-v1
+            git reset --hard origin/julie-v1
+            mkdir -p docs
+            {
+              echo '# Dernière compilation JULIE vérifiée'
+              echo
+              echo "Commit source : $GITHUB_SHA"
+              echo "Exécution : https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              echo 'Tests : morphologie, mémoire, mise à jour, topologie Genesis sur vrai GLB, APK Android'
+              echo 'Artefact : Julie-Android-APK'
+              echo 'Statut : compilation et publication réussies'
+            } > docs/JULIE_BUILD_STATUS.md
+            git add -- docs/JULIE_BUILD_STATUS.md
+            if git diff --cached --quiet; then
+              echo 'Preuve déjà à jour'
+              exit 0
+            fi
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'ci(julie): enregistrer build Android réussi'
+            if git push origin HEAD:julie-v1; then
+              echo 'Preuve de compilation sauvegardée'
+              exit 0
+            fi
+            echo "La branche a avancé ; nouvel essai $attempt/4"
+            sleep "$attempt"
+          done
+          echo 'La preuve de compilation n’a pas pu être sauvegardée' >&2
+          exit 1
