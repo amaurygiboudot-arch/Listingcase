@@ -24,7 +24,7 @@ import java.util.Map;
 
 /**
  * JULIE 0.3.1 : WebView à origine HTTPS locale, avec maillage GLB dans les assets.
- * Pas d'autorisation INTERNET, ni de chargement de contenus distants.
+ * Accès HTTPS natif pour mises à jour APK vérifiées, pas de JavaScript distant dans WebView.
  * L'import/export JSON ne fonctionne que sur une action explicite de l'utilisateur.
  */
 public final class MainActivity extends Activity {
@@ -38,6 +38,7 @@ public final class MainActivity extends Activity {
     private static final int MAX_JSON_BYTES = JulieSecureStore.MAX_JSON_BYTES;
 
     private JulieSecureStore secureStore;
+    private JulieUpdateManager updates;
     private WebView web;
     private String pendingExport;
 
@@ -126,6 +127,8 @@ public final class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         settings.setMediaPlaybackRequiresUserGesture(true);
         web.addJavascriptInterface(new JulieBridge(),"JulieAndroid");
+        updates=new JulieUpdateManager(this,web);
+        web.addJavascriptInterface(updates,"JulieUpdater");
         web.setWebViewClient(new WebViewClient(){
             @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){
                 return serveLocalResource(request.getUrl());
@@ -173,7 +176,8 @@ public final class MainActivity extends Activity {
         }
     }
     @Override protected void onDestroy(){
-        if(web!=null){web.removeJavascriptInterface("JulieAndroid");web.destroy();}
+        if(updates!=null)updates.close();
+        if(web!=null){web.removeJavascriptInterface("JulieUpdater");web.removeJavascriptInterface("JulieAndroid");web.destroy();}
         super.onDestroy();
     }
 }
