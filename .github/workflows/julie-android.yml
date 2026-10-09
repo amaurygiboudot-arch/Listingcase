@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: julie-android-${{ github.ref }}
@@ -25,7 +25,7 @@ jobs:
       - name: Lire les sources et garder la sauvegarde
         uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          persist-credentials: true
       - name: Contrôler le périmètre de Julie
         shell: bash
         run: |
@@ -151,3 +151,22 @@ jobs:
           path: julie-android-artifact/
           retention-days: 14
           if-no-files-found: error
+
+      - name: Enregistrer la preuve du build réussi
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          {
+            echo '# Dernière compilation JULIE vérifiée'
+            echo
+            echo "Commit source : $GITHUB_SHA"
+            echo "Exécution : https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo 'Tests : morphologie, historique, maillage humain et APK Android'
+            echo 'Artefact : Julie-Android-APK'
+            echo 'Statut : compilation et publication réussies'
+          } > docs/JULIE_BUILD_STATUS.md
+          git add -- docs/JULIE_BUILD_STATUS.md
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'ci(julie): enregistrer build Android réussi'
+          git push origin HEAD:julie-v1
