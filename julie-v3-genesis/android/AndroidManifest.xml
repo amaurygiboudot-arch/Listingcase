@@ -1,7 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Réseau uniquement pour vérifier/télécharger les APK signés depuis GitHub. -->
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+  <!-- Nécessaire pour proposer une APK hors Play Store ; confirmation Android obligatoire. -->
+  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
   <application
       android:allowBackup="false"
-      android:label="JULIE V3 • Genesis"
+      android:label="JULIE • Genesis"
       android:icon="@drawable/julie_icon"
       android:usesCleartextTraffic="false"
       android:theme="@style/AppTheme">
@@ -11,5 +16,6 @@
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
     </activity>
+    <receiver android:name=".JulieInstallReceiver" android:exported="false"/>
   </application>
 </manifest>
