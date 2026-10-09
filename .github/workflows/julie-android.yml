@@ -92,6 +92,8 @@ jobs:
           assert 'appendConversation(saved' in app and 'mergeImport(saved' in app
           assert 'slice(-120)' not in app and 'slice(-60)' not in app
           assert './models/julie_genesis_human.glb' in app
+          assert 'stripGenesisConstructionHelpers(root)' in app
+          assert (d/'integration/check-genesis-body.mjs').exists()
           updater=(d/'android/JulieUpdateManager.java').read_text()
           assert 'sha256' in updater and 'PackageInstaller.SessionParams.MODE_FULL_INSTALL' in updater
           assert 'activity.getPackageName().equals(candidate.packageName)' in updater
@@ -105,6 +107,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --prefix julie-v3-genesis --no-save --no-audit --no-fund three@0.181.1 esbuild@0.25.12
+          node julie-v3-genesis/integration/check-genesis-body.mjs
           ./julie-v3-genesis/node_modules/.bin/esbuild julie-v3-genesis/www/app.mjs \
             --bundle --format=iife --platform=browser --target=es2020 \
             --outfile=julie-v3-genesis/www/app.js
@@ -128,7 +131,7 @@ jobs:
           assert s.count("applicationId 'com.humanpartner'")==1
           s=s.replace("applicationId 'com.humanpartner'","applicationId 'com.julie.preview.v3'")
           s=s.replace('versionCode 9',"versionCode "+str(300000+int('${{ github.run_number }}')))
-          s=s.replace("versionName '0.1.8'","versionName '0.3.2-dev.${{ github.run_number }}'")
+          s=s.replace("versionName '0.1.8'","versionName '0.3.3-dev.${{ github.run_number }}'")
           p.write_text(s)
           PYGRADLE
       - name: Compiler APK Android de test
@@ -147,10 +150,10 @@ jobs:
           unzip -Z1 "$APK" | grep -Fx assets/julie/app.js
           unzip -Z1 "$APK" | grep -Fx classes.dex
           mkdir -p julie-android-artifact
-          cp "$APK" julie-android-artifact/JULIE-Android-0.3.2-debug.apk
+          cp "$APK" julie-android-artifact/JULIE-Android-0.3.3-debug.apk
           cp julie-v3-genesis/README.md julie-android-artifact/LIRE_AVANT_INSTALLATION.md
           cp julie-v3-genesis/CREDITS_MODELE.md julie-android-artifact/CREDITS_MODELE.md
-          (cd julie-android-artifact && sha256sum JULIE-Android-0.3.2-debug.apk > SHA256SUMS.txt)
+          (cd julie-android-artifact && sha256sum JULIE-Android-0.3.3-debug.apk > SHA256SUMS.txt)
       - name: Publier Julie Android
         uses: actions/upload-artifact@v4
         with:
@@ -239,7 +242,7 @@ jobs:
           fi
           export JULIE_RELEASE_APK="$APK"
           export JULIE_RELEASE_VERSIONCODE="$((300000+${{ github.run_number }}))"
-          export JULIE_RELEASE_VERSIONNAME="0.3.2-dev.${{ github.run_number }}"
+          export JULIE_RELEASE_VERSIONNAME="0.3.3-dev.${{ github.run_number }}"
           python3 - <<'PYRELEASE'
           import hashlib,json,os
           from pathlib import Path
@@ -273,7 +276,7 @@ jobs:
             echo
             echo "Commit source : $GITHUB_SHA"
             echo "Exécution : https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            echo 'Tests : morphologie, mémoire, mises à jour signées, maillage humain et APK Android'
+            echo 'Tests : morphologie, mémoire, mise à jour, topologie Genesis sur vrai GLB, APK Android'
             echo 'Artefact : Julie-Android-APK'
             echo 'Statut : compilation et publication réussies'
           } > docs/JULIE_BUILD_STATUS.md
