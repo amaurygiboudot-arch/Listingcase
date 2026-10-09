@@ -45,21 +45,8 @@ function components(g){
 export function findGenesisEyes(g){
   const two=components(g).filter(e=>e.ids.length===308&&e.minY>1.49&&e.maxY<1.54&&e.minZ>.09&&e.maxZ<.14&&Math.abs((e.minX+e.maxX)/2)>.02)
     .sort((a,b)=>(a.minX+a.maxX)-(b.minX+b.maxX));
-  if(two.length!==2||(two[0].minX+two[0].maxX)*(two[1].minX+two[1].maxX)>=0){
-    const all=components(g).sort((a,b)=>b.ids.length-a.ids.length);
-    const near=all.slice(0,45)
-      .map(e=>({count:e.ids.length,ym:[+e.minY.toFixed(4),+e.maxY.toFixed(4)],
-        xm:[+e.minX.toFixed(4),+e.maxX.toFixed(4)],zm:[+e.minZ.toFixed(4),+e.maxZ.toFixed(4)]}));
-    const p=g.attributes.position,idx=g.index;
-    const matched=[];
-    for(let i=0;i<p.count;i++)if(p.getY(i)>1.47&&p.getY(i)<1.57&&p.getZ(i)>.05){
-      matched.push([p.getX(i),p.getY(i),p.getZ(i)]);
-    }
-    const region={count:matched.length,
-      minX:Math.min(...matched.map(x=>x[0])),maxX:Math.max(...matched.map(x=>x[0])),
-      minZ:Math.min(...matched.map(x=>x[2])),maxZ:Math.max(...matched.map(x=>x[2]))};
-    throw Error('Deux vrais globes oculaires Genesis requis; diagnostic='+JSON.stringify({groups:near.slice(0,30),region,selected:two.length}));
-  }
+  if(two.length!==2||(two[0].minX+two[0].maxX)*(two[1].minX+two[1].maxX)>=0)
+    throw Error('Deux globes oculaires du corps Genesis introuvables (topologie inconnue)');
   return two.map(e=>({ids:e.ids,center:new THREE.Vector3((e.minX+e.maxX)/2,(e.minY+e.maxY)/2,(e.minZ+e.maxZ)/2)}));
 }
 
@@ -191,7 +178,7 @@ export function attachJulieFace(model){
   if(!model?.traverse)throw Error('Julie: modèle Genesis absent');
   let human=null;
   model.traverse(node=>{
-    if(node.isSkinnedMesh&&node.geometry?.userData?.julieFemaleTopologyCleaned)human=node;
+    if(node.isSkinnedMesh&&node.geometry?.userData?.julieFemaleTopologyCleaned&&node.geometry.index?.count>50000&&node.geometry.attributes.position?.count>=20000)human=node;
   });
   if(!human?.skeleton)throw Error('Corps féminin Genesis non reconnu');
   const eye=attachEyes(human),morph=createFaceMorphs(human,eye.eyes);

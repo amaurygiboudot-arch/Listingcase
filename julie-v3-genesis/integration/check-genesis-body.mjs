@@ -45,6 +45,7 @@ assert.equal(fem.malePartsRemoved,4,'Quatre composants attendus sur le GLB réel
 assert.ok(fem.removedTriangles>0,'Le nettoyage anatomique doit retirer des triangles');
 const wardrobe=attachJulieWardrobe(THREE,gltf.scene,{outfit:'rose'});
 assert.equal(wardrobe.layers.length,2,'Deux pièces de tenue doivent suivre les os');
+assert.ok(wardrobe.layers.every(layer=>layer.geometry.userData.julieFemaleTopologyCleaned===false),'Aucun vêtement ne doit imiter le corps féminin');
 assert.ok(wardrobe.triangles>400,'Les vêtements doivent couvrir suffisamment de triangles humains');
 assert.ok(wardrobe.layers.every(layer=>layer.isSkinnedMesh&&layer.skeleton===mesh.skeleton),'Habillage détaché du squelette');
 assert.equal(wardrobe.setOutfit('bleu'),'bleu');

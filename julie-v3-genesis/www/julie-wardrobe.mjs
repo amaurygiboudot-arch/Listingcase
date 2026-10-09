@@ -38,6 +38,8 @@ export function selectFabricIndices(geometry,name){
 }
 function fittedGeometry(original,indices){
   const clone=original.clone();
+  // Un vêtement ne peut pas se déclarer corps humain Genesis.
+  clone.userData={...clone.userData,julieWardrobeSurface:true,julieFemaleTopologyCleaned:false};
   clone.setIndex(indices);
   clone.clearGroups();
   const touched=new Set(indices);

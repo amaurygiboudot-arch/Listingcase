@@ -159,7 +159,7 @@ export function attachJulieHair(model,{quality='balanced'}={}){
   if(!model?.traverse)throw Error('Julie: tête Genesis manquante');
   let source=null;
   model.traverse(obj=>{
-    if(obj.isSkinnedMesh&&obj.geometry?.userData?.julieFemaleTopologyCleaned)source=obj;
+    if(obj.isSkinnedMesh&&obj.geometry?.userData?.julieFemaleTopologyCleaned&&obj.geometry.index?.count>50000&&obj.geometry.attributes.position?.count>=20000)source=obj;
   });
   const head=findHead(model);
   if(!source||!head)throw Error('Crâne féminin articulé non trouvé');
