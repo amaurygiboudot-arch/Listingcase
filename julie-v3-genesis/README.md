@@ -1,4 +1,4 @@
-# JULIE — canal Android de développement (0.3.2)
+# JULIE — canal Android de développement (0.3.3)
 
 **Source active sur `julie-v1`** : `julie-v3-genesis/`. Le nom du répertoire est hérité du premier prototype Genesis ; il n'implique pas la création d'une nouvelle APK à chaque mise à jour.
 
@@ -19,7 +19,7 @@
 Un seul workflow à utiliser pour les prochaines versions : `.github/workflows/julie-android.yml`.
 Les anciens workflows et les anciennes versions doivent être considérés comme des archives/prototypes, à retirer uniquement après preuve du bon fonctionnement du nouveau canal.
 
-Paquet Android de développement : `com.julie.preview.v3` (inchangé par rapport à Julie V3), version 0.3.2. **Signature** : tant qu'une clé Android privée et persistante n'est pas configurée dans GitHub Actions, l'APK de test reste signée avec une clé debug propre au runner. L'installation par-dessus l'ancienne peut alors être refusée. **Exporter les souvenirs avant toute désinstallation** puis importer volontairement l'export JSON. Une désinstallation efface la mémoire chiffrée AndroidKeyStore.
+Paquet Android de développement : `com.julie.preview.v3` (inchangé par rapport à Julie V3), version 0.3.3. **Signature** : tant qu'une clé Android privée et persistante n'est pas configurée dans GitHub Actions, l'APK de test reste signée avec une clé debug propre au runner. L'installation par-dessus l'ancienne peut alors être refusée. **Exporter les souvenirs avant toute désinstallation** puis importer volontairement l'export JSON. Une désinstallation efface la mémoire chiffrée AndroidKeyStore.
 
 ### Flux des mises à jour
 - Source de mise à jour : `https://api.github.com/repos/amaurygiboudot-arch/Listingcase/releases/tags/julie-android-updates`.
@@ -27,6 +27,13 @@ Paquet Android de développement : `com.julie.preview.v3` (inchangé par rapport
 - La Release GitHub doit contenir un seul fichier `JULIE-Android.apk`, avec métadonnées JSON de version/empreinte. **Aucune mise à jour ne sera proposée avant sa publication.**
 - Pour publier des mises à jour compatibles, une **clé de signature Android stable** doit être enregistrée dans les secrets GitHub Actions. Ne jamais publier la clé dans le dépôt ou les logs, et ne jamais insister sur une installation si la signature diffère.
 - Après une première migration contrôlée depuis l'APK de test à signature temporaire, les futures versions signées avec la même clé pourront s'installer sans effacer le stockage privé Android.
+
+## Correctif du modèle à partir de la vidéo (0.3.3)
+- Suppression des **quatre coquilles de construction** du fichier MakeHuman/MPFB qui faisaient apparaître le bas du corps sous la forme d'une fausse jupe couleur peau.
+- Le nettoyage ne retire que les indices de triangles vérifiés sur la topologie connue ; maillage corporel, UV, animation, morph targets et poids du squelette sont préservés.
+- Le workflow teste cette opération sur le **vrai GLB de Genesis** et échoue si les résultats ou la topologie ne correspondent plus.
+- L'information de chargement se masque après quelques secondes afin de laisser les jambes visibles pour l'inspection.
+- Le visage, les cheveux, les vêtements physiques et les mouvements réalistes avancés restent à développer ; la correction doit être validée visuellement sur Android.
 
 ## Limites importantes
 Cette application n'est pas une compagne pleinement autonome, ne possède pas de voix, de synchronisation sécurisée ni de monde persistant. Le corps utilise la même source GLB humanoïde que Genesis et seulement une première morphologie féminine adaptée : l'apparence exacte d'Ève (cheveux, yeux, texture peau, animations et morphs avancés) est encore à intégrer et doit être contrôlée visuellement.
