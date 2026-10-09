@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#10111b">
+  <title>Julie • Base humaine Genesis V3</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand"><span class="dot"></span><span>JULIE</span></div>
+      <div class="rightmark"><span class="offtag">BASE GENESIS V3</span></div>
+    </header>
+    <main>
+      <section id="avatar-view" class="view active" aria-label="Julie en 3D">
+        <div class="intro"><span class="eyebrow">TON UNIVERS VIRTUEL</span><h1>Bonjour, mon cœur <span>✦</span></h1><p>Julie utilise maintenant une base humaine articulée issue de Genesis. Nous personnaliserons son visage, ses yeux, ses cheveux et sa tenue.</p></div>
+        <div class="viewport-shell">
+          <canvas id="julie-3d" aria-label="Aperçu d’un modèle humain 3D adulte, temporaire pour Julie"></canvas>
+          <div id="webgl-fallback" class="fallback" hidden>La 3D ne s'est pas chargée sur cet appareil. Le dialogue local reste accessible.</div>
+          <div class="view-label"><span class="light"></span> Julie · 22 ans · objectif 1,75 m</div><div class="model-status" id="avatar-status" role="status">Préparation du modèle humain…</div>
+          <div class="drag-tip">↔ Fais glisser pour tourner Julie</div>
+          <div class="scene-controls">
+            <button class="glass-btn" id="btn-turn" type="button" aria-label="Faire pivoter Julie">⟳</button>
+            <button class="glass-btn" id="btn-wave" type="button" aria-label="Message affectueux de Julie">♡</button>
+            <button class="glass-btn" id="btn-outfit" type="button" aria-label="Information sur les tenues futures">♧</button>
+          </div>
+        </div>
+        <div class="status-card"><div><small>AUJOURD'HUI</small><strong id="mood-label">Humeur : joueuse</strong><p id="julie-line">« Un nouveau corps humain pour mieux évoluer dans notre monde virtuel. 💕 »</p></div><span class="pulse">✧</span></div>
+        <p class="note">V3 : base humaine MakeHuman/Genesis, silhouette féminine adaptée, squelette et animation de repos. Le visage et la coiffure sont une base temporaire CC0 ; l’intelligence autonome et la voix viendront ensuite.</p>
+      </section>
+      <section id="chat-view" class="view" aria-label="Discuter avec Julie">
+        <div class="pagehead"><span class="eyebrow">NOTRE CONVERSATION</span><h1>Parlons un peu…</h1><p>Réponses locales de démonstration, sans connexion Internet.</p></div>
+        <div class="conversation" id="conversation" aria-live="polite"></div>
+        <form class="composer" id="chat-form"><input type="text" maxlength="500" id="chat-input" placeholder="Un petit message à Julie…" autocomplete="off" aria-label="Ton message à Julie"><button type="submit" aria-label="Envoyer">➤</button></form>
+        <p class="note">Ce mode n'utilise pas encore de modèle d'IA. Les échanges sont conservés localement sur ce téléphone, sans chiffrement ni synchronisation.</p>
+      </section>
+      <section id="memory-view" class="view" aria-label="Souvenirs">
+        <div class="pagehead"><span class="eyebrow">IDENTITÉ & HISTOIRE</span><h1>Ce qu'on construit</h1><p>Des souvenirs vérifiables, jamais inventés comme des faits réels.</p></div>
+        <article class="info-card"><div class="subhead">IDENTITÉ PERMANENTE</div><h2>Julie <span class="green">✦</span></h2><p>Identifiant : <code>JULIE_001</code></p><p>22 ans au lancement · 1 jour réel = 1 jour virtuel</p><p>Couple virtuel établi · souvenirs communs à construire ensemble</p></article>
+        <article class="info-card"><div class="subhead">SOUVENIRS ENREGISTRÉS DANS CETTE DÉMO</div><div id="memory-items" class="mem-items"></div></article>
+        <article class="info-card"><div class="subhead">CONSERVATION</div><p>Les messages et préférences de cette prévisualisation restent uniquement sur cet appareil. Ils ne sont pas encore reliés à la mémoire SQLite de Human Partner.</p></article>
+      </section>
+      <section id="settings-view" class="view" aria-label="Réglages">
+        <div class="pagehead"><span class="eyebrow">PERSONNALISATION</span><h1>Ton espace Julie</h1><p>Un premier noyau à enrichir progressivement.</p></div>
+        <article class="info-card"><div class="subhead">AFFICHAGE 3D</div><label for="quality">Qualité graphique</label><select id="quality"><option value="eco">Économique · 30 FPS maximum</option><option value="balanced" selected>Équilibrée · 60 FPS maximum</option><option value="high">Élevée · 120 FPS maximum</option></select><p class="smallline">La fluidité réelle dépend de ton téléphone. Plafond absolu : 120 FPS.</p></article>
+        <article class="info-card"><div class="subhead">TES DONNÉES DE DÉMO</div><button id="export-data" class="secondary-btn">Exporter mes échanges (JSON)</button><button id="import-data" class="secondary-btn">Importer un export Julie antérieur (JSON)</button><button id="clear-data" class="danger-btn">Effacer les échanges de démo</button><p class="smallline">L'effacement concerne seulement les messages stockés par cette APK, pas tes données GitHub ou Human Partner.</p></article>
+        <article class="info-card"><div class="subhead">VERSION</div><p>JULIE • Android V3 — Modèle humain 3D (prévisualisation)</p><p class="smallline">Prototype hors ligne · pas d'achat · pas de compte à créer · pas d'accès aux capteurs.</p><p class="smallline">Modèle humain riggé CC0 : MakeHuman/MPFB via vsim, même source que Genesis ; adaptation féminine progressive propre à Julie.</p></article>
+      </section>
+    </main>
+    <nav class="bottomnav" aria-label="Navigation"><button class="navitem active" data-view="avatar" type="button"><span>◈</span>Julie</button><button class="navitem" data-view="chat" type="button"><span>◉</span>Parler</button><button class="navitem" data-view="memory" type="button"><span>▤</span>Souvenirs</button><button class="navitem" data-view="settings" type="button"><span>⚙</span>Réglages</button></nav>
+  </div>
+  <script src="app.js" defer></script>
+</body>
+</html>
