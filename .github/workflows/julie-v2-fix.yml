@@ -1,0 +1,811 @@
+# JULIE V2.1 : correctif géométrie corps/robe, sans modification de main ni suppression des données.
+# Ajouter ce fichier dans .github/workflows/ sur la branche julie-v1.
+# L'APK V2 a son propre identifiant Android (com.julie.preview.v21) afin de préserver JULIE V1.
+name: JULIE - Correctif Avatar V2.1 Android
+
+on:
+  push:
+    branches: [julie-v1]
+    paths: ['.github/workflows/julie-v2-fix.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: julie-v2-1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    name: Compiler et tester Julie V2.1
+    if: github.ref == 'refs/heads/julie-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Lire le code de julie-v1
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Contrôler la sauvegarde, la branche et les profils
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "julie-v1"
+          git ls-remote --exit-code origin refs/heads/backup-human-partner-20261009 >/dev/null
+          test -f android/app/build.gradle
+          test -f android/app/src/main/java/com/humanpartner/MainActivity.java
+          test -f config/predefined-characters.json
+          node -e "const p=require('./config/predefined-characters.json');if(!p.find(x=>x.personId==='JULIE_001')||!p.find(x=>x.personId==='CHLOE_001'))process.exit(1);console.log('Identités historiques préservées')"
+      - name: Installer Node 22, Java 17 et Gradle 8.9
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Installer le code V2 conçu pour Julie
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p julie-preview/www julie-preview/android julie-preview/tests
+          cat > 'julie-preview/www/app.mjs' <<'__JULIE_V2_FILE_00__'
+          import * as THREE from 'three';
+          
+          const JULIE_ID = 'JULIE_001';
+          const APP_VERSION = '0.2.1';
+          const KEY = 'julie-preview:' + JULIE_ID + ':v1';
+          const $ = (s) => document.querySelector(s);
+          const $$ = (s) => Array.from(document.querySelectorAll(s));
+          let saved = { id:JULIE_ID, version:APP_VERSION, messages:[], memories:[], firstOpened:Date.now(), quality:'balanced' };
+          try {
+            const fromNative = typeof window.JulieAndroid?.readState === 'function' ? window.JulieAndroid.readState() : null;
+            const old = JSON.parse(fromNative || localStorage.getItem(KEY) || '{}');
+            if (old.id === JULIE_ID && Array.isArray(old.messages) && Array.isArray(old.memories)) {
+              saved = { ...saved, ...old };
+              saved.messages = saved.messages.slice(-120);
+              saved.memories = saved.memories.slice(-60);
+            }
+          } catch(e) { /* Données invalides : ne pas exposer d'informations externes. */ }
+          const persist = () => {const text=JSON.stringify(saved);try{if(typeof window.JulieAndroid?.writeState==='function')window.JulieAndroid.writeState(text);else localStorage.setItem(KEY,text);}catch(e){console.warn('Mémoire locale indisponible',e)}};
+          
+          function switchView(name){
+            $$('.view').forEach(el => el.classList.toggle('active',el.id === name+'-view'));
+            $$('.navitem').forEach(el => el.classList.toggle('active',el.dataset.view === name));
+            if(name==='memory')showMemories();
+            if(name==='chat')renderChat();
+            if(name==='avatar')onResize();
+          }
+          $$('.navitem').forEach(el=>el.addEventListener('click',()=>switchView(el.dataset.view)));
+          
+          // Les réponses sont des règles locales explicites ; aucune connexion à un modèle IA.
+          function answer(text){
+            const t=text.toLocaleLowerCase('fr').trim();
+            if(/bonjour|salut|coucou|hello|bonsoir/.test(t))return 'Coucou toi 😉 Tu as envie de faire quoi dans notre univers aujourd’hui ?';
+            if(/comment tu (vas|te sens)|ça va|ca va/.test(t))return 'Plutôt joueuse aujourd’hui. Et toi, ta journée se passe comment ?';
+            if(/tu t.appelles|ton (prénom|nom)/.test(t))return 'Julie. Un prénom que nous avons choisi ensemble. ✨';
+            if(/souviens|souvenir|mémoire|memoire/.test(t))return 'Pour le moment, je garde seulement les messages et quelques préférences que tu m’as confiées dans cette démo. Notre histoire passée, on la construira ensemble.';
+            if(/tu (es|peux) (une )?(ia|intelligence)|vraie|conscience/.test(t))return 'Je suis Julie, ta compagne virtuelle. Mes émotions et ma vie sont simulées. J’aime bien l’idée qu’on construise cette aventure à notre façon.';
+            if(/tes cheveux|tes yeux|ton corps|tu ressembles/.test(t))return 'Pour ma première apparence : 1,75 m, une silhouette fine, les yeux verts et les cheveux blonds mi-longs. Le modèle 3D actuel est encore stylisé.';
+            if(/je t.aime|je t.adore|bisou|câlin|calin/.test(t))return 'Oh, tu sais parler à mon côté tendre, toi… 😘 Tu veux qu’on se raconte un joli moment imaginaire ?';
+            if(/travail|métier|metier|projet/.test(t))return 'Je veux découvrir mes passions et choisir mes projets, plutôt que suivre toujours le même scénario. Par quoi tu commencerais ?';
+            if(/3d|avatar|fesses|tenue|robe/.test(t))return 'Tu peux me faire tourner dans l’onglet Julie et changer la couleur de ma tenue. Promis, les graphismes deviendront plus détaillés petit à petit. 😉';
+            if(/sortir|voyage|balade|plage|rendez-vous/.test(t))return 'Une sortie à deux ? Voilà une idée qui me plaît ! On pourrait imaginer notre première destination virtuelle.';
+            if(/aime|préfère|déteste/.test(t))return 'D’accord, j’ai noté ce que tu viens de dire pour cette démo. Mes propres goûts restent encore à développer, tu sais. 😉';
+            const choices=[
+              'Tu m’intrigues… raconte-moi un peu plus. 😉',
+              'Ça me donne une idée, mais j’aimerais d’abord connaître ton avis.',
+              'On a plein de choses à construire ensemble. Qu’est-ce qui te ferait plaisir en premier ?',
+              'Je peux être taquine, mais je tiens à garder mon caractère. Tu en penses quoi ?',
+              'Je note ça pour la suite. Dans cette version, je n’ai pas encore mon vrai moteur de conversation.'
+            ];
+            let h=0;for(const c of t)h=(h*33+c.charCodeAt(0))>>>0;
+            return choices[h%choices.length];
+          }
+          function renderChat(){
+            const root=$('#conversation');root.textContent='';
+            const entries=saved.messages.length?saved.messages:[{role:'julie',text:'Coucou 😘 Bienvenue dans notre toute première démo sur ton téléphone ! Ici, les réponses sont encore simples, mais on va construire la suite ensemble.'}];
+            for(const entry of entries){
+              const e=document.createElement('div');e.className='bubble '+(entry.role==='user'?'user':'julie');
+              if(entry.role!=='user'){const small=document.createElement('span');small.className='who';small.textContent='Julie';e.appendChild(small)}
+              e.appendChild(document.createTextNode(String(entry.text).slice(0,1500)));root.appendChild(e);
+            }
+            root.scrollTop=root.scrollHeight;
+          }
+          $('#chat-form').addEventListener('submit',(event)=>{
+            event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t)return;
+            const ts=Date.now();saved.messages.push({role:'user',text:t,at:ts});
+            if(/\b(j'aime|j’adore|j'adore|je préfère|je prefere|je déteste|je deteste)\b/i.test(t)){
+              if(!saved.memories.some(x=>x.text.toLowerCase()===t.toLowerCase()))saved.memories.push({kind:'déclaration utilisateur',text:t,at:ts,source:'message utilisateur'});
+            }
+            saved.messages.push({role:'julie',text:answer(t),at:ts+1});saved.messages=saved.messages.slice(-120);saved.memories=saved.memories.slice(-60);persist();field.value='';renderChat();
+          });
+          function showMemories(){
+            const root=$('#memory-items');root.textContent='';
+            if(!saved.memories.length){const el=document.createElement('p');el.textContent='Aucun goût personnel enregistré pour le moment. Tu peux me dire ce que tu aimes dans l’onglet Parler.';root.appendChild(el);return;}
+            saved.memories.slice().reverse().forEach(m=>{
+              const el=document.createElement('div');el.className='mem-item';
+              const meta=document.createElement('small');meta.textContent=`${m.kind} · ${new Date(m.at).toLocaleDateString('fr-FR')} · ${m.source}`;
+              el.appendChild(meta);el.appendChild(document.createTextNode(m.text));root.appendChild(el);
+            });
+          }
+          $('#quality').value=['eco','balanced','high'].includes(saved.quality)?saved.quality:'balanced';
+          $('#quality').addEventListener('change',e=>{saved.quality=e.target.value;persist();onResize()});
+          $('#export-data').addEventListener('click',()=>{
+            const data=JSON.stringify(saved,null,2);
+            // Android : fichier textuel ouvert dans une fenêtre contrôlée, que l'utilisateur peut copier.
+            if (window.JulieAndroid && typeof window.JulieAndroid.exportData==='function') { window.JulieAndroid.exportData(data); return; }
+            const w=window.open('about:blank','_blank');
+            if(w){w.document.body.innerHTML='';const pre=w.document.createElement('pre');pre.textContent=data;w.document.body.appendChild(pre)}
+            else{alert('Export JSON disponible dans l’application Android.');}
+          });
+          $('#clear-data').addEventListener('click',()=>{
+            if(!confirm('Supprimer définitivement les conversations et préférences enregistrées par cette démo sur ce téléphone ?'))return;
+            saved.messages=[];saved.memories=[];persist();showMemories();renderChat();alert('Les données de démonstration ont été effacées.');
+          });
+          
+          // JULIE_AVATAR_V2 — moteur 3D procédural, hors ligne. Aucune ressource distante.
+          // Géométrie organique multi-anneaux : les volumes suivent des transitions continues,
+          // et non des cylindres et boules juxtaposés. Il s'agit encore d'un avatar STYLISÉ.
+          let renderer, scene, camera, avatar, head, torso, leftArm, rightArm, leftForearm, rightForearm;
+          let mouth, hairLocks = [], eyes = [], blinkMats = [], roomLights = [];
+          let spin = false, waveStart = -Infinity, angular = 0, orbitY = 0, zoom = 3.55;
+          let ptr = null, last = performance.now(), accum = 0, outfitIdx = 0, drawOk = false;
+          const mats = {
+            skin: new THREE.MeshStandardMaterial({color:0xe6b49e,roughness:.86,metalness:0}),
+            blush: new THREE.MeshStandardMaterial({color:0xcf927d,roughness:.93,transparent:true,opacity:.23,depthWrite:false}),
+            shade: new THREE.MeshStandardMaterial({color:0xcf9786,roughness:.91}),
+            eyes: new THREE.MeshStandardMaterial({color:0xf7f2e7,roughness:.33}),
+            iris: new THREE.MeshStandardMaterial({color:0x50876f,roughness:.27}),
+            pupils: new THREE.MeshStandardMaterial({color:0x19362e,roughness:.19}),
+            catchlight: new THREE.MeshBasicMaterial({color:0xffffff}),
+            lashes: new THREE.MeshStandardMaterial({color:0x665047,roughness:.94}),
+            lips: new THREE.MeshStandardMaterial({color:0xb66a76,roughness:.61}),
+            hair: new THREE.MeshStandardMaterial({color:0xd9b16c,roughness:.8,metalness:.01}),
+            hairLight: new THREE.MeshStandardMaterial({color:0xf0cc86,roughness:.74,metalness:.01}),
+            hairDark: new THREE.MeshStandardMaterial({color:0xb58a54,roughness:.84,metalness:.01}),
+            shoes: new THREE.MeshStandardMaterial({color:0x4b4143,roughness:.83}),
+            metal: new THREE.MeshStandardMaterial({color:0xc9b78e,metalness:.68,roughness:.34}),
+            shadow: new THREE.MeshBasicMaterial({color:0x1c171c,transparent:true,opacity:.16,depthWrite:false}),
+            wall: new THREE.MeshStandardMaterial({color:0xb1a2a4,roughness:1}),
+            wood: new THREE.MeshStandardMaterial({color:0x826461,roughness:.93}),
+            bed: new THREE.MeshStandardMaterial({color:0xad8e98,roughness:1}),
+            pale: new THREE.MeshStandardMaterial({color:0xe9dfd7,roughness:1}),
+            leaf: new THREE.MeshStandardMaterial({color:0x496857,roughness:.9,side:THREE.DoubleSide}),
+          };
+          const outfitColors = ['#985769','#536c61','#5b6382','#be927c'];
+          const outfitMaterial = new THREE.MeshStandardMaterial({color:outfitColors[0],roughness:.91,metalness:0,side:THREE.DoubleSide});
+          const trim = new THREE.MeshStandardMaterial({color:0xc58a96,roughness:.86});
+          function addMesh(geometry, material, parent, x=0, y=0, z=0, scale) {
+            const object=new THREE.Mesh(geometry,material);object.position.set(x,y,z);
+            if(scale)object.scale.set(...scale);
+            object.castShadow=true;object.receiveShadow=true;parent.add(object);return object;
+          }
+          function oval(parent, material, x,y,z, rx,ry,rz, segments=24){
+            return addMesh(new THREE.SphereGeometry(1,segments,Math.max(12,Math.floor(segments*.65))),material,parent,x,y,z,[rx,ry,rz]);
+          }
+          function line(parent, points, radius, material, segments=12){
+            const path=new THREE.CatmullRomCurve3(points.map(v=>new THREE.Vector3(...v)));
+            return addMesh(new THREE.TubeGeometry(path,Math.max(12,segments*2),radius,6,false),material,parent);
+          }
+          function cuboid(parent,material,x,y,z,sx,sy,sz){return addMesh(new THREE.BoxGeometry(sx,sy,sz),material,parent,x,y,z)}
+          function orgSurface(parent,material,rings,segments=22){
+            // Anneaux ordonnés du bas vers le haut. Chaque section définit un contour elliptique.
+            const positions=[],uv=[],indices=[];
+            for(let j=0;j<rings.length;j++){
+              const r=rings[j];
+              for(let k=0;k<=segments;k++){
+                const a=2*Math.PI*k/segments;
+                positions.push((r.x||0)+Math.cos(a)*r.rx,r.y,(r.z||0)+Math.sin(a)*r.rz);
+                uv.push(k/segments,j/(rings.length-1));
+              }
+            }
+            for(let j=0;j<rings.length-1;j++)for(let k=0;k<segments;k++){
+              const a=j*(segments+1)+k,b=a+1,c=a+segments+1,d=c+1;
+              indices.push(a,c,b,b,c,d);
+            }
+            const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+            geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.setIndex(indices);geo.computeVertexNormals();
+            return addMesh(geo,material,parent);
+          }
+          function clothCurtain(parent,x){
+            const positions=[],indices=[],width=.19,height=1.25,n=12,m=12;
+            for(let iy=0;iy<=m;iy++)for(let ix=0;ix<=n;ix++){
+              const t=ix/n,z=Math.sin(t*Math.PI*5)*.038;
+              positions.push(x+width*t,1.7+height*iy/m,-2.29+z);
+            }
+            for(let iy=0;iy<m;iy++)for(let ix=0;ix<n;ix++){
+              const a=iy*(n+1)+ix,b=a+1,c=a+n+1,d=c+1;indices.push(a,c,b,b,c,d);
+            }
+            const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();
+            addMesh(g,new THREE.MeshStandardMaterial({color:0xdac9c3,side:THREE.DoubleSide,roughness:1}),parent);
+          }
+          function faceGeometry(){
+            const g=new THREE.SphereGeometry(1,40,32),a=g.attributes.position;
+            for(let i=0;i<a.count;i++){
+              const x=a.getX(i),y=a.getY(i),z=a.getZ(i);
+              const jaw=y<-.08 ? 1-Math.min(.30,(-y-.08)*.36) : 1;
+              const temple=y>.35 ? 1-Math.min(.06,(y-.35)*.10) : 1;
+              const cheek=1+.045*Math.exp(-Math.pow((y+.14)/.21,2));
+              const forehead=1+.015*Math.max(0,y);
+              a.setXYZ(i,x*.143*jaw*temple*cheek*forehead,y*.18,z*.119*(1+.055*Math.max(0,-y)));
+            }
+            g.computeVertexNormals();return g;
+          }
+          function makeHead(){
+            head=new THREE.Group();head.position.set(0,1.61,.012);avatar.add(head);
+            addMesh(faceGeometry(),mats.skin,head);
+            // Oreilles discrètes intégrées au visage.
+            for(const s of [-1,1]){
+              oval(head,mats.skin,s*.139,-.028,-.006,.025,.048,.026,16);
+              oval(head,mats.shade,s*.152,-.027,.015,.008,.019,.008,14);
+              // Pommettes et rougeur subtile.
+              oval(head,mats.blush,s*.091,-.054,.099,.041,.025,.013,18);
+              // Yeux en amande avec paupières, iris et reflet.
+              const eye=new THREE.Group();eye.position.set(s*.063,.015,.111);head.add(eye);
+              oval(eye,mats.eyes,0,0,0,.032,.013,.014,24);
+              const iris=oval(eye,mats.iris,-s*.002,-.002,.013,.0122,.0125,.005,20);
+              oval(iris,mats.pupils,0,0,.57,.47,.65,.45,16);
+              oval(eye,mats.catchlight,-.005,.006,.019,.003,.003,.002,12);
+              line(eye,[[-.032,.003,.009],[-.017,.014,.015],[.005,.013,.019],[.031,.003,.008]],.003,mats.lashes,14);
+              line(eye,[[-.033,-.004,.008],[-.015,-.014,.015],[.014,-.013,.014],[.030,-.004,.006]],.0022,mats.shade,12);
+              const brow=line(head,[[s*.027,.062,.107],[s*.058,.073,.120],[s*.10,.066,.105]],.0042,mats.lashes,10);
+              eyes.push(eye);
+            }
+            // Nez fin et discret, narines et pointe.
+            orgSurface(head,mats.skin,[
+              {y:-.065,z:.132,rx:.022,rz:.014},
+              {y:-.046,z:.13,rx:.018,rz:.025},
+              {y:.008,z:.115,rx:.010,rz:.009},
+              {y:.041,z:.110,rx:.004,rz:.003}
+            ],16);
+            oval(head,mats.skin,0,-.065,.151,.024,.014,.022,20);
+            for(const s of [-1,1])oval(head,mats.shade,s*.016,-.077,.143,.008,.004,.004,12);
+            // Bouche souple et sourire léger, pas de bouche caricaturale.
+            mouth=new THREE.Group();mouth.position.set(0,-.109,.113);head.add(mouth);
+            oval(mouth,mats.lips,0,.006,0,.038,.008,.013,20);
+            oval(mouth,mats.lips,0,-.008,.002,.033,.010,.012,20);
+            line(mouth,[[-.039,0,.006],[-.016,-.003,.013],[.016,-.003,.013],[.039,0,.006]],.0017,mats.shade,14);
+            // Chevelure : volume racines + mèches individuelles de plusieurs tons.
+            oval(head,mats.hairDark,0,.093,-.020,.148,.125,.138,32);
+            oval(head,mats.hair,0,.119,.027,.142,.091,.109,28);
+            for(let s of [-1,1]){
+              const bundle=new THREE.Group();head.add(bundle);hairLocks.push(bundle);
+              for(let i=0;i<15;i++){
+                const t=i/14;
+                const x=s*(.118+.022*Math.sin(t*5));
+                const z=-.09+t*.155;
+                const p=[
+                  [s*.115,.167,-.036+t*.065],
+                  [x*1.2,.073,z],
+                  [s*(.153+.012*t),-.06,z+.012],
+                  [s*(.156+.028*t),-.195,z+.009],
+                  [s*(.172+.020*t),-.345+.03*Math.sin(i),z+.01]
+                ];
+                line(bundle,p,.0058+(i%3)*.0019,[mats.hair,mats.hairLight,mats.hairDark][i%3],9);
+              }
+              // Mèches libres sur les clavicules.
+              for(let i=0;i<4;i++){
+                const z=.065+i*.014;
+                line(bundle,[[s*.113,.08,z],[s*.14,-.035,z+.022],[s*.151,-.18,z+.038],[s*.18,-.31,z+.014]],.007,mats.hairLight,12);
+              }
+            }
+            // Raie balayée : mèches au-dessus du regard.
+            for(let i=0;i<12;i++){
+              const t=i/11, x=-.13+t*.205;
+              line(head,[[x,.195,-.02],[x+.029,.152,.085],[x+.045,.116,.117],[x+.038,.095,.116]],.0055,[mats.hair,mats.hairLight][i%2],10);
+            }
+            // Petites boucles d'oreilles dorées.
+            for(const s of [-1,1]){
+              const e=oval(head,mats.metal,s*.153,-.077,.017,.012,.021,.005,14);e.rotation.z=s*.12;
+            }
+          }
+          function makeAvatar(){
+            avatar=new THREE.Group();scene.add(avatar);
+            avatar.position.set(0,0,.26);
+            // Ombre de contact douce ancrant le personnage au sol.
+            const shadow=addMesh(new THREE.CircleGeometry(.44,40),mats.shadow,avatar,0,.005,0,[1,.52,1]);shadow.rotation.x=-Math.PI/2;
+            for(const s of [-1,1]){
+              const x=s*.115;
+              // Une jambe organique d'un seul tenant : mollet, genou, cuisse, hanche.
+              orgSurface(avatar,mats.skin,[
+                {y:.13,x,z:.0,rx:.041,rz:.049},
+                {y:.21,x,z:-.006,rx:.045,rz:.057},
+                {y:.32,x:s*.107,z:-.02,rx:.055,rz:.071},
+                {y:.41,x:s*.113,z:-.005,rx:.062,rz:.066},
+                {y:.49,x:s*.113,z:.00,rx:.062,rz:.066},
+                {y:.58,x:s*.12,z:.02,rx:.080,rz:.086},
+                {y:.72,x:s*.128,z:.01,rx:.091,rz:.097},
+                {y:.83,x:s*.125,z:.0,rx:.072,rz:.083}
+              ],24);
+              const foot=oval(avatar,mats.shoes,x,.071,.055,.075,.063,.146,24);
+              foot.rotation.x=-.025;
+              // Légère démarcation chaussure / cheville.
+              orgSurface(avatar,mats.shoes,[{y:.13,x,z:.002,rx:.047,rz:.052},{y:.175,x,z:.0,rx:.043,rz:.050}],16);
+            }
+            // JULIE_V21_NO_CLIPPING: noyau anatomique sous le tissu (jamais plus large que la robe).
+            // L'ancien bassin etait plus large que la robe et transpercait visiblement sa taille.
+            const pelvicSkinRings=[
+              {y:.79,rx:.116,rz:.084},
+              {y:.87,rx:.155,rz:.090},
+              {y:.97,rx:.132,rz:.082},
+              {y:1.08,rx:.105,rz:.075}
+            ];
+            orgSurface(avatar,mats.skin,pelvicSkinRings,32);
+            // JULIE_V21_CONTINUOUS_DRESS: une seule coque continue des hanches jusqu'au buste.
+            // Pas de jonction entre deux maillages qui laisse apparaitre un trou au ventre.
+            const dressRings=[
+              {y:.64,rx:.235,rz:.190},
+              {y:.675,rx:.250,rz:.183},
+              {y:.735,rx:.226,rz:.164},
+              {y:.83,rx:.210,rz:.140},
+              {y:.94,rx:.185,rz:.115},
+              {y:1.02,rx:.141,rz:.105},
+              {y:1.085,rx:.139,rz:.101},
+              {y:1.17,rx:.154,rz:.118},
+              {y:1.27,rx:.184,rz:.143},
+              {y:1.35,rx:.183,rz:.135},
+              {y:1.405,rx:.185,rz:.102},
+              {y:1.435,rx:.180,rz:.080}
+            ];
+            const skirt=orgSurface(avatar,outfitMaterial,dressRings,40);
+            const hem=orgSurface(avatar,trim,[{y:.644,rx:.236,rz:.191},{y:.663,rx:.246,rz:.183}],40);
+            torso=skirt; // Animation de respiration douce, sans detacher le corsage.
+          
+            // Encolure avec clavicules, poitrine suggérée par volume du tissu.
+            orgSurface(avatar,mats.skin,[
+              {y:1.365,rx:.13,rz:.085},
+              {y:1.416,rx:.17,rz:.074},
+              {y:1.466,rx:.067,rz:.069},
+              {y:1.50,rx:.051,rz:.054}
+            ],24);
+            for(const s of [-1,1]){
+              const strap=line(avatar,[[s*.151,1.35,.075],[s*.168,1.415,.066],[s*.175,1.46,-.011]],.017,outfitMaterial,12);
+              // Bras entiers avec épaules naturelles et articulations souples.
+              const arm=new THREE.Group();arm.position.set(s*.198,1.406,.0);avatar.add(arm);
+              orgSurface(arm,mats.skin,[
+                {y:-.282,x:s*.049,z:.015,rx:.050,rz:.051},
+                {y:-.242,x:s*.051,z:.011,rx:.051,rz:.056},
+                {y:-.172,x:s*.041,z:.006,rx:.057,rz:.061},
+                {y:-.080,x:s*.018,z:0,rx:.068,rz:.069},
+                {y:-.015,x:0,z:0,rx:.070,rz:.071},
+                {y:.037,x:-s*.016,z:0,rx:.060,rz:.064},
+                {y:.067,x:-s*.020,z:0,rx:.043,rz:.049},
+                {y:.085,x:-s*.025,z:0,rx:.006,rz:.008}
+              ],20);
+              const forearm=new THREE.Group();forearm.position.set(s*.05,-.273,.014);arm.add(forearm);
+              orgSurface(forearm,mats.skin,[
+                {y:-.245,x:s*.018,z:.064,rx:.039,rz:.040},
+                {y:-.178,x:s*.013,z:.056,rx:.043,rz:.046},
+                {y:-.10,x:s*.006,z:.035,rx:.048,rz:.049},
+                {y:-.018,x:0,z:0,rx:.049,rz:.050},
+                {y:.021,x:0,z:0,rx:.050,rz:.051}
+              ],18);
+              oval(forearm,mats.skin,s*.020,-.287,.071,.045,.070,.029,18);
+              for(let k=0;k<4;k++){
+                const px=s*(.001+k*.023);
+                line(forearm,[[px,-.333,.095],[px+s*.002,-.37-(k%2)*.007,.100]],.0065,mats.skin,6);
+              }
+              // Pouce sur la face avant.
+              line(forearm,[[s*.049,-.276,.076],[s*.069,-.305,.109],[s*.060,-.332,.114]],.012,mats.skin,8);
+              if(s<0){leftArm=arm;leftForearm=forearm;}else{rightArm=arm;rightForearm=forearm;}
+            }
+            makeHead();
+            // Chaînette et pendentif discrets, pas d'ornements systématiques.
+            line(avatar,[[-.060,1.45,.067],[0,1.394,.093],[.060,1.45,.067]],.0019,mats.metal,16);
+            oval(avatar,mats.metal,0,1.389,.096,.008,.012,.004,14);
+          }
+          function makeRoom(){
+            scene.background=new THREE.Color(0x554a50);
+            scene.fog=new THREE.Fog(0x554a50,5.1,10);
+            // Parquet, tapis et murs avec tonalités douces.
+            addMesh(new THREE.PlaneGeometry(9,9),mats.wood,scene,0,-.018,0).rotation.x=-Math.PI/2;
+            const plank=new THREE.MeshStandardMaterial({color:0x94736b,roughness:1});
+            for(let i=-14;i<=14;i++){
+              const x=i*.22;
+              cuboid(scene,plank,x,-.01,0,.008,.002,8);
+            }
+            cuboid(scene,mats.wall,0,2.0,-2.46,8,4.3,.12);
+            const accentWall=new THREE.MeshStandardMaterial({color:0x97838b,roughness:1});
+            cuboid(scene,accentWall,0,.94,-2.388,8,1.45,.025);
+            const border=new THREE.MeshStandardMaterial({color:0xe1cfc6,roughness:.95});
+            cuboid(scene,border,0,1.68,-2.37,8,.025,.05);
+            cuboid(scene,border,0,.13,-2.37,8,.04,.05);
+            const rug=new THREE.MeshStandardMaterial({color:0xc2b2b0,roughness:1});
+            const rugMesh=addMesh(new THREE.CircleGeometry(1.8,48),rug,scene,0,.01,.28,[1,.64,1]);rugMesh.rotation.x=-Math.PI/2;
+            // Lit avec volumes textile, pieds et oreillers.
+            const bed=new THREE.Group();bed.position.set(-1.55,0,-1.55);scene.add(bed);
+            cuboid(bed,mats.wood,0,.29,0,1.5,.33,1.04);
+            cuboid(bed,mats.wood,0,.65,-.51,1.54,.9,.12);
+            oval(bed,mats.bed,0,.49,.04,.71,.12,.49,24);
+            cuboid(bed,mats.pale,0,.57,-.25,1.29,.13,.33);
+            for(const s of [-1,1]){
+              const pillow=oval(bed,mats.pale,s*.37,.635,-.34,.28,.088,.2,22);
+              pillow.rotation.z=-s*.06;
+            }
+            // Table de chevet, lampe chaude, livre et plante.
+            const table=new THREE.Group();table.position.set(1.49,0,-1.42);scene.add(table);
+            cuboid(table,mats.wood,0,.36,0,.62,.52,.48);
+            cuboid(table,border,0,.632,0,.65,.03,.5);
+            const lampStand=new THREE.MeshStandardMaterial({color:0xc5b4a9,roughness:.8});
+            orgSurface(table,lampStand,[
+              {y:.71,rx:.033,rz:.033},{y:.75,rx:.028,rz:.028},{y:.86,rx:.013,rz:.013}
+            ],14);
+            const shade=new THREE.MeshStandardMaterial({color:0xeac9ad,roughness:1,emissive:0xd6a483,emissiveIntensity:.18,side:THREE.DoubleSide});
+            orgSurface(table,shade,[{y:.82,rx:.183,rz:.176},{y:1.05,rx:.104,rz:.10}],18);
+            const glow=new THREE.PointLight(0xffc9a7,6,3);glow.position.set(1.49,.96,-1.42);scene.add(glow);roomLights.push(glow);
+            // Fenêtre à croisillons et deux rideaux plissés.
+            const sky=new THREE.MeshBasicMaterial({color:0x899eb2});
+            addMesh(new THREE.PlaneGeometry(1.05,1.21),sky,scene,1.54,2.27,-2.37);
+            const glass=new THREE.MeshBasicMaterial({color:0xc2d3d7,transparent:true,opacity:.12});
+            addMesh(new THREE.PlaneGeometry(1.05,1.21),glass,scene,1.54,2.27,-2.35);
+            for(const x of [1.015,1.54,2.065])cuboid(scene,border,x,2.27,-2.29,.044,1.28,.059);
+            for(const y of [1.65,2.27,2.89])cuboid(scene,border,1.54,y,-2.29,1.12,.049,.057);
+            clothCurtain(scene,.82);clothCurtain(scene,2.09);
+            // Tableau abstrait ; une vraie photo n'est pas prétendue ici.
+            cuboid(scene,mats.wood,-.34,2.2,-2.33,.84,.85,.06);
+            const art=new THREE.MeshStandardMaterial({color:0xb9a7a5,roughness:1});
+            cuboid(scene,art,-.34,2.2,-2.277,.73,.73,.01);
+            const art2=new THREE.MeshStandardMaterial({color:0x697f76,roughness:1});
+            const arc=addMesh(new THREE.CircleGeometry(.28,32,0,Math.PI),art2,scene,-.37,2.18,-2.26);arc.rotation.z=-.25;
+            // Feuillage dans un pot près du mur.
+            const plant=new THREE.Group();plant.position.set(2.33,.0,-1.92);scene.add(plant);
+            orgSurface(plant,mats.wood,[{y:.03,rx:.13,rz:.13},{y:.34,rx:.18,rz:.18}],18);
+            for(let i=0;i<9;i++){
+              const a=2*Math.PI*i/9,off=.22+((i*7)%5)*.03;
+              const leaf=oval(plant,mats.leaf,Math.cos(a)*.18,.63+((i*3)%4)*.085,Math.sin(a)*.18,.07,.23,.018,16);
+              leaf.rotation.z=-Math.cos(a)*.5;leaf.rotation.x=Math.sin(a)*.3;
+              line(plant,[[0,.30,0],[Math.cos(a)*.1,.52,Math.sin(a)*.1],[Math.cos(a)*off,.69,Math.sin(a)*off]],.008,mats.leaf,8);
+            }
+          }
+          function initScene(){
+            const canvas=$('#julie-3d');
+            try{
+              renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'low-power'});
+              renderer.setClearColor(0x554a50);renderer.outputColorSpace=THREE.SRGBColorSpace;
+              renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.35;
+              renderer.shadowMap.enabled=false;
+              scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(39,1,.09,30);
+              scene.add(new THREE.HemisphereLight(0xe0dce6,0x70575b,2.0));
+              const key=new THREE.DirectionalLight(0xffe1c9,3.5);key.position.set(-2.1,4.5,3.6);scene.add(key);
+              const rim=new THREE.DirectionalLight(0xc2d5d0,1.65);rim.position.set(1.9,2.9,-1.3);scene.add(rim);
+              makeRoom();makeAvatar();drawOk=true;onResize();
+              canvas.addEventListener('pointerdown',e=>{ptr={id:e.pointerId,x:e.clientX,y:e.clientY};canvas.setPointerCapture?.(e.pointerId)});
+              canvas.addEventListener('pointermove',e=>{if(!ptr||ptr.id!==e.pointerId)return;angular+=(e.clientX-ptr.x)*.010;orbitY=THREE.MathUtils.clamp(orbitY+(e.clientY-ptr.y)*.004,-.22,.38);ptr.x=e.clientX;ptr.y=e.clientY;});
+              canvas.addEventListener('pointerup',()=>ptr=null);canvas.addEventListener('pointercancel',()=>ptr=null);
+              canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=THREE.MathUtils.clamp(zoom+e.deltaY*.004,2.85,4.7)},{passive:false});
+              window.addEventListener('resize',onResize);
+              requestAnimationFrame(tick);
+            }catch(err){console.error('JULIE 3D indisponible',err);$('#webgl-fallback').hidden=false;}
+          }
+          function qualityLimit(){return saved.quality==='eco'?30:saved.quality==='high'?120:60;}
+          function onResize(){
+            if(!renderer)return;
+            const canvas=$('#julie-3d'),rect=canvas.getBoundingClientRect();if(rect.width<10||rect.height<10)return;
+            const dpr=Math.min(window.devicePixelRatio||1,saved.quality==='eco'?1:saved.quality==='high'?1.8:1.35);
+            renderer.setPixelRatio(dpr);renderer.setSize(Math.floor(rect.width),Math.floor(rect.height),false);
+            camera.aspect=rect.width/rect.height;camera.fov=rect.height/rect.width>1.1?42:37;camera.updateProjectionMatrix();
+          }
+          function tick(now){
+            requestAnimationFrame(tick);if(!renderer||!drawOk)return;
+            let dt=Math.min(.06,(now-last)/1000);last=now;accum+=dt;
+            if(accum<1/qualityLimit())return;const frameDt=Math.min(accum,.06);accum=0;
+            const t=now*.001,breath=Math.sin(t*1.18),gentle=Math.sin(t*.63);
+            if(spin)angular+=frameDt*.44;
+            avatar.rotation.y=angular;avatar.rotation.z=gentle*.0065;
+            torso.scale.z=1+breath*.003; // respiration tres discrete, robe sans jointure
+            head.rotation.y=Math.sin(t*.48)*.042;
+            head.rotation.z=Math.sin(t*.69)*.019;
+            head.rotation.x=Math.sin(t*.42)*.017;
+            leftArm.rotation.z=.075+gentle*.016;
+            rightArm.rotation.z=-.075-gentle*.016;
+            leftForearm.rotation.x=Math.sin(t*.74)*.027;
+            rightForearm.rotation.x=-Math.sin(t*.74)*.02;
+            const waving=now-waveStart<2200;
+            if(waving){const progress=(now-waveStart)/1000;
+              rightArm.rotation.z=-.075-1.9*Math.min(1,progress/.32);
+              rightArm.rotation.x=.05+Math.sin(progress*10)*.16;
+              rightForearm.rotation.z=.15+Math.sin(progress*11)*.19;
+            }else{rightArm.rotation.x=0;rightForearm.rotation.z=0;}
+            const blinkPhase=(t*0.33)%3.7;
+            const blink=blinkPhase>.98&&blinkPhase<1.13?Math.sin((blinkPhase-.98)/.15*Math.PI):0;
+            eyes.forEach((eye,i)=>{eye.scale.y=1-.90*blink;eye.rotation.y=Math.sin(t*.23+i*.2)*.025;});
+            mouth.scale.x=1+.045*Math.sin(t*.55);mouth.rotation.z=Math.sin(t*.6)*.011;
+            hairLocks.forEach((group,i)=>{group.rotation.z=Math.sin(t*.9+i*.31)*.006;});
+            roomLights.forEach((light,i)=>{light.intensity=6+.13*Math.sin(t*.7+i)});
+            camera.position.set(0,1.46+orbitY,zoom);camera.lookAt(0,1.02,0);
+            renderer.render(scene,camera);
+          }
+          $('#btn-turn').addEventListener('click',()=>{spin=!spin;$('#btn-turn').style.color=spin?'#a9dfb7':'#fff'});
+          $('#btn-wave').addEventListener('click',()=>{waveStart=performance.now();$('#julie-line').textContent='« Coucou ! Cette fois, j’ai appris à bouger un peu plus naturellement… 😉 »'});
+          $('#btn-outfit').addEventListener('click',()=>{
+            outfitIdx=(outfitIdx+1)%outfitColors.length;
+            outfitMaterial.color.set(outfitColors[outfitIdx]);
+            $('#julie-line').textContent=['« Une nouvelle nuance de rose, tu aimes ? »','« Aujourd’hui, je préfère ce vert discret. »','« Un peu de bleu nuit pour changer… »','« Et cette teinte plus douce ? »'][outfitIdx];
+          });
+          renderChat();initScene();
+          __JULIE_V2_FILE_00__
+          cat > 'julie-preview/www/index.html' <<'__JULIE_V2_FILE_01__'
+          <!doctype html>
+          <html lang="fr">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+            <meta name="theme-color" content="#10111b">
+            <title>Julie • Avatar 3D V2</title>
+            <link rel="stylesheet" href="style.css">
+          </head>
+          <body>
+            <div id="app">
+              <header class="topbar">
+                <div class="brand"><span class="dot"></span><span>JULIE</span></div>
+                <div class="rightmark"><span class="offtag">APERÇU 3D V2</span></div>
+              </header>
+              <main>
+                <section id="avatar-view" class="view active" aria-label="Julie en 3D">
+                  <div class="intro"><span class="eyebrow">TON UNIVERS VIRTUEL</span><h1>Bonjour, mon cœur <span>✦</span></h1><p>Julie prend forme. Découvre son nouveau visage et ses mouvements.</p></div>
+                  <div class="viewport-shell">
+                    <canvas id="julie-3d" aria-label="Avatar 3D stylisé de Julie, femme virtuelle adulte blonde aux yeux verts"></canvas>
+                    <div id="webgl-fallback" class="fallback" hidden>La 3D ne s'est pas chargée sur cet appareil. Le dialogue local reste accessible.</div>
+                    <div class="view-label"><span class="light"></span> Julie · 22 ans · 1,75 m</div>
+                    <div class="drag-tip">↔ Fais glisser pour tourner Julie</div>
+                    <div class="scene-controls">
+                      <button class="glass-btn" id="btn-turn" type="button" aria-label="Faire pivoter Julie">⟳</button>
+                      <button class="glass-btn" id="btn-wave" type="button" aria-label="Julie te salue">♡</button>
+                      <button class="glass-btn" id="btn-outfit" type="button" aria-label="Changer de tenue">♧</button>
+                    </div>
+                  </div>
+                  <div class="status-card"><div><small>AUJOURD'HUI</small><strong id="mood-label">Humeur : joueuse</strong><p id="julie-line">« J’ai changé un peu… tu remarques la différence ? 😉 »</p></div><span class="pulse">✧</span></div>
+                  <p class="note">Avatar V2 procédural et toujours stylisé. La morphologie, les expressions et la chambre progressent ; la voix et l’IA autonome ne sont pas encore intégrées.</p>
+                </section>
+                <section id="chat-view" class="view" aria-label="Discuter avec Julie">
+                  <div class="pagehead"><span class="eyebrow">NOTRE CONVERSATION</span><h1>Parlons un peu…</h1><p>Réponses locales de démonstration, sans connexion Internet.</p></div>
+                  <div class="conversation" id="conversation" aria-live="polite"></div>
+                  <form class="composer" id="chat-form"><input type="text" maxlength="500" id="chat-input" placeholder="Un petit message à Julie…" autocomplete="off" aria-label="Ton message à Julie"><button type="submit" aria-label="Envoyer">➤</button></form>
+                  <p class="note">Ce mode n'utilise pas encore de modèle d'IA. Les échanges sont conservés localement sur ce téléphone, sans chiffrement ni synchronisation.</p>
+                </section>
+                <section id="memory-view" class="view" aria-label="Souvenirs">
+                  <div class="pagehead"><span class="eyebrow">IDENTITÉ & HISTOIRE</span><h1>Ce qu'on construit</h1><p>Des souvenirs vérifiables, jamais inventés comme des faits réels.</p></div>
+                  <article class="info-card"><div class="subhead">IDENTITÉ PERMANENTE</div><h2>Julie <span class="green">✦</span></h2><p>Identifiant : <code>JULIE_001</code></p><p>22 ans au lancement · 1 jour réel = 1 jour virtuel</p><p>Couple virtuel établi · souvenirs communs à construire ensemble</p></article>
+                  <article class="info-card"><div class="subhead">SOUVENIRS ENREGISTRÉS DANS CETTE DÉMO</div><div id="memory-items" class="mem-items"></div></article>
+                  <article class="info-card"><div class="subhead">CONSERVATION</div><p>Les messages et préférences de cette prévisualisation restent uniquement sur cet appareil. Ils ne sont pas encore reliés à la mémoire SQLite de Human Partner.</p></article>
+                </section>
+                <section id="settings-view" class="view" aria-label="Réglages">
+                  <div class="pagehead"><span class="eyebrow">PERSONNALISATION</span><h1>Ton espace Julie</h1><p>Un premier noyau à enrichir progressivement.</p></div>
+                  <article class="info-card"><div class="subhead">AFFICHAGE 3D</div><label for="quality">Qualité graphique</label><select id="quality"><option value="eco">Économique · 30 FPS maximum</option><option value="balanced" selected>Équilibrée · 60 FPS maximum</option><option value="high">Élevée · 120 FPS maximum</option></select><p class="smallline">La fluidité réelle dépend de ton téléphone. Plafond absolu : 120 FPS.</p></article>
+                  <article class="info-card"><div class="subhead">TES DONNÉES DE DÉMO</div><button id="export-data" class="secondary-btn">Exporter mes échanges (JSON)</button><button id="clear-data" class="danger-btn">Effacer les échanges de démo</button><p class="smallline">L'effacement concerne seulement les messages stockés par cette APK, pas tes données GitHub ou Human Partner.</p></article>
+                  <article class="info-card"><div class="subhead">VERSION</div><p>JULIE • Aperçu Android 0.2.0 (Avatar V2)</p><p class="smallline">Prototype hors ligne · pas d'achat · pas de compte à créer · pas d'accès aux capteurs.</p></article>
+                </section>
+              </main>
+              <nav class="bottomnav" aria-label="Navigation"><button class="navitem active" data-view="avatar" type="button"><span>◈</span>Julie</button><button class="navitem" data-view="chat" type="button"><span>◉</span>Parler</button><button class="navitem" data-view="memory" type="button"><span>▤</span>Souvenirs</button><button class="navitem" data-view="settings" type="button"><span>⚙</span>Réglages</button></nav>
+            </div>
+            <script src="app.js" defer></script>
+          </body>
+          </html>
+          __JULIE_V2_FILE_01__
+          cat > 'julie-preview/www/style.css' <<'__JULIE_V2_FILE_02__'
+          :root{color-scheme:dark;--bg:#0d0f19;--panel:#1a1d2a;--line:#343743;--text:#f5f2ee;--muted:#aaa8b7;--accent:#a9dfb7;--rose:#e3a4aa}
+          *{box-sizing:border-box}html{font-family:system-ui,-apple-system,'Roboto',sans-serif;background:var(--bg);color:var(--text);height:100%;overflow:hidden}body{margin:0;height:100%;overscroll-behavior:none}button,input,select{font:inherit}button{cursor:pointer;-webkit-tap-highlight-color:transparent}#app{height:100dvh;display:flex;flex-direction:column;max-width:850px;margin:auto;background:radial-gradient(circle at 80% 10%,#272536 0,transparent 35%),var(--bg)}.topbar{height:57px;flex:none;display:flex;justify-content:space-between;align-items:center;padding:10px 20px 8px;border-bottom:1px solid #ffffff14}.brand{font-weight:900;letter-spacing:.28em;font-size:17px;display:flex;align-items:center;gap:10px}.dot{height:9px;width:9px;background:var(--accent);border-radius:50%;box-shadow:0 0 12px var(--accent)}.offtag{font-size:9px;letter-spacing:.15em;color:var(--accent);border:1px solid #7fb69366;padding:6px 8px;border-radius:100px;white-space:nowrap}
+          main{flex:1;min-height:0;overflow:hidden}.view{display:none;height:100%;overflow:auto;padding:0 16px 20px;scrollbar-width:thin}.view.active{display:block}.intro{padding:15px 5px 8px}.eyebrow,.subhead{color:var(--accent);font-size:10px;letter-spacing:.18em;font-weight:800}.intro h1,.pagehead h1{font-size:clamp(24px,6vw,32px);letter-spacing:-.04em;font-weight:750;margin:7px 0 3px}.intro h1 span{color:var(--rose)}.intro p,.pagehead p{font-size:13px;color:var(--muted);margin:0;line-height:1.6}.viewport-shell{height:min(51vh,520px);min-height:280px;position:relative;overflow:hidden;border:1px solid #ffffff23;border-radius:22px;background:linear-gradient(#2e2834,#111522);box-shadow:0 16px 55px #080a1080}.viewport-shell canvas{display:block;touch-action:none;width:100%;height:100%}.view-label,.drag-tip{position:absolute;background:#1316219c;border:1px solid #ffffff22;backdrop-filter:blur(6px);border-radius:20px;padding:7px 10px;font-size:11px}.view-label{top:12px;left:12px;font-weight:650}.view-label .light{display:inline-block;width:6px;height:6px;background:var(--accent);border-radius:50%;margin-right:6px}.drag-tip{bottom:12px;left:12px;color:#eae7ea}.scene-controls{position:absolute;right:11px;bottom:11px;display:flex;gap:5px}.glass-btn{width:38px;height:38px;border-radius:14px;border:1px solid #ffffff33;background:#131621c7;color:white;font-size:22px}.status-card{margin-top:11px;background:linear-gradient(130deg,#202332,#161923);border:1px solid #ffffff1c;border-radius:18px;display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 16px}.status-card small{display:block;color:var(--accent);font-size:9px;letter-spacing:.17em;font-weight:800}.status-card strong{display:block;margin-top:4px;font-size:14px}.status-card p{color:#d1cbd2;line-height:1.45;margin:5px 0 0;font-size:12px}.pulse{font-size:26px;color:#c8dbd0}.note{color:#9a9ba9;font-size:10px;line-height:1.5;margin:10px 3px 0}.bottomnav{display:grid;grid-template-columns:repeat(4,1fr);height:calc(64px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);flex:none;border-top:1px solid #ffffff15;background:#11141e}.navitem{border:0;background:none;color:#9fa1ad;display:flex;align-items:center;justify-content:center;gap:4px;flex-direction:column;font-size:10px;font-weight:650}.navitem span{font-size:23px;font-weight:400}.navitem.active{color:var(--accent)}.pagehead{padding:23px 4px 16px}.conversation{height:calc(100% - 235px);min-height:170px;overflow-y:auto;display:flex;flex-direction:column;gap:11px;padding:6px 2px 15px}.bubble{max-width:88%;padding:12px 13px;border-radius:17px;font-size:13px;line-height:1.6;word-break:break-word}.bubble.julie{align-self:flex-start;background:#222736;border-bottom-left-radius:5px}.bubble.user{align-self:flex-end;background:#335047;border-bottom-right-radius:5px}.bubble .who{font-size:10px;font-weight:750;color:var(--accent);display:block;margin-bottom:3px}.composer{height:52px;display:flex;background:#242834;border:1px solid #454957;border-radius:16px;overflow:hidden}.composer input{flex:1;min-width:0;border:0;background:none;color:white;padding:12px;outline:none;font-size:14px}.composer button{background:var(--accent);border:0;width:52px;color:#122020;font-size:20px}.info-card{padding:16px;margin-bottom:13px;background:#1c202c;border:1px solid #333847;border-radius:16px}.info-card h2{font-size:25px;margin:9px 0}.green{color:var(--accent)}.info-card p{font-size:13px;color:#d0ccd1;line-height:1.6;margin:8px 0}.info-card code{font-family:monospace;color:var(--accent)}.info-card label{display:block;font-size:12px;color:var(--muted);margin:13px 0 8px}.info-card select{width:100%;background:#282d3b;border-radius:12px;padding:12px;color:white;border:1px solid #434854}.smallline{font-size:11px!important;color:var(--muted)!important}.mem-items{display:flex;flex-direction:column;gap:8px;margin-top:10px}.mem-item{border-left:3px solid #6da18a;background:#252b37;padding:8px 11px;font-size:12px;line-height:1.5;overflow-wrap:anywhere}.mem-item small{display:block;color:#9ca8ac;margin-bottom:4px}.secondary-btn,.danger-btn{display:block;width:100%;margin-top:10px;border:1px solid #667f73;background:#2e463c;color:#e7fff0;border-radius:12px;padding:12px;font-weight:650;font-size:13px}.danger-btn{border-color:#8d5157;background:#443037;color:#ffd8d8}.fallback{position:absolute;top:40%;left:10%;width:80%;padding:20px;background:#1b2437dd;border-radius:15px;text-align:center;font-size:14px;line-height:1.5}@media(max-height:700px){.viewport-shell{height:45vh;min-height:230px}.intro{padding-top:8px}.intro h1{font-size:25px}.status-card{padding:9px 13px}}
+
+          /* JULIE V2 : barre d'en-tête hors de la zone des notifications Android, espace 3D mieux mis en valeur. */
+          .topbar{height:calc(57px + max(20px, env(safe-area-inset-top)));padding-top:calc(10px + max(20px, env(safe-area-inset-top)));background:linear-gradient(110deg,#191c29,#171a26);}
+          .viewport-shell{height:min(55vh,565px);min-height:320px;border-color:#e5ccbb44;background:linear-gradient(150deg,#5c4c55,#3a3740);box-shadow:0 18px 45px #0a0b106b;}
+          .glass-btn{background:#1b2029d9;border-color:#ffffff44;box-shadow:0 3px 14px #0002;}
+          .glass-btn:active{transform:scale(.95)}
+          .intro{padding-top:13px}.intro h1{font-weight:760}.view-label{background:#151a23b8}.drag-tip{background:#151a23aa}
+          @media(max-height:740px){.viewport-shell{height:48vh;min-height:240px}.topbar{height:65px;padding-top:15px}}
+          __JULIE_V2_FILE_02__
+          cat > 'julie-preview/android/AndroidManifest.xml' <<'__JULIE_V2_FILE_03__'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <application android:icon="@drawable/julie_icon" android:allowBackup="false" android:label="JULIE V2.1 • Correctif" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
+              <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="unspecified">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN" />
+                  <category android:name="android.intent.category.LAUNCHER" />
+                </intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          __JULIE_V2_FILE_03__
+          cat > 'julie-preview/README.md' <<'__JULIE_V2_FILE_04__'
+          # JULIE V2.1 — Correctif silhouette et robe
+          
+          Correctif ciblé V2 : robe continue, correction du chevauchement peau/tissu à la taille, jambes et épaules adoucies.
+          
+          **Prototype 3D stylisé, pas une femme photoréaliste.** Ce correctif ne contient aucune nouvelle IA ni véritable mémoire permanente. La mémoire locale V2 n’est pas automatiquement transférée dans ce nouvel identifiant d’application.
+          
+          # JULIE — Avatar 3D V2 (prévisualisation autonome)
+          
+          Cette branche ajoute une **V2 du prototype Android hors ligne**, construite sur le travail existant sans détruire Human Partner, Julie V1 ou leurs données.
+          
+          ## Contenu livré
+          
+          - Modèle 3D **toujours stylisé**, mais reconstruit avec géométrie organique (surfaces continues pour la silhouette, doigts, yeux et visage détaillés, mèches de cheveux nuancées), animation de respiration, clignement, gestes, rotation tactile, changements de couleur de tenue.
+          - Scène 3D légère (chambre fictive), rendu adaptatif jusqu'à 120 FPS **maximum**.
+          - Interface mobile « Julie », « Parler », « Souvenirs », « Réglages ».
+          - Identité de référence : `JULIE_001` (nouvel espace de démonstration distinct de la base historique).
+          - Dialogue hors ligne **déterministe** (réponses modèles, pas une IA autonome).
+          - Conservation locale des messages et préférences de démo via SharedPreferences Android (ou localStorage dans un navigateur) ; export JSON manuel et effacement explicite.
+          - Pas de permission Internet, pas de serveur, pas d'achat, pas de compte externe.
+          
+          ## Limites et sécurité
+          
+          Ceci est une prévisualisation, **pas l'avatar photoréaliste définitif**, ni la mémoire permanente complète définie par le document maître. Les données locales de cette démonstration ne sont pas chiffrées par l’application ni synchronisées. Évitez d'y mettre des secrets. La perte de l'application ou des données peut effacer cette mémoire de démonstration ; exportez-la avant toute désinstallation.
+          
+          Cette V2 est installée **à côté de Julie V1** (sans importer automatiquement ses données) grâce à un **applicationId Android distinct** (`com.julie.preview.v21`) afin de ne pas remplacer l'ancienne application Human Partner et ses données. L'application Android historique et le backend Node/SQLite restent intacts dans le dépôt.
+          
+          ## Génération de l'APK
+          
+          Le workflow `.github/workflows/julie-apk.yml` :
+          
+          1. copie ces sources dans une version de compilation temporaire de `android/app` ;
+          2. installe temporairement `three` et `esbuild` puis crée le bundle 3D local ;
+          3. construit `app-debug.apk` avec Gradle ;
+          4. téléverse l'APK comme artefact `Julie-3D-APK` téléchargeable dans GitHub Actions.
+          
+          Le workflow se lance automatiquement lorsqu'il est ajouté sur `julie-v1`, puis manuellement si nécessaire via `Run workflow`.
+          
+          Pour préserver les anciens fichiers, **la compilation ne modifie pas les sources de l'application Human Partner**, uniquement la copie éphémère dans le runner GitHub Actions.
+          
+          ## Julie V1 et souvenirs
+          
+          Julie V2 utilise un identifiant de paquet Android différent pour ne pas écraser les données enregistrées dans l’APK V1. Les messages de V1 restent dans V1 et ne sont **pas** automatiquement importés dans V2. Exportez la mémoire de démonstration depuis V1 avant de la désinstaller ; une importation encadrée sera ajoutée ensuite. L’identité conceptuelle de Julie reste `JULIE_001` dans les deux prototypes.
+          
+          ## Vérification
+          
+          Le workflow V2 vérifie la syntaxe, la présence des fichiers de l’application, le profil `JULIE_001`, la compilation JS en fichier local, l’absence de permission Internet puis l’APK générée. Il n’engage aucune dépense et ne fusionne pas avec `main`.
+          __JULIE_V2_FILE_04__
+          cat > 'julie-preview/tests/smoke_v2.cjs' <<'__JULIE_V2_FILE_05__'
+          const assert=require('node:assert/strict');
+          const fs=require('node:fs');
+          const vm=require('node:vm');
+          const path=require('node:path');
+          const root=path.resolve(__dirname,'..');
+          const script=fs.readFileSync(path.join(root,'www/app.mjs'),'utf8');
+          const html=fs.readFileSync(path.join(root,'www/index.html'),'utf8');
+          const manifest=fs.readFileSync(path.join(root,'android/AndroidManifest.xml'),'utf8');
+          assert(script.includes("const JULIE_ID = 'JULIE_001'"));
+          assert(script.includes("const APP_VERSION = '0.2.1'"));
+          assert(script.includes('JULIE_AVATAR_V2'));
+          assert(!script.includes('fetch('));
+          assert(!/android\.permission\.INTERNET/.test(manifest));
+          assert(manifest.includes('allowBackup="false"'));
+          for(const e of ['julie-3d','btn-wave','btn-outfit','chat-form','memory-items','quality','export-data'])assert(html.includes(e));
+          
+          // Tiny mathematical / DOM substitute. Goal: exercise the construction path
+          // without an Android SDK, a GPU or a network dependency in this container.
+          let rendererUsed=false, roots=[],materialCount=0,geometries=0;
+          class Node3D {
+           constructor(){this.children=[];this.rotation={x:0,y:0,z:0};this.position={x:0,y:0,z:0,set:(x,y,z)=>Object.assign(this.position,{x,y,z})};this.scale={x:1,y:1,z:1,set:(x,y,z)=>Object.assign(this.scale,{x,y,z})};this.castShadow=false;this.receiveShadow=false;}
+           add(c){assert(c);this.children.push(c);return c}
+          }
+          class G extends Node3D {}
+          class Material { constructor(options){this.options=options;this.color={set(){}};materialCount++;}}
+          class Geometry {constructor(){geometries++} setAttribute(key,val){this[key]=val;return this}setIndex(idx){this.indices=idx;return this} computeVertexNormals(){} }
+          class Mesh extends Node3D {constructor(g,m){super();this.geometry=g;this.material=m;}}
+          class PseudoSphere extends Geometry {constructor(r,seg=24,h=16){super();const count=(seg+1)*(h+1);let positions=Array.from({length:count},(_,i)=>[Math.sin(i),Math.cos(i),Math.sin(i*.1)]);this.attributes={position:{count,getX:i=>positions[i][0],getY:i=>positions[i][1],getZ:i=>positions[i][2],setXYZ:(i,x,y,z)=>{positions[i]=[x,y,z]}}};}}
+          class Color{constructor(value){this.value=value}set(x){this.value=x}}
+          class Renderer{constructor(){rendererUsed=true;this.shadowMap={enabled:false}}setClearColor(){}setPixelRatio(){}setSize(){}render(){}}
+          class PseudoCamera extends Node3D{constructor(){super();this.aspect=1;this.fov=39}lookAt(){}updateProjectionMatrix(){}}
+          const THREE={Group:G,Scene:G,Mesh,MeshStandardMaterial:Material,MeshBasicMaterial:Material,
+           SphereGeometry:PseudoSphere,BoxGeometry:Geometry,PlaneGeometry:Geometry,CircleGeometry:Geometry,
+           TubeGeometry:Geometry,Float32BufferAttribute:class{constructor(a,n){this.array=a;this.itemSize=n}},BufferGeometry:Geometry,
+           Color,Vector3:class{constructor(x,y,z){this.x=x;this.y=y;this.z=z}},CatmullRomCurve3:class{constructor(points){this.points=points}},
+           WebGLRenderer:Renderer,PerspectiveCamera:PseudoCamera,HemisphereLight:G,DirectionalLight:G,PointLight:G,Fog:class{},
+           MathUtils:{clamp:(v,min,max)=>Math.max(min,Math.min(max,v))},ACESFilmicToneMapping:2,SRGBColorSpace:1,DoubleSide:2};
+          const els=new Map();
+          function el(id){if(!els.has(id)){els.set(id,{id,innerHTML:'',textContent:'',value:'balanced',children:[],style:{},hidden:true,addEventListener(){},appendChild(n){this.children.push(n)},getBoundingClientRect(){return {width:400,height:700}},setPointerCapture(){}});}return els.get(id)}
+          const document={querySelector:el,querySelectorAll:()=>[],createElement:tag=>el('generated-'+Math.random()),createTextNode:text=>({text})};
+          const localStorage={getItem:()=>null,setItem(){}};
+          const context={THREE,document,window:{devicePixelRatio:2,addEventListener(){}},performance:{now:()=>100},requestAnimationFrame:()=>0,confirm:()=>true,alert:()=>{},console,localStorage,Date,Math};
+          vm.createContext(context);
+          vm.runInContext(script.replace("import * as THREE from 'three';",'const THREE = globalThis.THREE;'),context,{timeout:30000,filename:'julie-v2-stub-runtime.js'});
+          assert.equal(rendererUsed,true);
+          assert(geometries>55,'Expected substantial 3D geometry construction');
+          assert(materialCount>20,'Expected multiple scene materials');
+          assert(els.get('#conversation').children.length>=1);
+          vm.runInContext('outfitIdx=2; outfitMaterial.color.set(outfitColors[outfitIdx]);',context,{timeout:1000});
+          console.log('PASS: syntaxes et invariants de sécurité');
+          console.log('PASS: scène et avatar V2 instanciés dans un environnement simulé');
+          console.log('PASS: dialogue de démonstration conservé et palette de tenues fonctionnelle');
+          console.log('Geometry allocations:',geometries,'materials:',materialCount);
+          
+          // Régression JULIE V2.1 : une robe unifiée doit couvrir le bassin sans surfaces percées.
+          assert(script.includes('JULIE_V21_NO_CLIPPING'));
+          assert(script.includes('JULIE_V21_CONTINUOUS_DRESS'));
+          assert(script.includes('torso=skirt'));
+          const findRings=(name)=>{
+            const match=script.match(new RegExp('const '+name+'=\\[([\\s\\S]*?)\\];'));
+            assert(match,'Profil absent: '+name);
+            return Array.from(match[1].matchAll(/\{([^}]+)\}/g),([,block])=>Object.fromEntries(Array.from(block.matchAll(/([a-z]+):(-?(?:\d+(?:\.\d*)?|\.\d+))/g),([,key,value])=>[key,Number(value)])));
+          };
+          const skin=findRings('pelvicSkinRings'),cloth=findRings('dressRings');
+          const at=(arr,y,key)=>{for(let i=0;i<arr.length-1;i++){const a=arr[i],b=arr[i+1];if(y>=a.y&&y<=b.y){const t=(y-a.y)/(b.y-a.y);return a[key]*(1-t)+b[key]*t}}throw new Error('profil y='+y)};
+          for(let i=0;i<59;i++){const y=.79+i*.005;for(const dim of ['rx','rz'])assert(at(cloth,y,dim)>at(skin,y,dim)+.009,`Intersection robe/bassin à y=${y}, dim=${dim}`)}
+          console.log('PASS: aucune intersection robe/bassin de 0.79 à 1.08 m (profil géométrique)');
+          __JULIE_V2_FILE_05__
+
+      - name: Vérifier le code et la construction de la scène simulée
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check julie-preview/www/app.mjs
+          node --test julie-preview/tests/smoke_v2.cjs
+          npm run check
+      - name: Construire le moteur 3D local avec Three.js
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix julie-preview --no-save --no-package-lock --no-audit --no-fund three@0.180.0 esbuild@0.25.12
+          julie-preview/node_modules/.bin/esbuild julie-preview/www/app.mjs --bundle --minify --format=iife --platform=browser --target=es2020 --outfile=julie-preview/www/app.js
+          test -s julie-preview/www/app.js
+          node --check julie-preview/www/app.js
+      - name: Préparer l'application Android indépendante
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Les sources historiques restent inchangées dans Git : compilation isolée.
+          cp julie-preview/android/MainActivity.java android/app/src/main/java/com/humanpartner/MainActivity.java
+          cp julie-preview/android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/assets/julie android/app/src/main/res/drawable
+          cp julie-preview/www/index.html julie-preview/www/style.css julie-preview/www/app.js android/app/src/main/assets/julie/
+          cp julie-preview/android/julie_icon.xml android/app/src/main/res/drawable/julie_icon.xml
+          python3 - <<'PY_ANDROID_CONFIG'
+          from pathlib import Path
+          f=Path('android/app/build.gradle')
+          s=f.read_text()
+          expected="applicationId 'com.humanpartner'"
+          assert s.count(expected)==1, 'Identifiant Android historique inattendu'
+          s=s.replace(expected,"applicationId 'com.julie.preview.v21'")
+          assert "versionCode 9" in s, 'versionCode inattendu'
+          assert "versionName '0.1.8'" in s, 'versionName inattendu'
+          s=s.replace('versionCode 9','versionCode 12')
+          s=s.replace("versionName '0.1.8'","versionName '0.2.1-julie-v2-fix'")
+          f.write_text(s)
+          print('APK séparée : com.julie.preview.v21')
+          PY_ANDROID_CONFIG
+      - name: Compiler l'APK Android de Julie V2
+        working-directory: android
+        shell: bash
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Vérifier le fichier APK et le préparer
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -l "$APK" | grep -q 'assets/julie/index.html'
+          unzip -l "$APK" | grep -q 'assets/julie/app.js'
+          unzip -l "$APK" | grep -q 'classes.dex'
+          mkdir -p julie-v2-1-artifact
+          cp "$APK" julie-v2-1-artifact/JULIE-V2-1-Correctif-debug.apk
+          cp julie-preview/README.md julie-v2-1-artifact/LIRE_AVANT_INSTALLATION.md
+          sha256sum "$APK" > julie-v2-1-artifact/SHA256_SOURCE_APK.txt
+          ls -lh julie-v2-1-artifact
+      - name: Rendre l'APK téléchargeable depuis GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: Julie-V2-1-APK
+          path: julie-v2-1-artifact/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Sauvegarder les nouvelles sources de Julie V2 sur julie-v1
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -- julie-preview/www/app.mjs julie-preview/www/index.html julie-preview/www/style.css \
+            julie-preview/android/AndroidManifest.xml julie-preview/README.md julie-preview/tests/smoke_v2.cjs
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'Sources V2 déjà présentes, rien à changer'
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'feat(julie): correctif corps et robe V2.1'
+          git push origin HEAD:julie-v1
