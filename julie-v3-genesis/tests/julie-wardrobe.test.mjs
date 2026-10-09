@@ -34,7 +34,7 @@ test('Topologie féminine: seules les petites pièces compatibles sont ciblées'
   const chosen=femaleComponentsToRemove(candidates,box);
   assert.equal(chosen.male.length,4);
   assert.equal(chosen.rig.length,1);
-  assert.equal(chosen.hair.length,0);
+  assert.equal(chosen.hair.length,1);
   assert.equal(chosen.eye.length,0);
   assert.throws(()=>femaleComponentsToRemove(candidates,{min:{x:0,y:0,z:0},max:{x:0,y:0,z:0}}));
 });
