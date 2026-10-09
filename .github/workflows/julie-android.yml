@@ -83,7 +83,7 @@ jobs:
           d=Path('julie-v3-genesis')
           manifest=(d/'android/AndroidManifest.xml').read_text()
           ET.fromstring(manifest)
-          assert 'android.permission.INTERNET' not in manifest
+          assert 'android.permission.INTERNET' in manifest and 'android.permission.REQUEST_INSTALL_PACKAGES' in manifest and 'android.permission.ACCESS_NETWORK_STATE' in manifest
           assert 'allowBackup="false"' in manifest
           java=(d/'android/JulieSecureStore.java').read_text()
           assert 'AndroidKeyStore' in java and 'AES/GCM/NoPadding' in java
@@ -92,7 +92,13 @@ jobs:
           assert 'appendConversation(saved' in app and 'mergeImport(saved' in app
           assert 'slice(-120)' not in app and 'slice(-60)' not in app
           assert './models/julie_genesis_human.glb' in app
-          print('Identité, schéma mémoire et permission réseau : OK')
+          updater=(d/'android/JulieUpdateManager.java').read_text()
+          assert 'sha256' in updater and 'PackageInstaller.SessionParams.MODE_FULL_INSTALL' in updater
+          assert 'activity.getPackageName().equals(candidate.packageName)' in updater
+          assert 'PackageManager.GET_SIGNING_CERTIFICATES' in updater
+          assert 'NET_CAPABILITY_NOT_METERED' in updater
+          assert (d/'android/JulieInstallReceiver.java').exists()
+          print('Identité, schéma mémoire, accès HTTPS et validation d’installation : OK')
           PYCHECK
       - name: Construire JavaScript 3D embarqué
         shell: bash
@@ -109,6 +115,7 @@ jobs:
           set -euo pipefail
           cp julie-v3-genesis/android/MainActivity.java android/app/src/main/java/com/humanpartner/MainActivity.java
           cp julie-v3-genesis/android/JulieSecureStore.java android/app/src/main/java/com/humanpartner/JulieSecureStore.java
+          cp julie-v3-genesis/android/JulieUpdateManager.java julie-v3-genesis/android/JulieInstallReceiver.java android/app/src/main/java/com/humanpartner/
           cp julie-v3-genesis/android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
           mkdir -p android/app/src/main/assets/julie/models android/app/src/main/res/drawable
           cp julie-v3-genesis/android/julie_icon.xml android/app/src/main/res/drawable/julie_icon.xml
@@ -121,7 +128,7 @@ jobs:
           assert s.count("applicationId 'com.humanpartner'")==1
           s=s.replace("applicationId 'com.humanpartner'","applicationId 'com.julie.preview.v3'")
           s=s.replace('versionCode 9',"versionCode "+str(300000+int('${{ github.run_number }}')))
-          s=s.replace("versionName '0.1.8'","versionName '0.3.1-dev.${{ github.run_number }}'")
+          s=s.replace("versionName '0.1.8'","versionName '0.3.2-dev.${{ github.run_number }}'")
           p.write_text(s)
           PYGRADLE
       - name: Compiler APK Android de test
@@ -140,10 +147,10 @@ jobs:
           unzip -Z1 "$APK" | grep -Fx assets/julie/app.js
           unzip -Z1 "$APK" | grep -Fx classes.dex
           mkdir -p julie-android-artifact
-          cp "$APK" julie-android-artifact/JULIE-Android-0.3.1-debug.apk
+          cp "$APK" julie-android-artifact/JULIE-Android-0.3.2-debug.apk
           cp julie-v3-genesis/README.md julie-android-artifact/LIRE_AVANT_INSTALLATION.md
           cp julie-v3-genesis/CREDITS_MODELE.md julie-android-artifact/CREDITS_MODELE.md
-          (cd julie-android-artifact && sha256sum JULIE-Android-0.3.1-debug.apk > SHA256SUMS.txt)
+          (cd julie-android-artifact && sha256sum JULIE-Android-0.3.2-debug.apk > SHA256SUMS.txt)
       - name: Publier Julie Android
         uses: actions/upload-artifact@v4
         with:
@@ -162,7 +169,7 @@ jobs:
             echo
             echo "Commit source : $GITHUB_SHA"
             echo "Exécution : https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            echo 'Tests : morphologie, historique, maillage humain et APK Android'
+            echo 'Tests : morphologie, mémoire, mises à jour signées, maillage humain et APK Android'
             echo 'Artefact : Julie-Android-APK'
             echo 'Statut : compilation et publication réussies'
           } > docs/JULIE_BUILD_STATUS.md
