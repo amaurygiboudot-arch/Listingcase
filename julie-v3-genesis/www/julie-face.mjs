@@ -45,8 +45,12 @@ function components(g){
 export function findGenesisEyes(g){
   const two=components(g).filter(e=>e.ids.length===308&&e.minY>1.49&&e.maxY<1.54&&e.minZ>.09&&e.maxZ<.14&&Math.abs((e.minX+e.maxX)/2)>.02)
     .sort((a,b)=>(a.minX+a.maxX)-(b.minX+b.maxX));
-  if(two.length!==2||(two[0].minX+two[0].maxX)*(two[1].minX+two[1].maxX)>=0)
-    throw Error('Deux vrais globes oculaires Genesis requis');
+  if(two.length!==2||(two[0].minX+two[0].maxX)*(two[1].minX+two[1].maxX)>=0){
+    const near=components(g).filter(e=>(e.minY>1.38&&e.minY<1.60)||e.ids.length===308).slice(0,45)
+      .map(e=>({count:e.ids.length,ym:[+e.minY.toFixed(4),+e.maxY.toFixed(4)],
+        xm:[+e.minX.toFixed(4),+e.maxX.toFixed(4)],zm:[+e.minZ.toFixed(4),+e.maxZ.toFixed(4)]}));
+    throw Error('Deux vrais globes oculaires Genesis requis; diagnostic='+JSON.stringify({groups:near,selected:two.length}));
+  }
   return two.map(e=>({ids:e.ids,center:new THREE.Vector3((e.minX+e.maxX)/2,(e.minY+e.maxY)/2,(e.minZ+e.maxZ)/2)}));
 }
 
