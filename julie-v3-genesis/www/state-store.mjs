@@ -14,7 +14,7 @@ export function checkCapacity(state){
   return size;
 }
 export function createInitialState(now=Date.now()){
-  return {id:JULIE_ID,schemaVersion:STATE_SCHEMA,version:'0.3.2',
+  return {id:JULIE_ID,schemaVersion:STATE_SCHEMA,version:'0.3.3',
     firstOpened:now,quality:'balanced',deletedBefore:0,messages:[],memories:[]};
 }
 function stamp(v){return Number.isFinite(Number(v))&&Number(v)>=0?Number(v):0;}
@@ -39,7 +39,7 @@ export function parseJulieState(raw,{allowEmpty=false}={}){
     throw new Error('Cet export ne correspond pas à l’identité JULIE_001');
   validateMessages(input.messages);validateMemories(input.memories);
   const result={...input,id:JULIE_ID,schemaVersion:STATE_SCHEMA,
-    version:'0.3.2',firstOpened:stamp(input.firstOpened)||Date.now(),
+    version:'0.3.3',firstOpened:stamp(input.firstOpened)||Date.now(),
     deletedBefore:stamp(input.deletedBefore),
     quality:qualities.has(input.quality)?input.quality:'balanced',
     // Garder les champs inconnus : une mise à jour ne doit pas effacer des données futures.
