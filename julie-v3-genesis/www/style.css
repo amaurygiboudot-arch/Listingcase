@@ -11,4 +11,4 @@ main{flex:1;min-height:0;overflow:hidden}.view{display:none;height:100%;overflow
 @media(max-height:740px){.viewport-shell{height:48vh;min-height:240px}.topbar{height:65px;padding-top:15px}}
 
 /* Chargement explicite du GLB réaliste, lisible sur mobile. */
-.model-status{position:absolute;bottom:84px;left:14px;right:14px;background:rgba(22,27,33,.77);color:#fff;border-radius:10px;padding:7px 12px;font-size:11px;text-align:center;pointer-events:none;z-index:4}
+.model-status{position:absolute;top:52px;left:14px;right:14px;background:rgba(22,27,33,.78);color:#fff;border-radius:10px;padding:7px 12px;font-size:11px;text-align:center;pointer-events:none;z-index:4} .model-status[hidden]{display:none}
