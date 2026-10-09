@@ -1,23 +1,27 @@
-# JULIE V3 — Maillage humain d'origine Genesis / Ève
+# JULIE — canal Android de développement (0.3.1)
 
-## Objectif
-Remplacer la figurine stylisée des prototypes V1/V2 par un véritable maillage humanoïde texturé et skinné, basé sur le **même GLB MakeHuman/MPFB CC0 que le simulateur Genesis**. Julie conserve son identifiant `JULIE_001` et ses paramètres initiaux (22 ans, 1,75 m, silhouette fine).
+**Source active sur `julie-v1`** : `julie-v3-genesis/`. Le nom du répertoire est hérité du premier prototype Genesis ; il n'implique pas la création d'une nouvelle APK à chaque mise à jour.
 
-## Ce que cette V3 fait réellement
-- Télécharge le modèle source public `vsim/packages/assets/library/human.glb` pendant la compilation GitHub Actions et l'embarque localement dans l'APK (pas d'accès Internet à l'exécution).
-- Animation GLB de repos, squelette d'animation existant (environ 53 os), rotation tactile, proportions à 1,75 m.
-- Ajustement féminin **simplifié et prudent** reprenant la méthode de morphologie morphométrique de Genesis ; conserve les textures et les poids des os.
-- Corrige les surfaces de peau parfois déclarées transparentes par erreur (problème déjà traité dans Genesis).
-- Conserve la maquette Android (chat de démonstration hors ligne, export/import de souvenirs de test). Identifiant Android distinct `com.julie.preview.v3`.
+## Fonctionnement vérifiable
+- Identité immuable **JULIE_001**, modèle femme adulte de base issu de la même ressource MakeHuman / MPFB CC0 que Genesis.
+- Squelette et animation inclus dans le GLB, scène 3D hors ligne, plafond FPS économique 30, normal 60, élevé 120.
+- Chat **hors ligne déterministe** : pas encore d'IA conversationnelle ni de mémoire cloud.
+- Android WebView, origine HTTPS simulée par interception locale, pas de permission INTERNET.
+- Journal des messages et souvenirs de démonstration sans troncature silencieuse ; plafond physique de 8 Mo vérifié avant écriture.
+- Stockage privé Android **AES-256-GCM via AndroidKeyStore** ; une ancienne mémoire V3 enregistrée en clair est migrée uniquement après enregistrement chiffré confirmé.
+- Export JSON explicite **non chiffré**, import validé et fusionné sans écraser le courant. Effacement horodaté : les anciens exports ne peuvent pas recréer silencieusement les éléments supprimés.
+- Toute erreur de stockage refuse de remplacer l'ancien état. Les données de Genesis/Ève ne sont ni copiées ni modifiées.
 
-## Ce qui reste à faire pour reproduire exactement Ève
-Le modèle Genesis d'Ève n'est **pas** un second fichier GLB distinct. Genesis charge un modèle commun, puis applique de multiples modules : variantes anatomiques, visage, peau, morphs, cheveux, mouvements et état physiologique. La V3 réutilise la base et une première adaptation féminine, **pas encore l'ensemble** des adaptations d'Ève. Les cheveux blonds mi-longs et la couleur des iris nécessiteront une validation visuelle et des assets/contrôles supplémentaires. L'apparence n'est pas encore photoréaliste.
+## Source unique et compilation
+Un seul workflow à utiliser pour les prochaines versions : `.github/workflows/julie-android.yml`.
+Les anciens workflows et les anciennes versions doivent être considérés comme des archives/prototypes, à retirer uniquement après preuve du bon fonctionnement du nouveau canal.
 
-## Sécurité
-Aucune donnée Genesis ou mémoire d'Ève n'est transférée ; aucun abonnement ni service payant ajouté. Le dépôt Genesis reste inchangé. Le prototype ne synchronise pas avec le vrai moteur de mémoire de Human Partner. Exporter les souvenirs de V1/V2/V2.1 avant désinstallation : aucune importation silencieuse. Ne pas stocker d'informations sensibles dans la mémoire de démonstration non chiffrée.
+Paquet Android de développement : `com.julie.preview.v3` (inchangé par rapport à Julie V3), code de version 13, nom 0.3.1. **Signature** : tant qu'une clé Android privée et persistante n'est pas configurée dans GitHub Actions, l'APK de test est signée avec une clé debug propre au runner. Une mise à jour par-dessus une ancienne installation peut être refusée. **Exporter les souvenirs avant toute désinstallation** puis importer volontairement l'export JSON. Une désinstallation efface la mémoire chiffrée AndroidKeyStore.
 
-## Source et licence
-Voir `CREDITS_MODELE.md`. La source humaine CC0 est publique ; toute future texture tierce devra faire l'objet d'une vérification de licence distincte.
+## Limites importantes
+Cette application n'est pas une compagne pleinement autonome, ne possède pas de voix, de synchronisation sécurisée ni de monde persistant. Le corps utilise la même source GLB humanoïde que Genesis et seulement une première morphologie féminine adaptée : l'apparence exacte d'Ève (cheveux, yeux, texture peau, animations et morphs avancés) est encore à intégrer et doit être contrôlée visuellement.
 
-## Compilation
-Ajouter `.github/workflows/julie-v3-genesis.yml` à la branche `julie-v1`. GitHub Actions vérifie le GLB, effectue les tests JS et compile l'APK. Si le téléchargement public échoue, l'installation échoue explicitement plutôt que de retomber sur un mannequin géométrique trompeur.
+## Sécurité et coût
+Pas d'abonnement, pas de paiement, pas d'appel à une API payante, pas d'accès à un compte sensible. Les journaux GitHub Actions ne doivent jamais contenir de souvenir personnel ou de clé de signature. Aucun changement aux branches `main` ou `backup-human-partner-20261009`, ni au dépôt Genesis, dans ce canal.
+
+Références : `Julie_Document_Maitre_V1.docx` (document de conception approuvé), `CREDITS_MODELE.md` (provenance et licence GLB).
