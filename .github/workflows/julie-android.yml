@@ -159,6 +159,110 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      - name: Vérifier si la signature permanente est configurée
+        id: signing
+        shell: bash
+        env:
+          JULIE_KEYSTORE_B64: ${{ secrets.JULIE_ANDROID_KEYSTORE_BASE64 }}
+          JULIE_STORE_PASSWORD: ${{ secrets.JULIE_ANDROID_STORE_PASSWORD }}
+          JULIE_KEY_ALIAS: ${{ secrets.JULIE_ANDROID_KEY_ALIAS }}
+          JULIE_KEY_PASSWORD: ${{ secrets.JULIE_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$JULIE_KEYSTORE_B64" && -n "$JULIE_STORE_PASSWORD" && -n "$JULIE_KEY_ALIAS" && -n "$JULIE_KEY_PASSWORD" ]]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+            echo 'Signature permanente détectée ; préparer une release signée.'
+          else
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo 'Aucune signature permanente ; pas de publication automatique. APK debug conservée.'
+          fi
+      - name: Compiler une APK signée sans exposer la clef
+        if: steps.signing.outputs.configured == 'true'
+        shell: bash
+        env:
+          JULIE_KEYSTORE_B64: ${{ secrets.JULIE_ANDROID_KEYSTORE_BASE64 }}
+          JULIE_STORE_PASSWORD: ${{ secrets.JULIE_ANDROID_STORE_PASSWORD }}
+          JULIE_KEY_ALIAS: ${{ secrets.JULIE_ANDROID_KEY_ALIAS }}
+          JULIE_KEY_PASSWORD: ${{ secrets.JULIE_ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          export JULIE_SIGNING_FILE="$RUNNER_TEMP/julie-android-private.jks"
+          trap 'rm -f "$JULIE_SIGNING_FILE"' EXIT
+          printf '%s' "$JULIE_KEYSTORE_B64" | base64 --decode > "$JULIE_SIGNING_FILE"
+          test -s "$JULIE_SIGNING_FILE"
+          cat >> android/app/build.gradle <<'GRADLESIGN'
+          android {
+              signingConfigs {
+                  julieStable {
+                      storeFile file(System.getenv('JULIE_SIGNING_FILE'))
+                      storePassword System.getenv('JULIE_STORE_PASSWORD')
+                      keyAlias System.getenv('JULIE_KEY_ALIAS')
+                      keyPassword System.getenv('JULIE_KEY_PASSWORD')
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.julieStable
+                  }
+              }
+          }
+          GRADLESIGN
+          (cd android && gradle --no-daemon --stacktrace :app:assembleRelease)
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -mindepth 2 -maxdepth 2 -name apksigner | sort -V | tail -1)"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --print-certs "$APK" > "$RUNNER_TEMP/julie-cert-summary.txt"
+          grep -q '^Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/julie-cert-summary.txt"
+          echo 'APK permanente compilée et signature vérifiée.'
+      - name: Publier l'APK permanente et son empreinte sur GitHub Releases
+        if: steps.signing.outputs.configured == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          TAG=julie-android-updates
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -mindepth 2 -maxdepth 2 -name apksigner | sort -V | tail -1)"
+          NEW_CERT="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)"
+          [[ "$NEW_CERT" =~ ^[[:xdigit:]]{64}$ ]]
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            mkdir -p "$RUNNER_TEMP/julie-previous-release"
+            gh release download "$TAG" -p 'JULIE-Android.apk' -D "$RUNNER_TEMP/julie-previous-release" --clobber
+            OLD_APK="$RUNNER_TEMP/julie-previous-release/JULIE-Android.apk"
+            test -s "$OLD_APK"
+            OLD_CERT="$("$APKSIGNER" verify --print-certs "$OLD_APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)"
+            test "$NEW_CERT" = "$OLD_CERT" || { echo 'Signature différente de la release précédente : publication BLOQUÉE.'; exit 1; }
+          fi
+          export JULIE_RELEASE_APK="$APK"
+          export JULIE_RELEASE_VERSIONCODE="$((300000+${{ github.run_number }}))"
+          export JULIE_RELEASE_VERSIONNAME="0.3.2-dev.${{ github.run_number }}"
+          python3 - <<'PYRELEASE'
+          import hashlib,json,os
+          from pathlib import Path
+          apk=Path(os.environ['JULIE_RELEASE_APK'])
+          manifest={
+            'packageName':'com.julie.preview.v3',
+            'versionCode':int(os.environ['JULIE_RELEASE_VERSIONCODE']),
+            'versionName':os.environ['JULIE_RELEASE_VERSIONNAME'],
+            'sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),
+            'notes':'Mise à jour de Julie : mémoire préservée et gestionnaire de mises à jour vérifié.'
+          }
+          Path(os.environ['RUNNER_TEMP'],'julie-release-notes.json').write_text(
+            json.dumps(manifest,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          PYRELEASE
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK#JULIE-Android.apk" --clobber
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/julie-release-notes.json"
+          else
+            gh release create "$TAG" "$APK#JULIE-Android.apk" \
+              --title 'JULIE Android • mises à jour' --latest=false \
+              --target julie-v1 --notes-file "$RUNNER_TEMP/julie-release-notes.json"
+          fi
+          echo 'Release signée et manifeste de version publiés.'
       - name: Enregistrer la preuve du build réussi
         shell: bash
         run: |
