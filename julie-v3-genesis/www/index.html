@@ -46,7 +46,17 @@
         <div class="pagehead"><span class="eyebrow">PERSONNALISATION</span><h1>Ton espace Julie</h1><p>Un premier noyau à enrichir progressivement.</p></div>
         <article class="info-card"><div class="subhead">AFFICHAGE 3D</div><label for="quality">Qualité graphique</label><select id="quality"><option value="eco">Économique · 30 FPS maximum</option><option value="balanced" selected>Équilibrée · 60 FPS maximum</option><option value="high">Élevée · 120 FPS maximum</option></select><p class="smallline">La fluidité réelle dépend de ton téléphone. Plafond absolu : 120 FPS.</p></article>
         <article class="info-card"><div class="subhead">TES DONNÉES DE DÉMO</div><button id="export-data" class="secondary-btn">Exporter mes échanges (JSON)</button><button id="import-data" class="secondary-btn">Importer un export Julie antérieur (JSON)</button><button id="clear-data" class="danger-btn">Effacer les échanges de démo</button><p class="smallline">L'effacement protège aussi contre la réimportation d'anciens souvenirs supprimés. Aucun transfert depuis les autres APK n'est automatique.</p></article>
-        <article class="info-card"><div class="subhead">VERSION</div><p>JULIE • Android 0.3.1 — modèle humain de développement</p><p class="smallline">Prototype hors ligne · pas d'achat · pas de compte à créer · pas d'accès aux capteurs.</p><p class="smallline">Modèle humain riggé CC0 : MakeHuman/MPFB via vsim, même source que Genesis ; adaptation féminine progressive propre à Julie.</p></article>
+        <article class="info-card" id="update-panel">
+          <div class="subhead">MISES À JOUR DE JULIE</div>
+          <p id="update-status" class="smallline" role="status" aria-live="polite">Mises à jour : vérification automatique à l'ouverture lorsque disponible.</p>
+          <label for="auto-updates" class="update-toggle"><input id="auto-updates" type="checkbox" checked> Vérifier et télécharger automatiquement en Wi-Fi</label>
+          <p class="smallline">L'installation finale nécessite une confirmation Android. Les souvenirs restent conservés lors d'une mise à jour de même signature.</p>
+          <button id="update-check" class="secondary-btn" type="button">Vérifier maintenant</button>
+          <button id="update-download" class="secondary-btn" type="button" hidden>Télécharger la mise à jour</button>
+          <button id="update-install" class="secondary-btn" type="button" hidden>Installer avec Android</button>
+          <p class="smallline">Pour les anciennes APK signées différemment, exporte tes souvenirs avant de changer d'installation. Julie n'installe rien à ton insu.</p>
+        </article>
+        <article class="info-card"><div class="subhead">VERSION</div><p>JULIE • Android <span id="installed-version">0.3.2</span> — modèle humain Genesis</p><p class="smallline">Prototype avec accès HTTPS limité aux mises à jour · pas d'achat · pas de compte à créer · pas d'accès aux capteurs.</p><p class="smallline">Modèle humain riggé CC0 : MakeHuman/MPFB via vsim, même source que Genesis ; adaptation féminine progressive propre à Julie.</p></article>
       </section>
     </main>
     <nav class="bottomnav" aria-label="Navigation"><button class="navitem active" data-view="avatar" type="button"><span>◈</span>Julie</button><button class="navitem" data-view="chat" type="button"><span>◉</span>Parler</button><button class="navitem" data-view="memory" type="button"><span>▤</span>Souvenirs</button><button class="navitem" data-view="settings" type="button"><span>⚙</span>Réglages</button></nav>
