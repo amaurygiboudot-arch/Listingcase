@@ -58,7 +58,7 @@ export function findGenesisEyes(g){
     const region={count:matched.length,
       minX:Math.min(...matched.map(x=>x[0])),maxX:Math.max(...matched.map(x=>x[0])),
       minZ:Math.min(...matched.map(x=>x[2])),maxZ:Math.max(...matched.map(x=>x[2]))};
-    throw Error('Deux vrais globes oculaires Genesis requis; diagnostic='+JSON.stringify({groups:near.slice(0,30).map(e=>({count:e.ids.length,ym:[+e.minY.toFixed(3),+e.maxY.toFixed(3)],zm:[+e.minZ.toFixed(3),+e.maxZ.toFixed(3)]})),region,selected:two.length}));
+    throw Error('Deux vrais globes oculaires Genesis requis; diagnostic='+JSON.stringify({groups:near.slice(0,30),region,selected:two.length}));
   }
   return two.map(e=>({ids:e.ids,center:new THREE.Vector3((e.minX+e.maxX)/2,(e.minY+e.maxY)/2,(e.minZ+e.maxZ)/2)}));
 }
