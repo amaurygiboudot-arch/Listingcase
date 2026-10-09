@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {stripGenesisConstructionHelpers,GENESIS_TOPOLOGY} from '../www/genesis-body-cleanup.mjs';
 import {cleanGenesisFemaleAnatomy} from '../www/genesis-female-topology.mjs';
+import {attachJulieWardrobe} from '../www/julie-wardrobe.mjs';
 
 // Contrôle de la vraie ressource de Genesis utilisée dans l'APK (pas un mannequin
 // fictif de test). En Node on neutralise uniquement les images, afin de
@@ -40,6 +41,11 @@ assert.ok(report.removedTriangles>0,'Des triangles parasites persistent');
 const fem=cleanGenesisFemaleAnatomy(gltf.scene);
 assert.equal(fem.malePartsRemoved,4,'Quatre composants attendus sur le GLB réel');
 assert.ok(fem.removedTriangles>0,'Le nettoyage anatomique doit retirer des triangles');
+const wardrobe=attachJulieWardrobe(THREE,gltf.scene,{outfit:'rose'});
+assert.equal(wardrobe.layers.length,2,'Deux pièces de tenue doivent suivre les os');
+assert.ok(wardrobe.triangles>400,'Les vêtements doivent couvrir suffisamment de triangles humains');
+assert.ok(wardrobe.layers.every(layer=>layer.isSkinnedMesh&&layer.skeleton===mesh.skeleton),'Habillage détaché du squelette');
+assert.equal(wardrobe.setOutfit('bleu'),'bleu');
 assert.ok(geometry.index.count<before);
 assert.equal(mesh.skeleton.bones.length,originalBoneCount);
 assert.strictEqual(geometry.attributes.skinWeight,skinnedWeights);
@@ -53,6 +59,7 @@ console.log('PASS JULIE GLB GENESIS',JSON.stringify({
   animations:gltf.animations.length,
   removedComponents:report.removedComponents,
   femaleComponents:fem.malePartsRemoved,
+  clothingTriangles:wardrobe.triangles,
   removedTriangles:report.removedTriangles+fem.removedTriangles,
   remainingTriangles:geometry.index.count/3
 }));
