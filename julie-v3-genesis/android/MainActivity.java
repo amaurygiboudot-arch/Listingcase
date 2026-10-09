@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * JULIE V3 : WebView à origine HTTPS locale, avec maillage GLB dans les assets.
+ * JULIE 0.3.1 : WebView à origine HTTPS locale, avec maillage GLB dans les assets.
  * Pas d'autorisation INTERNET, ni de chargement de contenus distants.
  * L'import/export JSON ne fonctionne que sur une action explicite de l'utilisateur.
  */
@@ -35,26 +35,23 @@ public final class MainActivity extends Activity {
     private static final String KEY = "julie_v3_preview_JULIE_001";
     private static final int EXPORT_REQUEST = 9041;
     private static final int IMPORT_REQUEST = 9042;
-    private static final int MAX_JSON_BYTES = 2_000_000;
+    private static final int MAX_JSON_BYTES = JulieSecureStore.MAX_JSON_BYTES;
 
+    private JulieSecureStore secureStore;
     private WebView web;
     private String pendingExport;
 
-    private SharedPreferences prefs(){return getSharedPreferences(PREF,MODE_PRIVATE);}
     public final class JulieBridge {
-        @JavascriptInterface public String readState(){return prefs().getString(KEY, "");}
-        @JavascriptInterface public void writeState(String json){
-            if(json==null||json.length()>MAX_JSON_BYTES)return;
-            prefs().edit().putString(KEY,json).apply();
-        }
+        @JavascriptInterface public String readState(){return secureStore.read();}
+        @JavascriptInterface public boolean writeState(String json){return secureStore.write(json);}
         @JavascriptInterface public void exportData(String json){
-            if(json==null||json.length()>MAX_JSON_BYTES)return;
+            if(json==null||json.getBytes(StandardCharsets.UTF_8).length>MAX_JSON_BYTES)return;
             runOnUiThread(()->{
                 pendingExport=json;
                 Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType("application/json");
-                intent.putExtra(Intent.EXTRA_TITLE,"Julie_souvenirs_V3.json");
+                intent.putExtra(Intent.EXTRA_TITLE,"Julie_souvenirs_JULIE_001.json");
                 try{startActivityForResult(intent,EXPORT_REQUEST);}catch(Exception ex){
                     Toast.makeText(MainActivity.this,"Export indisponible",Toast.LENGTH_SHORT).show();
                 }
@@ -111,6 +108,7 @@ public final class MainActivity extends Activity {
 
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
+        secureStore=new JulieSecureStore(getApplicationContext());
         getWindow().setStatusBarColor(Color.rgb(15,17,27));
         getWindow().setNavigationBarColor(Color.rgb(15,17,27));
         web=new WebView(this);
