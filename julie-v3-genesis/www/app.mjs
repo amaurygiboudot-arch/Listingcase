@@ -1,21 +1,35 @@
 import * as THREE from 'three';
 
-const JULIE_ID = 'JULIE_001';
-const APP_VERSION = '0.3.0';
+import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
+
+const APP_VERSION = '0.3.1';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
-let saved = { id:JULIE_ID, version:APP_VERSION, messages:[], memories:[], firstOpened:Date.now(), quality:'balanced' };
+let storageHealthy = true;
+let saved = createInitialState();
 try {
-  const fromNative = typeof window.JulieAndroid?.readState === 'function' ? window.JulieAndroid.readState() : null;
-  const old = JSON.parse(fromNative || localStorage.getItem(KEY) || '{}');
-  if (old.id === JULIE_ID && Array.isArray(old.messages) && Array.isArray(old.memories)) {
-    saved = { ...saved, ...old };
-    saved.messages = saved.messages.slice(-120);
-    saved.memories = saved.memories.slice(-60);
-  }
-} catch(e) { /* Données invalides : ne pas exposer d'informations externes. */ }
-const persist = () => {const text=JSON.stringify(saved);try{if(typeof window.JulieAndroid?.writeState==='function')window.JulieAndroid.writeState(text);else localStorage.setItem(KEY,text);}catch(e){console.warn('Mémoire locale indisponible',e)}};
+  const hasNative = typeof window.JulieAndroid?.readState === 'function';
+  const raw = hasNative ? window.JulieAndroid.readState() : localStorage.getItem(KEY);
+  if (raw === '__ERROR_SECURE_STORAGE__') throw new Error('Déchiffrement local impossible. Conserver cette installation, ne rien effacer.');
+  if (raw) saved = parseJulieState(raw);
+} catch(e) {
+  storageHealthy=false;
+  console.error('Mémoire JULIE : données non modifiées',e);
+  window.addEventListener('DOMContentLoaded',()=>alert('Lecture des souvenirs impossible. Aucun nouvel échange ne sera enregistré avant réparation. Ne désinstalle pas Julie.'));
+}
+function persist(next){
+  if(!storageHealthy){alert('Stockage indisponible. Les souvenirs existants sont protégés, aucune modification enregistrée.');return false;}
+  try {
+    checkCapacity(next);
+    const data=JSON.stringify(next);
+    if(typeof window.JulieAndroid?.writeState==='function'){
+      if(window.JulieAndroid.writeState(data)!==true)throw new Error('Le stockage chiffré Android a refusé la sauvegarde');
+    }else localStorage.setItem(KEY,data);
+    saved=next;
+    return true;
+  }catch(e){console.error('Sauvegarde JULIE non effectuée',e);alert(e?.message||'Impossible de sauvegarder. Les données précédentes sont conservées.');return false;}
+}
 
 function switchView(name){
   $$('.view').forEach(el => el.classList.toggle('active',el.id === name+'-view'));
@@ -62,11 +76,10 @@ function renderChat(){
 }
 $('#chat-form').addEventListener('submit',(event)=>{
   event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t)return;
-  const ts=Date.now();saved.messages.push({role:'user',text:t,at:ts});
-  if(/\b(j'aime|j’adore|j'adore|je préfère|je prefere|je déteste|je deteste)\b/i.test(t)){
-    if(!saved.memories.some(x=>x.text.toLowerCase()===t.toLowerCase()))saved.memories.push({kind:'déclaration utilisateur',text:t,at:ts,source:'message utilisateur'});
-  }
-  saved.messages.push({role:'julie',text:answer(t),at:ts+1});saved.messages=saved.messages.slice(-120);saved.memories=saved.memories.slice(-60);persist();field.value='';renderChat();
+  try{
+    const next=appendConversation(saved,t,answer(t),Date.now());
+    if(persist(next)){field.value='';renderChat();}
+  }catch(e){alert(e?.message||'Message non enregistré. Aucun ancien souvenir effacé.');}
 });
 function showMemories(){
   const root=$('#memory-items');root.textContent='';
@@ -78,48 +91,36 @@ function showMemories(){
   });
 }
 $('#quality').value=['eco','balanced','high'].includes(saved.quality)?saved.quality:'balanced';
-$('#quality').addEventListener('change',e=>{saved.quality=e.target.value;persist();onResize()});
+$('#quality').addEventListener('change',e=>{
+  if(!persist({...saved,quality:e.target.value}))e.target.value=saved.quality;
+  onResize();
+});
 $('#export-data').addEventListener('click',()=>{
   const data=JSON.stringify(saved,null,2);
-  // Export JSON via le sélecteur de fichiers Android, sans transmission réseau.
-  if (window.JulieAndroid && typeof window.JulieAndroid.exportData==='function') { window.JulieAndroid.exportData(data); return; }
+  if(new TextEncoder().encode(data).length>MAX_STATE_BYTES){alert('Export trop volumineux ; contacte le support avant de modifier les données.');return;}
+  if(typeof window.JulieAndroid?.exportData==='function'){window.JulieAndroid.exportData(data);return;}
   const w=window.open('about:blank','_blank');
-  if(w){w.document.body.innerHTML='';const pre=w.document.createElement('pre');pre.textContent=data;w.document.body.appendChild(pre)}
-  else{alert('Export JSON disponible dans l’application Android.');}
+  if(w){w.document.body.innerHTML='';const pre=w.document.createElement('pre');pre.textContent=data;w.document.body.appendChild(pre);}
+  else alert('Export JSON disponible dans l’application Android.');
 });
 $('#clear-data').addEventListener('click',()=>{
-  if(!confirm('Supprimer définitivement les conversations et préférences enregistrées par cette démo sur ce téléphone ?'))return;
-  saved.messages=[];saved.memories=[];persist();showMemories();renderChat();alert('Les données de démonstration ont été effacées.');
+  if(!confirm('Effacer définitivement les échanges et préférences de cette démo ? Les anciennes sauvegardes ne pourront pas les réintroduire.'))return;
+  if(persist(eraseDemoHistory(saved,Date.now()))){showMemories();renderChat();alert('Données de démonstration effacées sur ce téléphone.');}
 });
 
-
-// Import explicite des souvenirs de démonstration (V1/V2.1) après export JSON.
+// Import explicite, fusion sans troncature ni résurrection après effacement.
 function importOlderMemories(raw){
-  if(typeof raw!=='string'||raw.length>2000000)throw new Error('Fichier trop volumineux');
-  const incoming=JSON.parse(raw);
-  if(incoming?.id!==JULIE_ID || !Array.isArray(incoming.messages) || !Array.isArray(incoming.memories))
-    throw new Error('Le fichier n’est pas un export Julie compatible');
-  if(!confirm('Importer les conversations et préférences de cet ancien export Julie ? Les données actuelles seront conservées.'))return false;
-  const knownMsg=new Set(saved.messages.map(x=>[x.role,x.at,x.text].join('|')));
-  for(const m of incoming.messages.slice(-120)){
-    if(!m||!['user','julie','partner'].includes(m.role)||typeof m.text!=='string')continue;
-    const row={role:m.role==='partner'?'julie':m.role,at:Number(m.at)||Date.now(),text:m.text.slice(0,1500)};
-    const k=[row.role,row.at,row.text].join('|');if(!knownMsg.has(k)){saved.messages.push(row);knownMsg.add(k);}
-  }
-  const knownMem=new Set(saved.memories.map(x=>[x.kind,x.at,x.text].join('|')));
-  for(const m of incoming.memories.slice(-60)){
-    if(!m||typeof m.text!=='string')continue;
-    const row={kind:String(m.kind||'souvenir importé').slice(0,60),text:m.text.slice(0,1500),source:'export utilisateur',at:Number(m.at)||Date.now()};
-    const k=[row.kind,row.at,row.text].join('|');if(!knownMem.has(k)){saved.memories.push(row);knownMem.add(k);}
-  }
-  saved.messages=saved.messages.sort((a,b)=>a.at-b.at).slice(-120);
-  saved.memories=saved.memories.sort((a,b)=>a.at-b.at).slice(-60);
-  persist();renderChat();showMemories();
-  alert('Import terminé : les données existantes ont été conservées.');
+  if(typeof raw!=='string'||new TextEncoder().encode(raw).length>MAX_STATE_BYTES)throw new Error('Export trop volumineux');
+  const merged=mergeImport(saved,raw);
+  const msg=`Ajouter ${merged.addedMessages} messages et ${merged.addedMemories} souvenirs ? Les données actuelles seront conservées. ${merged.blocked} entrées antérieurement supprimées resteront effacées.`;
+  if(!confirm(msg))return false;
+  if(!persist(merged.state))return false;
+  renderChat();showMemories();
+  alert('Import vérifié et enregistré. Aucun ancien souvenir supprimé n’a été restauré.');
   return true;
 }
 window.JulieReceiveImport=(raw)=>{
-  try{importOlderMemories(raw)}catch(e){alert(e?.message||'Import impossible')}
+  try{importOlderMemories(raw)}catch(e){alert(e?.message||'Import impossible : aucun changement enregistré.');}
 };
 $('#import-data')?.addEventListener('click',()=>{
   if(typeof window.JulieAndroid?.importData==='function')window.JulieAndroid.importData();
@@ -245,7 +246,7 @@ async function loadHuman(){
     action.play();
     loadedHuman=true;
     updateStatus(`Maillage Genesis chargé • ${Math.round(fitted.height*100)} cm • ${idle.duration.toFixed(1)} s`);
-    $('#julie-line').textContent='« Cette fois, mon modèle humain reprend la base d’Ève de Genesis. Je vais encore évoluer. 💕 »';
+    $('#julie-line').textContent='« J’apprends à habiter un véritable avatar humain. Mon histoire et mes souvenirs restent les miens. 💕 »';
     console.info('JULIE V3: Genesis modèle chargé', {triangles:modelStats.triangles,bones:modelStats.skinned,clip:idle.name});
   }catch(err){
     loadedHuman=false;
