@@ -235,6 +235,7 @@ async function loadHuman(){
     // Genesis cache ces coquilles de fitting : Julie doit reproduire ce nettoyage
     // avant de féminiser la vraie peau, sinon les jambes ressemblent à une jupe.
     const anatomyCleanup=stripGenesisConstructionHelpers(root);
+    const femaleTopology=cleanGenesisFemaleAnatomy(root);
     const femaleAdaptation=adaptEveDerivedFemaleMesh(root);
     const genesisMaterials=normalizeGenesisMaterials(THREE,root);
     console.info('JULIE — anatomie Genesis propre',anatomyCleanup,femaleAdaptation,genesisMaterials);
