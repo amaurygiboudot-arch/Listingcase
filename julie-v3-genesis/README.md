@@ -49,3 +49,9 @@ Références : `Julie_Document_Maitre_V1.docx` (document de conception approuvé
 - Première chevelure blonde mi-longue ancrée sur les sommets du crâne skinné et l'os de la tête, avec de légers mouvements des pointes. Pas encore de physique capillaire complexe ni de pousse simulée.
 - Les modules échouent si la topologie du visage/chevelure de Genesis ne correspond pas aux repères vérifiés. Les tests sur le GLB réel et la compilation Android ne prouvent pas le photoréalisme ; validation visuelle sur téléphone encore indispensable.
 - Conservation du même package Android, de la même identité et des souvenirs existants : aucune migration de mémoire requise par ce changement de scène 3D. Signature Android permanente toujours préalable aux mises à jour en place.
+
+## Contrôle qualité du rendu (0.3.5, correctif)
+- Capture automatique Chromium avec WebGL logiciel ajoutée au workflow unique.
+- La première capture a révélé des mèches hérissées et un matériau de construction sombre sur les membres ; les tests unitaires ne suffisaient pas.
+- Correctif : les mèches suivent désormais la gravité à partir des racines latérales du crâne ; le matériau de la peau n'utilise plus l'atlas vestimentaire d'origine sur la surface corporelle vérifiée de 4 170 sommets.
+- Ces changements seront à nouveau comparés à une capture visuelle et restent un prototype, pas un avatar photoréaliste approuvé.

@@ -7,6 +7,7 @@ import {cleanGenesisFemaleAnatomy} from '../www/genesis-female-topology.mjs';
 import {attachJulieWardrobe} from '../www/julie-wardrobe.mjs';
 import {attachJulieFace} from '../www/julie-face.mjs';
 import {attachJulieHair} from '../www/julie-hair.mjs';
+import {attachJulieNaturalSkin} from '../www/julie-natural-skin.mjs';
 
 // Contrôle de la vraie ressource de Genesis utilisée dans l'APK (pas un mannequin
 // fictif de test). En Node on neutralise uniquement les images, afin de
@@ -43,6 +44,10 @@ assert.ok(report.removedTriangles>0,'Des triangles parasites persistent');
 const fem=cleanGenesisFemaleAnatomy(gltf.scene);
 assert.equal(fem.malePartsRemoved,4,'Quatre composants attendus sur le GLB réel');
 assert.ok(fem.removedTriangles>0,'Le nettoyage anatomique doit retirer des triangles');
+const skin=attachJulieNaturalSkin(gltf.scene);
+assert.equal(skin.vertices,4170,'Genesis doit préserver la surface de peau réelle');
+assert.ok(skin.triangles>2000,'La peau complète doit supplanter le faux atlas de vêtements');
+assert.ok(mesh.material.some(m=>m.name==='JULIE_001.natural-skin'),'Matériau peau manquant');
 const wardrobe=attachJulieWardrobe(THREE,gltf.scene,{outfit:'rose'});
 assert.equal(wardrobe.layers.length,2,'Deux pièces de tenue doivent suivre les os');
 assert.ok(wardrobe.layers.every(layer=>layer.geometry.userData.julieFemaleTopologyCleaned===false),'Aucun vêtement ne doit imiter le corps féminin');
@@ -81,6 +86,7 @@ console.log('PASS JULIE GLB GENESIS',JSON.stringify({
   removedComponents:report.removedComponents,
   femaleComponents:fem.malePartsRemoved,
   clothingTriangles:wardrobe.triangles,
+  skinTriangles:skin.triangles,
   eyes:face.eyeCount,
   eyelidVertices:face.blinkVertices,
   hairRoots:hair.rootCount,

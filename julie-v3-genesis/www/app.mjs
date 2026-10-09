@@ -138,6 +138,7 @@ import { cleanGenesisFemaleAnatomy } from './genesis-female-topology.mjs';
 import { attachJulieWardrobe,JULIE_OUTFITS } from './julie-wardrobe.mjs';
 import { attachJulieFace } from './julie-face.mjs';
 import { attachJulieHair } from './julie-hair.mjs';
+import { attachJulieNaturalSkin } from './julie-natural-skin.mjs';
 
 const MODEL_URL = './models/julie_genesis_human.glb';
 const canvas = $('#julie-3d');
@@ -244,10 +245,11 @@ async function loadHuman(){
     const femaleTopology=cleanGenesisFemaleAnatomy(root);
     const femaleAdaptation=adaptEveDerivedFemaleMesh(root);
     const genesisMaterials=normalizeGenesisMaterials(THREE,root);
+    const skin=attachJulieNaturalSkin(root);
     wardrobe=attachJulieWardrobe(THREE,root,{outfit:saved.outfit||'rose'});
     faceMotion=attachJulieFace(root);
     julieHair=attachJulieHair(root,{quality:saved.quality||'balanced'});
-    console.info('JULIE — anatomie Genesis propre',anatomyCleanup,femaleTopology,femaleAdaptation,genesisMaterials,{eyes:faceMotion.eyeCount,hairRoots:julieHair.rootCount});
+    console.info('JULIE — anatomie Genesis propre',anatomyCleanup,femaleTopology,femaleAdaptation,genesisMaterials,{skinTriangles:skin.triangles,eyes:faceMotion.eyeCount,hairRoots:julieHair.rootCount});
     const fitted=fitHumanModel(THREE,root,{heightMeters:1.75});
     avatar=new THREE.Group();
     avatar.name='JULIE_001_genesis_eve_derived_base';

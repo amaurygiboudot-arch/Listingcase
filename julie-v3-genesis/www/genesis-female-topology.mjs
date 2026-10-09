@@ -9,7 +9,7 @@
 const KNOWN_VERTICES=21833;
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 
-function connectedComponents(geometry){
+export function connectedComponents(geometry){
   const pos=geometry.attributes.position,idx=geometry.index;
   const n=pos.count,parent=new Int32Array(n),rank=new Uint8Array(n);
   for(let i=0;i<n;i++)parent[i]=i;

@@ -104,30 +104,34 @@ function scalpCap(THREEunused,source,mask){
  */
 function ribbonGeometry(roots,down,{quality='balanced',seed=1672}={}){
   const random=randomGenerator(seed);
-  const count=quality==='eco'?170:quality==='high'?430:300;
+  const count=quality==='eco'?130:quality==='high'?320:230;
+  // Le haut du crâne reste couvert par le scalp; seules les racines latérales
+  // et arrière portent des mèches longues pour éviter l'effet hérisson.
+  const hanging=roots.filter(r=>r.normal.dot(down)>-.55);
+  if(hanging.length<30)throw Error('Racines capillaires latérales insuffisantes');
   const positions=[],colors=[],uv=[],indices=[],weights=[];
-  const palettes=[0xc7a16a,0xd4ad70,0xe3c487,0xb99763,0xe5c589,0xc7a878];
-  const zero=new THREE.Vector3();
+  const palettes=[0xb4a17d,0xc4ad83,0xd1ba92,0xbaa680,0xcbb18a,0xd6c198];
+
   for(let strand=0;strand<count;strand++){
-    const element=roots[Math.floor(random()*roots.length)],origin=element.local,normal=element.normal;
-    const tangent=down.clone().addScaledVector(normal,-down.dot(normal));
-    if(tangent.lengthSq()<.000001)tangent.crossVectors(normal,new THREE.Vector3(1,0,0));
-    tangent.normalize();
-    const lateral=new THREE.Vector3().crossVectors(tangent,normal).normalize();
+    const element=hanging[Math.floor(random()*hanging.length)],origin=element.local,normal=element.normal;
+    const flow=down.clone().normalize();
+    const lateral=new THREE.Vector3().crossVectors(flow,normal).normalize();
     if(lateral.lengthSq()<1e-6)lateral.set(1,0,0);
     const phase=random()*Math.PI*2;
     // Back and sides fall to shoulder length; front fringe remains clear of eyes.
-    const length=element.front>.33?.10+random()*.04:.23+random()*.11;
-    const width=.003+random()*.0022;
+    const length=element.front>.33?.10+random()*.04:.22+random()*.09;
+    const width=.0045+random()*.003;
     const baseColor=new THREE.Color(palettes[Math.floor(random()*palettes.length)]);
     const first=positions.length/3;
     for(let j=0;j<=8;j++){
       const t=j/8,fall=length*t;
-      const wave=Math.sin(t*8.8+phase)*(.004+.005*random())*t;
+      // La gravité dirige les mèches vers les épaules. Le léger relief des
+      // racines maintient le ruban hors de la peau, sans rayons hérissés.
+      const wave=Math.sin(t*6.2+phase)*.0019*t;
+      const outward=.006+.015*Math.sin(t*Math.PI);
       const point=origin.clone()
-        .addScaledVector(tangent,fall*(1-.12*t))
-        .addScaledVector(down,fall*.18*t*t)
-        .addScaledVector(normal,.005+.008*Math.sin(t*Math.PI))
+        .addScaledVector(flow,fall)
+        .addScaledVector(normal,outward)
         .addScaledVector(lateral,wave);
       const w=Math.max(.00045,width*Math.pow(1-t,.55));
       const shade=baseColor.clone().lerp(new THREE.Color(0xf0d297),.07+.12*t);
@@ -182,9 +186,9 @@ export function attachJulieHair(model,{quality='balanced'}={}){
     const x=hair.rest,weights=hair.weights;
     for(let i=0;i<a.count;i++){
       const k=i*3,w=weights[i];
-      a.array[k]=x[k]+Math.sin(t*.93+i*.013)*.0032*w;
+      a.array[k]=x[k]+Math.sin(t*.93+i*.013)*.0011*w;
       a.array[k+1]=x[k+1];
-      a.array[k+2]=x[k+2]+Math.cos(t*.82+i*.011)*.0026*w;
+      a.array[k+2]=x[k+2]+Math.cos(t*.82+i*.011)*.0011*w;
     }
     a.needsUpdate=true;
   }
