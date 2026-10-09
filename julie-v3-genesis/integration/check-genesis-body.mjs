@@ -5,6 +5,8 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {stripGenesisConstructionHelpers,GENESIS_TOPOLOGY} from '../www/genesis-body-cleanup.mjs';
 import {cleanGenesisFemaleAnatomy} from '../www/genesis-female-topology.mjs';
 import {attachJulieWardrobe} from '../www/julie-wardrobe.mjs';
+import {attachJulieFace} from '../www/julie-face.mjs';
+import {attachJulieHair} from '../www/julie-hair.mjs';
 
 // Contrôle de la vraie ressource de Genesis utilisée dans l'APK (pas un mannequin
 // fictif de test). En Node on neutralise uniquement les images, afin de
@@ -46,6 +48,24 @@ assert.equal(wardrobe.layers.length,2,'Deux pièces de tenue doivent suivre les 
 assert.ok(wardrobe.triangles>400,'Les vêtements doivent couvrir suffisamment de triangles humains');
 assert.ok(wardrobe.layers.every(layer=>layer.isSkinnedMesh&&layer.skeleton===mesh.skeleton),'Habillage détaché du squelette');
 assert.equal(wardrobe.setOutfit('bleu'),'bleu');
+const face=attachJulieFace(gltf.scene);
+assert.equal(face.eyeCount,2,'Deux yeux Genesis doivent rester présents');
+assert.ok(face.eyeTriangles>100,'Les véritables yeux doivent être visibles');
+assert.ok(face.blinkVertices>600,'Le clignement doit concerner le globe et les paupières');
+const eyeMat=mesh.material.find(m=>m.name==='JULIE_001.iris.vert');
+assert.ok(eyeMat,'Iris vert intégré au véritable corps');
+const shader={uniforms:{},vertexShader:'#include <begin_vertex>',fragmentShader:'#include <color_fragment>'};
+eyeMat.onBeforeCompile(shader);
+assert.ok(shader.fragmentShader.includes('julieIrisColor'),'Iris vert absent du shader');
+const expression=face.update(.017);
+assert.ok(expression.blink>=0&&expression.blink<=1);
+face.beforeMixer();
+const hair=attachJulieHair(gltf.scene,{quality:'balanced'});
+assert.ok(hair.rootCount>=35,'Racines absentes du véritable crâne');
+assert.ok(hair.capTriangles>30,'La couverture des cheveux doit suivre la peau');
+assert.ok(hair.ribbonTriangles>1000,'Les mèches doivent être réellement construites');
+assert.equal(hair.head.toLowerCase(),'head');
+hair.update(1.0);
 assert.ok(geometry.index.count<before);
 assert.equal(mesh.skeleton.bones.length,originalBoneCount);
 assert.strictEqual(geometry.attributes.skinWeight,skinnedWeights);
@@ -60,6 +80,10 @@ console.log('PASS JULIE GLB GENESIS',JSON.stringify({
   removedComponents:report.removedComponents,
   femaleComponents:fem.malePartsRemoved,
   clothingTriangles:wardrobe.triangles,
+  eyes:face.eyeCount,
+  eyelidVertices:face.blinkVertices,
+  hairRoots:hair.rootCount,
+  hairRibbons:hair.ribbonTriangles,
   removedTriangles:report.removedTriangles+fem.removedTriangles,
   remainingTriangles:geometry.index.count/3
 }));

@@ -1,4 +1,4 @@
-# JULIE — canal Android de développement (0.3.4)
+# JULIE — canal Android de développement (0.3.5)
 
 **Source active sur `julie-v1`** : `julie-v3-genesis/`. Le nom du répertoire est hérité du premier prototype Genesis ; il n'implique pas la création d'une nouvelle APK à chaque mise à jour.
 
@@ -19,7 +19,7 @@
 Un seul workflow à utiliser pour les prochaines versions : `.github/workflows/julie-android.yml`.
 Les anciens workflows et les anciennes versions doivent être considérés comme des archives/prototypes, à retirer uniquement après preuve du bon fonctionnement du nouveau canal.
 
-Paquet Android de développement : `com.julie.preview.v3` (inchangé par rapport à Julie V3), version 0.3.4. **Signature** : tant qu'une clé Android privée et persistante n'est pas configurée dans GitHub Actions, l'APK de test reste signée avec une clé debug propre au runner. L'installation par-dessus l'ancienne peut alors être refusée. **Exporter les souvenirs avant toute désinstallation** puis importer volontairement l'export JSON. Une désinstallation efface la mémoire chiffrée AndroidKeyStore.
+Paquet Android de développement : `com.julie.preview.v3` (inchangé par rapport à Julie V3), version 0.3.5. **Signature** : tant qu'une clé Android privée et persistante n'est pas configurée dans GitHub Actions, l'APK de test reste signée avec une clé debug propre au runner. L'installation par-dessus l'ancienne peut alors être refusée. **Exporter les souvenirs avant toute désinstallation** puis importer volontairement l'export JSON. Une désinstallation efface la mémoire chiffrée AndroidKeyStore.
 
 ### Flux des mises à jour
 - Source de mise à jour : `https://api.github.com/repos/amaurygiboudot-arch/Listingcase/releases/tags/julie-android-updates`.
@@ -42,3 +42,10 @@ Cette application n'est pas une compagne pleinement autonome, ne possède pas de
 Pas d'abonnement, pas de paiement, pas d'appel à une API payante, pas d'accès à un compte sensible. Les échanges de Julie ne sont jamais envoyés à GitHub par le gestionnaire de mises à jour. Les journaux GitHub Actions ne doivent jamais contenir de souvenir personnel ou de clé de signature. Aucun changement aux branches `main` ou `backup-human-partner-20261009`, ni au dépôt Genesis, dans ce canal.
 
 Références : `Julie_Document_Maitre_V1.docx` (document de conception approuvé), `CREDITS_MODELE.md` (provenance et licence GLB).
+
+## Prototype visage et cheveux — version 0.3.5
+- Pupilles et iris verts traités sur les deux globes oculaires du GLB réel, sans ajouter de fausses sphères.
+- Trois micro-expressions par morph de la peau : clignement, sourire discret et hausse des sourcils ; léger mouvement de tête après la pose d'animation.
+- Première chevelure blonde mi-longue ancrée sur les sommets du crâne skinné et l'os de la tête, avec de légers mouvements des pointes. Pas encore de physique capillaire complexe ni de pousse simulée.
+- Les modules échouent si la topologie du visage/chevelure de Genesis ne correspond pas aux repères vérifiés. Les tests sur le GLB réel et la compilation Android ne prouvent pas le photoréalisme ; validation visuelle sur téléphone encore indispensable.
+- Conservation du même package Android, de la même identité et des souvenirs existants : aucune migration de mémoire requise par ce changement de scène 3D. Signature Android permanente toujours préalable aux mises à jour en place.

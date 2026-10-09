@@ -76,6 +76,8 @@ jobs:
         run: |
           set -euo pipefail
           for f in julie-v3-genesis/www/*.mjs; do node --check "$f"; done
+          # Installer Three.js avant les tests du visage/cheveux (ils utilisent le maillage réel).
+          npm install --prefix julie-v3-genesis --no-save --no-audit --no-fund three@0.181.1 esbuild@0.25.12
           node --test julie-v3-genesis/tests/*.mjs
           python3 - <<'PYCHECK'
           from pathlib import Path
@@ -106,7 +108,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install --prefix julie-v3-genesis --no-save --no-audit --no-fund three@0.181.1 esbuild@0.25.12
+          # Teste les vrais globes oculaires, clignements et racines de cheveux sur le GLB.
           node julie-v3-genesis/integration/check-genesis-body.mjs
           ./julie-v3-genesis/node_modules/.bin/esbuild julie-v3-genesis/www/app.mjs \
             --bundle --format=iife --platform=browser --target=es2020 \
@@ -131,7 +133,7 @@ jobs:
           assert s.count("applicationId 'com.humanpartner'")==1
           s=s.replace("applicationId 'com.humanpartner'","applicationId 'com.julie.preview.v3'")
           s=s.replace('versionCode 9',"versionCode "+str(300000+int('${{ github.run_number }}')))
-          s=s.replace("versionName '0.1.8'","versionName '0.3.4-dev.${{ github.run_number }}'")
+          s=s.replace("versionName '0.1.8'","versionName '0.3.5-dev.${{ github.run_number }}'")
           p.write_text(s)
           PYGRADLE
       - name: Compiler APK Android de test
@@ -150,10 +152,10 @@ jobs:
           unzip -Z1 "$APK" | grep -Fx assets/julie/app.js
           unzip -Z1 "$APK" | grep -Fx classes.dex
           mkdir -p julie-android-artifact
-          cp "$APK" julie-android-artifact/JULIE-Android-0.3.4-debug.apk
+          cp "$APK" julie-android-artifact/JULIE-Android-0.3.5-debug.apk
           cp julie-v3-genesis/README.md julie-android-artifact/LIRE_AVANT_INSTALLATION.md
           cp julie-v3-genesis/CREDITS_MODELE.md julie-android-artifact/CREDITS_MODELE.md
-          (cd julie-android-artifact && sha256sum JULIE-Android-0.3.4-debug.apk > SHA256SUMS.txt)
+          (cd julie-android-artifact && sha256sum JULIE-Android-0.3.5-debug.apk > SHA256SUMS.txt)
       - name: Publier Julie Android
         uses: actions/upload-artifact@v4
         with:
@@ -242,7 +244,7 @@ jobs:
           fi
           export JULIE_RELEASE_APK="$APK"
           export JULIE_RELEASE_VERSIONCODE="$((300000+${{ github.run_number }}))"
-          export JULIE_RELEASE_VERSIONNAME="0.3.4-dev.${{ github.run_number }}"
+          export JULIE_RELEASE_VERSIONNAME="0.3.5-dev.${{ github.run_number }}"
           python3 - <<'PYRELEASE'
           import hashlib,json,os
           from pathlib import Path

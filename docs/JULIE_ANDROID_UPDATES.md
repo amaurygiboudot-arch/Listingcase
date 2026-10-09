@@ -1,6 +1,6 @@
 # JULIE — mises à jour Android contrôlées
 
-## État fonctionnel (version 0.3.4)
+## État fonctionnel (version 0.3.5)
 Dans **Réglages → Mises à jour**, Julie recherche une Release GitHub dédiée à l'ouverture de l'application (au plus une fois par 24 h), vérifie les métadonnées, et télécharge automatiquement une APK **uniquement sur réseau non facturé** lorsque l'option est activée.
 
 L'installation Android exige **toujours une action explicite** ; une application Android ordinaire ne peut pas installer silencieusement une APK téléchargée hors Play Store. Sur Android 8+, l'utilisateur peut avoir à autoriser cette source dans les paramètres.

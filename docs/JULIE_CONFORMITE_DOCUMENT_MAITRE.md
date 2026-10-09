@@ -24,7 +24,7 @@
 
 Une valeur **décrite** dans la configuration ne vaut pas preuve que son apparence, sa simulation ou son comportement sont effectivement intégrés.
 
-## Audit d'écarts au 09/10/2026 — canal Android de développement 0.3.4
+## Audit d'écarts au 09/10/2026 — canal Android de développement 0.3.5
 
 Statuts : **Prototype** = partie présente et testable mais incomplète ; **Absent** = aucun système correspondant prouvé ; **Partiel** = quelques sous-exigences techniques vérifiées. **Conforme** exige des tests, un contrôle visuel sur appareil et une approbation de l'utilisateur ; ce statut n'est attribué à aucune section globale à ce jour.
 
@@ -36,7 +36,7 @@ Statuts : **Prototype** = partie présente et testable mais incomplète ; **Abse
 | 04 Identité biographique | **Partiel** | Prénom et `JULIE_001` ; histoire fictive cohérente, entourage et secret narratif non réalisés |
 | 05 Vie quotidienne et autonomie | **Absent** | Sommeil, repas, travail, monnaie virtuelle, planification et événements hors connexion |
 | 06 Perception et sens simulés | **Absent** | Attention, vision simulée, perception, proprioception et sens |
-| 07 Corps et avatar 3D | **Prototype** | Véritable GLB humain articulé de la source Genesis, correction morphologique féminine, premier vêtement suivant le squelette et 30/60/120 FPS ; réalisme du visage, des yeux, cheveux, peau, animation et physique textile non validé |
+| 07 Corps et avatar 3D | **Prototype** | Véritable GLB humain articulé de la source Genesis, correction morphologique féminine, premier vêtement suivant le squelette, prototype iris verts/morphs faciaux/cheveux blonds mi-longs, et 30/60/120 FPS ; aspect réaliste, rendu GPU, coiffure, peau, animation et physique textile non validés sur téléphone |
 | 08 Biologie et santé fictives | **Absent** | Fonctions internes, vieillissement, fatigue, cycles, états physiologiques et conséquences |
 | 09 Communication immersive | **Prototype textuel** | Conversation en phrases modèles ; pas de moteur conversationnel autonome, voix, lèvres synchronisées ou vidéo |
 | 10 Vie sociale et professionnelle | **Absent** | Amis, famille, carrière, économie et décisions personnelles autonomes |

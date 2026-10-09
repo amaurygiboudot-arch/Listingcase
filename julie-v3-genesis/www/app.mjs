@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
 
-const APP_VERSION = '0.3.4';
+const APP_VERSION = '0.3.5';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -136,6 +136,8 @@ import { adaptEveDerivedFemaleMesh, normalizeGenesisMaterials } from './eve-deri
 import { stripGenesisConstructionHelpers } from './genesis-body-cleanup.mjs';
 import { cleanGenesisFemaleAnatomy } from './genesis-female-topology.mjs';
 import { attachJulieWardrobe,JULIE_OUTFITS } from './julie-wardrobe.mjs';
+import { attachJulieFace } from './julie-face.mjs';
+import { attachJulieHair } from './julie-hair.mjs';
 
 const MODEL_URL = './models/julie_genesis_human.glb';
 const canvas = $('#julie-3d');
@@ -156,6 +158,8 @@ let loadedHuman = false;
 let orbitDirection = 1;
 let modelStats = null;
 let wardrobe = null;
+let faceMotion = null;
+let julieHair = null;
 
 function updateStatus(message) {
   if (assetStatus){assetStatus.hidden=false;assetStatus.textContent=message;}
@@ -241,7 +245,9 @@ async function loadHuman(){
     const femaleAdaptation=adaptEveDerivedFemaleMesh(root);
     const genesisMaterials=normalizeGenesisMaterials(THREE,root);
     wardrobe=attachJulieWardrobe(THREE,root,{outfit:saved.outfit||'rose'});
-    console.info('JULIE — anatomie Genesis propre',anatomyCleanup,femaleAdaptation,genesisMaterials);
+    faceMotion=attachJulieFace(root);
+    julieHair=attachJulieHair(root,{quality:saved.quality||'balanced'});
+    console.info('JULIE — anatomie Genesis propre',anatomyCleanup,femaleTopology,femaleAdaptation,genesisMaterials,{eyes:faceMotion.eyeCount,hairRoots:julieHair.rootCount});
     const fitted=fitHumanModel(THREE,root,{heightMeters:1.75});
     avatar=new THREE.Group();
     avatar.name='JULIE_001_genesis_eve_derived_base';
@@ -257,7 +263,7 @@ async function loadHuman(){
     updateStatus(`Corps Genesis nettoyé • ${Math.round(fitted.height*100)} cm • ${anatomyCleanup.removedComponents} coquilles retirées`);
     // Après le chargement, dégager les pieds et les jambes pour l’inspection 3D.
     window.setTimeout(()=>{if(loadedHuman&&assetStatus)assetStatus.hidden=true;},6500);
-    $('#julie-line').textContent='« J’apprends à habiter un véritable avatar humain. Mon histoire et mes souvenirs restent les miens. 💕 »';
+    $('#julie-line').textContent='« Mon regard vert et mes cheveux blonds prennent forme. Je garde mon histoire et mes souvenirs. 💕 »';
     console.info('JULIE V3: Genesis modèle chargé', {triangles:modelStats.triangles,bones:modelStats.skinned,clip:idle.name});
   }catch(err){
     loadedHuman=false;
@@ -333,7 +339,12 @@ function tick(now){
   if(now-renderLast<1000/qualityLimit())return;
   const delta=Math.min(.05,(now-renderLast)/1000 || deltaMs/1000);
   renderLast=now;
-  if(mixer&&loadedHuman)mixer.update(delta);
+  if(mixer&&loadedHuman){
+    faceMotion?.beforeMixer();
+    mixer.update(delta);
+    faceMotion?.update(delta);
+    julieHair?.update(now/1000);
+  }
   if(avatar){
     if(turnOn)angle+=delta*.35;
     avatar.rotation.y=angle;
