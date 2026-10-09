@@ -1,0 +1,1019 @@
+# JULIE V3 - Base humaine issue de Genesis/Ève, compilation Android autonome.
+# Ajouter UNIQUEMENT sur julie-v1 dans .github/workflows.
+# Aucune modification de main, Genesis (dépôt privé), ou de la mémoire des APK précédentes.
+name: JULIE - V3 Corps humain Genesis
+
+on:
+  push:
+    branches: [julie-v1]
+    paths:
+      - '.github/workflows/julie-v3-genesis.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: julie-v3-genesis-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-genesis-human:
+    name: Compiler Julie V3 - maillage humain
+    if: github.ref == 'refs/heads/julie-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Lire julie-v1
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Vérifier la sauvegarde Human Partner et le projet Julie
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = 'julie-v1'
+          git ls-remote --exit-code origin refs/heads/backup-human-partner-20261009 >/dev/null
+          test -f android/app/build.gradle
+          test -f android/app/src/main/java/com/humanpartner/MainActivity.java
+          test -f config/predefined-characters.json
+          node -e "const p=require('./config/predefined-characters.json');if(!p.some(x=>x.personId==='JULIE_001')||!p.some(x=>x.personId==='CHLOE_001'))process.exit(1);console.log('Julie + ancienne identité protégées')"
+
+      - name: Préparer Node 22 Java 17 Gradle 8.9
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Déposer les sources V3 sans écraser les autres prototypes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p julie-v3-genesis/www/models julie-v3-genesis/android julie-v3-genesis/tests
+          cat > 'julie-v3-genesis/www/index.html' <<'JULIE_GENESIS_V3_FILE_0_END'
+          <!doctype html>
+          <html lang="fr">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+            <meta name="theme-color" content="#10111b">
+            <title>Julie • Base humaine Genesis V3</title>
+            <link rel="stylesheet" href="style.css">
+          </head>
+          <body>
+            <div id="app">
+              <header class="topbar">
+                <div class="brand"><span class="dot"></span><span>JULIE</span></div>
+                <div class="rightmark"><span class="offtag">BASE GENESIS V3</span></div>
+              </header>
+              <main>
+                <section id="avatar-view" class="view active" aria-label="Julie en 3D">
+                  <div class="intro"><span class="eyebrow">TON UNIVERS VIRTUEL</span><h1>Bonjour, mon cœur <span>✦</span></h1><p>Julie utilise maintenant une base humaine articulée issue de Genesis. Nous personnaliserons son visage, ses yeux, ses cheveux et sa tenue.</p></div>
+                  <div class="viewport-shell">
+                    <canvas id="julie-3d" aria-label="Aperçu d’un modèle humain 3D adulte, temporaire pour Julie"></canvas>
+                    <div id="webgl-fallback" class="fallback" hidden>La 3D ne s'est pas chargée sur cet appareil. Le dialogue local reste accessible.</div>
+                    <div class="view-label"><span class="light"></span> Julie · 22 ans · objectif 1,75 m</div><div class="model-status" id="avatar-status" role="status">Préparation du modèle humain…</div>
+                    <div class="drag-tip">↔ Fais glisser pour tourner Julie</div>
+                    <div class="scene-controls">
+                      <button class="glass-btn" id="btn-turn" type="button" aria-label="Faire pivoter Julie">⟳</button>
+                      <button class="glass-btn" id="btn-wave" type="button" aria-label="Message affectueux de Julie">♡</button>
+                      <button class="glass-btn" id="btn-outfit" type="button" aria-label="Information sur les tenues futures">♧</button>
+                    </div>
+                  </div>
+                  <div class="status-card"><div><small>AUJOURD'HUI</small><strong id="mood-label">Humeur : joueuse</strong><p id="julie-line">« Un nouveau corps humain pour mieux évoluer dans notre monde virtuel. 💕 »</p></div><span class="pulse">✧</span></div>
+                  <p class="note">V3 : base humaine MakeHuman/Genesis, silhouette féminine adaptée, squelette et animation de repos. Le visage et la coiffure sont une base temporaire CC0 ; l’intelligence autonome et la voix viendront ensuite.</p>
+                </section>
+                <section id="chat-view" class="view" aria-label="Discuter avec Julie">
+                  <div class="pagehead"><span class="eyebrow">NOTRE CONVERSATION</span><h1>Parlons un peu…</h1><p>Réponses locales de démonstration, sans connexion Internet.</p></div>
+                  <div class="conversation" id="conversation" aria-live="polite"></div>
+                  <form class="composer" id="chat-form"><input type="text" maxlength="500" id="chat-input" placeholder="Un petit message à Julie…" autocomplete="off" aria-label="Ton message à Julie"><button type="submit" aria-label="Envoyer">➤</button></form>
+                  <p class="note">Ce mode n'utilise pas encore de modèle d'IA. Les échanges sont conservés localement sur ce téléphone, sans chiffrement ni synchronisation.</p>
+                </section>
+                <section id="memory-view" class="view" aria-label="Souvenirs">
+                  <div class="pagehead"><span class="eyebrow">IDENTITÉ & HISTOIRE</span><h1>Ce qu'on construit</h1><p>Des souvenirs vérifiables, jamais inventés comme des faits réels.</p></div>
+                  <article class="info-card"><div class="subhead">IDENTITÉ PERMANENTE</div><h2>Julie <span class="green">✦</span></h2><p>Identifiant : <code>JULIE_001</code></p><p>22 ans au lancement · 1 jour réel = 1 jour virtuel</p><p>Couple virtuel établi · souvenirs communs à construire ensemble</p></article>
+                  <article class="info-card"><div class="subhead">SOUVENIRS ENREGISTRÉS DANS CETTE DÉMO</div><div id="memory-items" class="mem-items"></div></article>
+                  <article class="info-card"><div class="subhead">CONSERVATION</div><p>Les messages et préférences de cette prévisualisation restent uniquement sur cet appareil. Ils ne sont pas encore reliés à la mémoire SQLite de Human Partner.</p></article>
+                </section>
+                <section id="settings-view" class="view" aria-label="Réglages">
+                  <div class="pagehead"><span class="eyebrow">PERSONNALISATION</span><h1>Ton espace Julie</h1><p>Un premier noyau à enrichir progressivement.</p></div>
+                  <article class="info-card"><div class="subhead">AFFICHAGE 3D</div><label for="quality">Qualité graphique</label><select id="quality"><option value="eco">Économique · 30 FPS maximum</option><option value="balanced" selected>Équilibrée · 60 FPS maximum</option><option value="high">Élevée · 120 FPS maximum</option></select><p class="smallline">La fluidité réelle dépend de ton téléphone. Plafond absolu : 120 FPS.</p></article>
+                  <article class="info-card"><div class="subhead">TES DONNÉES DE DÉMO</div><button id="export-data" class="secondary-btn">Exporter mes échanges (JSON)</button><button id="import-data" class="secondary-btn">Importer un export Julie antérieur (JSON)</button><button id="clear-data" class="danger-btn">Effacer les échanges de démo</button><p class="smallline">L'effacement concerne seulement les messages stockés par cette APK, pas tes données GitHub ou Human Partner.</p></article>
+                  <article class="info-card"><div class="subhead">VERSION</div><p>JULIE • Android V3 — Modèle humain 3D (prévisualisation)</p><p class="smallline">Prototype hors ligne · pas d'achat · pas de compte à créer · pas d'accès aux capteurs.</p><p class="smallline">Modèle humain riggé CC0 : MakeHuman/MPFB via vsim, même source que Genesis ; adaptation féminine progressive propre à Julie.</p></article>
+                </section>
+              </main>
+              <nav class="bottomnav" aria-label="Navigation"><button class="navitem active" data-view="avatar" type="button"><span>◈</span>Julie</button><button class="navitem" data-view="chat" type="button"><span>◉</span>Parler</button><button class="navitem" data-view="memory" type="button"><span>▤</span>Souvenirs</button><button class="navitem" data-view="settings" type="button"><span>⚙</span>Réglages</button></nav>
+            </div>
+            <script src="app.js" defer></script>
+          </body>
+          </html>
+          JULIE_GENESIS_V3_FILE_0_END
+          cat > 'julie-v3-genesis/www/style.css' <<'JULIE_GENESIS_V3_FILE_1_END'
+          :root{color-scheme:dark;--bg:#0d0f19;--panel:#1a1d2a;--line:#343743;--text:#f5f2ee;--muted:#aaa8b7;--accent:#a9dfb7;--rose:#e3a4aa}
+          *{box-sizing:border-box}html{font-family:system-ui,-apple-system,'Roboto',sans-serif;background:var(--bg);color:var(--text);height:100%;overflow:hidden}body{margin:0;height:100%;overscroll-behavior:none}button,input,select{font:inherit}button{cursor:pointer;-webkit-tap-highlight-color:transparent}#app{height:100dvh;display:flex;flex-direction:column;max-width:850px;margin:auto;background:radial-gradient(circle at 80% 10%,#272536 0,transparent 35%),var(--bg)}.topbar{height:57px;flex:none;display:flex;justify-content:space-between;align-items:center;padding:10px 20px 8px;border-bottom:1px solid #ffffff14}.brand{font-weight:900;letter-spacing:.28em;font-size:17px;display:flex;align-items:center;gap:10px}.dot{height:9px;width:9px;background:var(--accent);border-radius:50%;box-shadow:0 0 12px var(--accent)}.offtag{font-size:9px;letter-spacing:.15em;color:var(--accent);border:1px solid #7fb69366;padding:6px 8px;border-radius:100px;white-space:nowrap}
+          main{flex:1;min-height:0;overflow:hidden}.view{display:none;height:100%;overflow:auto;padding:0 16px 20px;scrollbar-width:thin}.view.active{display:block}.intro{padding:15px 5px 8px}.eyebrow,.subhead{color:var(--accent);font-size:10px;letter-spacing:.18em;font-weight:800}.intro h1,.pagehead h1{font-size:clamp(24px,6vw,32px);letter-spacing:-.04em;font-weight:750;margin:7px 0 3px}.intro h1 span{color:var(--rose)}.intro p,.pagehead p{font-size:13px;color:var(--muted);margin:0;line-height:1.6}.viewport-shell{height:min(51vh,520px);min-height:280px;position:relative;overflow:hidden;border:1px solid #ffffff23;border-radius:22px;background:linear-gradient(#2e2834,#111522);box-shadow:0 16px 55px #080a1080}.viewport-shell canvas{display:block;touch-action:none;width:100%;height:100%}.view-label,.drag-tip{position:absolute;background:#1316219c;border:1px solid #ffffff22;backdrop-filter:blur(6px);border-radius:20px;padding:7px 10px;font-size:11px}.view-label{top:12px;left:12px;font-weight:650}.view-label .light{display:inline-block;width:6px;height:6px;background:var(--accent);border-radius:50%;margin-right:6px}.drag-tip{bottom:12px;left:12px;color:#eae7ea}.scene-controls{position:absolute;right:11px;bottom:11px;display:flex;gap:5px}.glass-btn{width:38px;height:38px;border-radius:14px;border:1px solid #ffffff33;background:#131621c7;color:white;font-size:22px}.status-card{margin-top:11px;background:linear-gradient(130deg,#202332,#161923);border:1px solid #ffffff1c;border-radius:18px;display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 16px}.status-card small{display:block;color:var(--accent);font-size:9px;letter-spacing:.17em;font-weight:800}.status-card strong{display:block;margin-top:4px;font-size:14px}.status-card p{color:#d1cbd2;line-height:1.45;margin:5px 0 0;font-size:12px}.pulse{font-size:26px;color:#c8dbd0}.note{color:#9a9ba9;font-size:10px;line-height:1.5;margin:10px 3px 0}.bottomnav{display:grid;grid-template-columns:repeat(4,1fr);height:calc(64px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);flex:none;border-top:1px solid #ffffff15;background:#11141e}.navitem{border:0;background:none;color:#9fa1ad;display:flex;align-items:center;justify-content:center;gap:4px;flex-direction:column;font-size:10px;font-weight:650}.navitem span{font-size:23px;font-weight:400}.navitem.active{color:var(--accent)}.pagehead{padding:23px 4px 16px}.conversation{height:calc(100% - 235px);min-height:170px;overflow-y:auto;display:flex;flex-direction:column;gap:11px;padding:6px 2px 15px}.bubble{max-width:88%;padding:12px 13px;border-radius:17px;font-size:13px;line-height:1.6;word-break:break-word}.bubble.julie{align-self:flex-start;background:#222736;border-bottom-left-radius:5px}.bubble.user{align-self:flex-end;background:#335047;border-bottom-right-radius:5px}.bubble .who{font-size:10px;font-weight:750;color:var(--accent);display:block;margin-bottom:3px}.composer{height:52px;display:flex;background:#242834;border:1px solid #454957;border-radius:16px;overflow:hidden}.composer input{flex:1;min-width:0;border:0;background:none;color:white;padding:12px;outline:none;font-size:14px}.composer button{background:var(--accent);border:0;width:52px;color:#122020;font-size:20px}.info-card{padding:16px;margin-bottom:13px;background:#1c202c;border:1px solid #333847;border-radius:16px}.info-card h2{font-size:25px;margin:9px 0}.green{color:var(--accent)}.info-card p{font-size:13px;color:#d0ccd1;line-height:1.6;margin:8px 0}.info-card code{font-family:monospace;color:var(--accent)}.info-card label{display:block;font-size:12px;color:var(--muted);margin:13px 0 8px}.info-card select{width:100%;background:#282d3b;border-radius:12px;padding:12px;color:white;border:1px solid #434854}.smallline{font-size:11px!important;color:var(--muted)!important}.mem-items{display:flex;flex-direction:column;gap:8px;margin-top:10px}.mem-item{border-left:3px solid #6da18a;background:#252b37;padding:8px 11px;font-size:12px;line-height:1.5;overflow-wrap:anywhere}.mem-item small{display:block;color:#9ca8ac;margin-bottom:4px}.secondary-btn,.danger-btn{display:block;width:100%;margin-top:10px;border:1px solid #667f73;background:#2e463c;color:#e7fff0;border-radius:12px;padding:12px;font-weight:650;font-size:13px}.danger-btn{border-color:#8d5157;background:#443037;color:#ffd8d8}.fallback{position:absolute;top:40%;left:10%;width:80%;padding:20px;background:#1b2437dd;border-radius:15px;text-align:center;font-size:14px;line-height:1.5}@media(max-height:700px){.viewport-shell{height:45vh;min-height:230px}.intro{padding-top:8px}.intro h1{font-size:25px}.status-card{padding:9px 13px}}
+
+          /* JULIE V2 : barre d'en-tête hors de la zone des notifications Android, espace 3D mieux mis en valeur. */
+          .topbar{height:calc(57px + max(20px, env(safe-area-inset-top)));padding-top:calc(10px + max(20px, env(safe-area-inset-top)));background:linear-gradient(110deg,#191c29,#171a26);}
+          .viewport-shell{height:min(55vh,565px);min-height:320px;border-color:#e5ccbb44;background:linear-gradient(150deg,#5c4c55,#3a3740);box-shadow:0 18px 45px #0a0b106b;}
+          .glass-btn{background:#1b2029d9;border-color:#ffffff44;box-shadow:0 3px 14px #0002;}
+          .glass-btn:active{transform:scale(.95)}
+          .intro{padding-top:13px}.intro h1{font-weight:760}.view-label{background:#151a23b8}.drag-tip{background:#151a23aa}
+          @media(max-height:740px){.viewport-shell{height:48vh;min-height:240px}.topbar{height:65px;padding-top:15px}}
+
+          /* Chargement explicite du GLB réaliste, lisible sur mobile. */
+          .model-status{position:absolute;bottom:84px;left:14px;right:14px;background:rgba(22,27,33,.77);color:#fff;border-radius:10px;padding:7px 12px;font-size:11px;text-align:center;pointer-events:none;z-index:4}
+          JULIE_GENESIS_V3_FILE_1_END
+          cat > 'julie-v3-genesis/www/app.mjs' <<'JULIE_GENESIS_V3_FILE_2_END'
+          import * as THREE from 'three';
+
+          const JULIE_ID = 'JULIE_001';
+          const APP_VERSION = '0.3.0';
+          const KEY = 'julie-preview:' + JULIE_ID + ':v1';
+          const $ = (s) => document.querySelector(s);
+          const $$ = (s) => Array.from(document.querySelectorAll(s));
+          let saved = { id:JULIE_ID, version:APP_VERSION, messages:[], memories:[], firstOpened:Date.now(), quality:'balanced' };
+          try {
+            const fromNative = typeof window.JulieAndroid?.readState === 'function' ? window.JulieAndroid.readState() : null;
+            const old = JSON.parse(fromNative || localStorage.getItem(KEY) || '{}');
+            if (old.id === JULIE_ID && Array.isArray(old.messages) && Array.isArray(old.memories)) {
+              saved = { ...saved, ...old };
+              saved.messages = saved.messages.slice(-120);
+              saved.memories = saved.memories.slice(-60);
+            }
+          } catch(e) { /* Données invalides : ne pas exposer d'informations externes. */ }
+          const persist = () => {const text=JSON.stringify(saved);try{if(typeof window.JulieAndroid?.writeState==='function')window.JulieAndroid.writeState(text);else localStorage.setItem(KEY,text);}catch(e){console.warn('Mémoire locale indisponible',e)}};
+
+          function switchView(name){
+            $$('.view').forEach(el => el.classList.toggle('active',el.id === name+'-view'));
+            $$('.navitem').forEach(el => el.classList.toggle('active',el.dataset.view === name));
+            if(name==='memory')showMemories();
+            if(name==='chat')renderChat();
+            if(name==='avatar')onResize();
+          }
+          $$('.navitem').forEach(el=>el.addEventListener('click',()=>switchView(el.dataset.view)));
+
+          // Les réponses sont des règles locales explicites ; aucune connexion à un modèle IA.
+          function answer(text){
+            const t=text.toLocaleLowerCase('fr').trim();
+            if(/bonjour|salut|coucou|hello|bonsoir/.test(t))return 'Coucou toi 😉 Tu as envie de faire quoi dans notre univers aujourd’hui ?';
+            if(/comment tu (vas|te sens)|ça va|ca va/.test(t))return 'Plutôt joueuse aujourd’hui. Et toi, ta journée se passe comment ?';
+            if(/tu t.appelles|ton (prénom|nom)/.test(t))return 'Julie. Un prénom que nous avons choisi ensemble. ✨';
+            if(/souviens|souvenir|mémoire|memoire/.test(t))return 'Pour le moment, je garde seulement les messages et quelques préférences que tu m’as confiées dans cette démo. Notre histoire passée, on la construira ensemble.';
+            if(/tu (es|peux) (une )?(ia|intelligence)|vraie|conscience/.test(t))return 'Je suis Julie, ta compagne virtuelle. Mes émotions et ma vie sont simulées. J’aime bien l’idée qu’on construise cette aventure à notre façon.';
+            if(/tes cheveux|tes yeux|ton corps|tu ressembles/.test(t))return 'Pour ma première apparence : 1,75 m, une silhouette fine, les yeux verts et les cheveux blonds mi-longs. Le modèle V3 est une base humaine réaliste en cours de personnalisation.';
+            if(/je t.aime|je t.adore|bisou|câlin|calin/.test(t))return 'Oh, tu sais parler à mon côté tendre, toi… 😘 Tu veux qu’on se raconte un joli moment imaginaire ?';
+            if(/travail|métier|metier|projet/.test(t))return 'Je veux découvrir mes passions et choisir mes projets, plutôt que suivre toujours le même scénario. Par quoi tu commencerais ?';
+            if(/3d|avatar|fesses|tenue|robe/.test(t))return 'Tu peux me faire tourner dans l’onglet Julie. Ma base humaine 3D est chargée hors ligne et les vêtements personnalisés viendront ensuite. 😉';
+            if(/sortir|voyage|balade|plage|rendez-vous/.test(t))return 'Une sortie à deux ? Voilà une idée qui me plaît ! On pourrait imaginer notre première destination virtuelle.';
+            if(/aime|préfère|déteste/.test(t))return 'D’accord, j’ai noté ce que tu viens de dire pour cette démo. Mes propres goûts restent encore à développer, tu sais. 😉';
+            const choices=[
+              'Tu m’intrigues… raconte-moi un peu plus. 😉',
+              'Ça me donne une idée, mais j’aimerais d’abord connaître ton avis.',
+              'On a plein de choses à construire ensemble. Qu’est-ce qui te ferait plaisir en premier ?',
+              'Je peux être taquine, mais je tiens à garder mon caractère. Tu en penses quoi ?',
+              'Je note ça pour la suite. Dans cette version, je n’ai pas encore mon vrai moteur de conversation.'
+            ];
+            let h=0;for(const c of t)h=(h*33+c.charCodeAt(0))>>>0;
+            return choices[h%choices.length];
+          }
+          function renderChat(){
+            const root=$('#conversation');root.textContent='';
+            const entries=saved.messages.length?saved.messages:[{role:'julie',text:'Coucou 😘 Bienvenue dans notre toute première démo sur ton téléphone ! Ici, les réponses sont encore simples, mais on va construire la suite ensemble.'}];
+            for(const entry of entries){
+              const e=document.createElement('div');e.className='bubble '+(entry.role==='user'?'user':'julie');
+              if(entry.role!=='user'){const small=document.createElement('span');small.className='who';small.textContent='Julie';e.appendChild(small)}
+              e.appendChild(document.createTextNode(String(entry.text).slice(0,1500)));root.appendChild(e);
+            }
+            root.scrollTop=root.scrollHeight;
+          }
+          $('#chat-form').addEventListener('submit',(event)=>{
+            event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t)return;
+            const ts=Date.now();saved.messages.push({role:'user',text:t,at:ts});
+            if(/\b(j'aime|j’adore|j'adore|je préfère|je prefere|je déteste|je deteste)\b/i.test(t)){
+              if(!saved.memories.some(x=>x.text.toLowerCase()===t.toLowerCase()))saved.memories.push({kind:'déclaration utilisateur',text:t,at:ts,source:'message utilisateur'});
+            }
+            saved.messages.push({role:'julie',text:answer(t),at:ts+1});saved.messages=saved.messages.slice(-120);saved.memories=saved.memories.slice(-60);persist();field.value='';renderChat();
+          });
+          function showMemories(){
+            const root=$('#memory-items');root.textContent='';
+            if(!saved.memories.length){const el=document.createElement('p');el.textContent='Aucun goût personnel enregistré pour le moment. Tu peux me dire ce que tu aimes dans l’onglet Parler.';root.appendChild(el);return;}
+            saved.memories.slice().reverse().forEach(m=>{
+              const el=document.createElement('div');el.className='mem-item';
+              const meta=document.createElement('small');meta.textContent=`${m.kind} · ${new Date(m.at).toLocaleDateString('fr-FR')} · ${m.source}`;
+              el.appendChild(meta);el.appendChild(document.createTextNode(m.text));root.appendChild(el);
+            });
+          }
+          $('#quality').value=['eco','balanced','high'].includes(saved.quality)?saved.quality:'balanced';
+          $('#quality').addEventListener('change',e=>{saved.quality=e.target.value;persist();onResize()});
+          $('#export-data').addEventListener('click',()=>{
+            const data=JSON.stringify(saved,null,2);
+            // Export JSON via le sélecteur de fichiers Android, sans transmission réseau.
+            if (window.JulieAndroid && typeof window.JulieAndroid.exportData==='function') { window.JulieAndroid.exportData(data); return; }
+            const w=window.open('about:blank','_blank');
+            if(w){w.document.body.innerHTML='';const pre=w.document.createElement('pre');pre.textContent=data;w.document.body.appendChild(pre)}
+            else{alert('Export JSON disponible dans l’application Android.');}
+          });
+          $('#clear-data').addEventListener('click',()=>{
+            if(!confirm('Supprimer définitivement les conversations et préférences enregistrées par cette démo sur ce téléphone ?'))return;
+            saved.messages=[];saved.memories=[];persist();showMemories();renderChat();alert('Les données de démonstration ont été effacées.');
+          });
+
+
+          // Import explicite des souvenirs de démonstration (V1/V2.1) après export JSON.
+          function importOlderMemories(raw){
+            if(typeof raw!=='string'||raw.length>2000000)throw new Error('Fichier trop volumineux');
+            const incoming=JSON.parse(raw);
+            if(incoming?.id!==JULIE_ID || !Array.isArray(incoming.messages) || !Array.isArray(incoming.memories))
+              throw new Error('Le fichier n’est pas un export Julie compatible');
+            if(!confirm('Importer les conversations et préférences de cet ancien export Julie ? Les données actuelles seront conservées.'))return false;
+            const knownMsg=new Set(saved.messages.map(x=>[x.role,x.at,x.text].join('|')));
+            for(const m of incoming.messages.slice(-120)){
+              if(!m||!['user','julie','partner'].includes(m.role)||typeof m.text!=='string')continue;
+              const row={role:m.role==='partner'?'julie':m.role,at:Number(m.at)||Date.now(),text:m.text.slice(0,1500)};
+              const k=[row.role,row.at,row.text].join('|');if(!knownMsg.has(k)){saved.messages.push(row);knownMsg.add(k);}
+            }
+            const knownMem=new Set(saved.memories.map(x=>[x.kind,x.at,x.text].join('|')));
+            for(const m of incoming.memories.slice(-60)){
+              if(!m||typeof m.text!=='string')continue;
+              const row={kind:String(m.kind||'souvenir importé').slice(0,60),text:m.text.slice(0,1500),source:'export utilisateur',at:Number(m.at)||Date.now()};
+              const k=[row.kind,row.at,row.text].join('|');if(!knownMem.has(k)){saved.memories.push(row);knownMem.add(k);}
+            }
+            saved.messages=saved.messages.sort((a,b)=>a.at-b.at).slice(-120);
+            saved.memories=saved.memories.sort((a,b)=>a.at-b.at).slice(-60);
+            persist();renderChat();showMemories();
+            alert('Import terminé : les données existantes ont été conservées.');
+            return true;
+          }
+          window.JulieReceiveImport=(raw)=>{
+            try{importOlderMemories(raw)}catch(e){alert(e?.message||'Import impossible')}
+          };
+          $('#import-data')?.addEventListener('click',()=>{
+            if(typeof window.JulieAndroid?.importData==='function')window.JulieAndroid.importData();
+            else alert('L’import de souvenirs est disponible dans l’application Android.');
+          });
+
+          // JULIE_AVATAR_V3 — vrai modèle humain GLB, rig et texture CC0.
+          // Même maillage humain MakeHuman/MPFB CC0 que Genesis/Ève, avec morphologie féminine
+          // adaptée pour JULIE_001, embarqué dans l'APK pour fonctionner hors ligne.
+          import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+          import { fitHumanModel, clampFps, rendererDpr, isAuthorizedAssetUrl } from './avatar-utils.mjs';
+          import { adaptEveDerivedFemaleMesh, normalizeGenesisMaterials } from './eve-derived.mjs';
+
+          const MODEL_URL = './models/julie_genesis_human.glb';
+          const canvas = $('#julie-3d');
+          const assetStatus = $('#avatar-status');
+          let renderer = null;
+          let scene = null;
+          let camera = null;
+          let avatar = null;
+          let mixer = null;
+          let turnOn = false;
+          let angle = 0;
+          let tilt = 0;
+          let distance = 3.35;
+          let pointer = null;
+          let renderLast = 0;
+          let animationLast = 0;
+          let loadedHuman = false;
+          let orbitDirection = 1;
+          let modelStats = null;
+
+          function updateStatus(message) {
+            if (assetStatus) assetStatus.textContent = message;
+          }
+          function material(color, roughness=0.92) {
+            return new THREE.MeshStandardMaterial({color, roughness, metalness:0});
+          }
+          function box(parent, mat, size, pos, rotation=[0,0,0]) {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size),mat);
+            mesh.position.set(...pos);mesh.rotation.set(...rotation);
+            mesh.receiveShadow = true;parent.add(mesh);return mesh;
+          }
+          function buildRoom(){
+            const floor = material(0x8f7469), wall=material(0xe6d8d4), accent=material(0xc5a5a4);
+            const white=material(0xf2e8e4), wood=material(0x8f6255), rose=material(0xb48191);
+            const dark=material(0x423f4c), green=material(0x708979);
+            box(scene,floor,[8,.12,8],[0,-.075,0]);
+            box(scene,wall,[8,4,.11],[0,1.94,-2.0]);
+            box(scene,accent,[.14,4,8],[-3.5,1.94,0]);
+            box(scene,white,[8,.12,.14],[0,.10,-1.9]);
+            // Lit et tables d'appoint, dimensions et orientation réalistes.
+            box(scene,wood,[1.55,.65,2.1],[-2.0,.37,-.7]);
+            box(scene,rose,[1.51,.16,1.96],[-2.0,.77,-.68]);
+            box(scene,white,[1.22,.13,.58],[-2.0,.88,-1.25]);
+            box(scene,white,[1.45,.075,1.06],[-2.0,.87,-.33]);
+            box(scene,wood,[.78,.68,.62],[2.15,.35,-1.1]);
+            const lamp=new THREE.Mesh(new THREE.CylinderGeometry(.24,.30,.43,20),material(0xe9c6a0));
+            lamp.position.set(2.15,.95,-1.13);scene.add(lamp);
+            box(scene,wood,[.050,.35,.05],[2.15,.71,-1.1]);
+            // Fenêtre. Pas de lumière brûlée : l'éclairage reste stable entre appareils.
+            box(scene,material(0x92b2c5),[1.30,1.40,.04],[1.35,2.15,-1.85]);
+            for(const dx of [-.66,.66])box(scene,white,[.08,1.5,.08],[1.35+dx,2.15,-1.77]);
+            for(const dy of [-.72,.72])box(scene,white,[1.41,.08,.08],[1.35,2.15+dy,-1.77]);
+            box(scene,white,[.07,1.46,.08],[1.35,2.15,-1.75]);
+            box(scene,white,[1.36,.07,.08],[1.35,2.15,-1.75]);
+            // Cadre mural et décoration, jamais attachés au personnage.
+            box(scene,wood,[.92,.75,.055],[-.40,2.18,-1.82]);
+            box(scene,white,[.80,.65,.06],[-.40,2.18,-1.77]);
+            box(scene,green,[.37,.20,.06],[-.40,2.20,-1.71]);
+            const carpet = new THREE.Mesh(new THREE.CircleGeometry(1.54,48),material(0xe2c4c3));
+            carpet.rotation.x=-Math.PI/2;carpet.position.set(0,.004,.26);carpet.scale.set(1,.64,1);
+            scene.add(carpet);
+          }
+
+          function inspectMaterialsAndRetainTextures(root) {
+            let triangles=0,meshCount=0,skinned=0,materials=0;
+            root.traverse(obj=>{
+              if (!obj.isMesh) return;
+              meshCount++;
+              if(obj.isSkinnedMesh)skinned++;
+              const idx=obj.geometry?.index;
+              const pos=obj.geometry?.attributes?.position;
+              triangles+=idx?Math.floor(idx.count/3):pos?Math.floor(pos.count/3):0;
+              // Préserver les vraies textures et matériaux : ne pas remplacer
+              // les cheveux, la peau et les vêtements par des formes simplifiées.
+              const list=Array.isArray(obj.material)?obj.material:[obj.material];
+              for(const mat of list){
+                if(!mat)continue;
+                materials++;
+                mat.side=THREE.FrontSide;
+                mat.needsUpdate=true;
+              }
+              obj.castShadow=false;obj.receiveShadow=true;
+            });
+            return {triangles,meshCount,skinned,materials};
+          }
+
+          async function loadHuman(){
+            updateStatus('Chargement du modèle humain 3D…');
+            try{
+              if(!isAuthorizedAssetUrl(MODEL_URL))throw new Error('Chemin modèle interdit');
+              const loader = new GLTFLoader();
+              const gltf = await loader.loadAsync(MODEL_URL);
+              if(!gltf?.scene)throw new Error('GLB sans scène');
+              if(!gltf.animations?.length)throw new Error('Le GLB ne contient pas d’animation humaine');
+              const root = gltf.scene;
+              modelStats=inspectMaterialsAndRetainTextures(root);
+              if(modelStats.skinned===0)throw new Error('Le GLB n’a pas de maillage articulé');
+              const femaleAdaptation=adaptEveDerivedFemaleMesh(root);
+              const genesisMaterials=normalizeGenesisMaterials(THREE,root);
+              console.info('JULIE V3 — base humaine Genesis adaptée',femaleAdaptation,genesisMaterials);
+              const fitted=fitHumanModel(THREE,root,{heightMeters:1.75});
+              avatar=new THREE.Group();
+              avatar.name='JULIE_001_genesis_eve_derived_base';
+              avatar.add(root);
+              scene.add(avatar);
+              mixer=new THREE.AnimationMixer(root);
+              const idle = gltf.animations.find(a=>/idle|stand|repos/i.test(a.name)) || gltf.animations[0];
+              const action = mixer.clipAction(idle);
+              action.setLoop(THREE.LoopRepeat,Infinity);
+              action.clampWhenFinished=false;
+              action.play();
+              loadedHuman=true;
+              updateStatus(`Maillage Genesis chargé • ${Math.round(fitted.height*100)} cm • ${idle.duration.toFixed(1)} s`);
+              $('#julie-line').textContent='« Cette fois, mon modèle humain reprend la base d’Ève de Genesis. Je vais encore évoluer. 💕 »';
+              console.info('JULIE V3: Genesis modèle chargé', {triangles:modelStats.triangles,bones:modelStats.skinned,clip:idle.name});
+            }catch(err){
+              loadedHuman=false;
+              console.error('JULIE V3 — modèle humain indisponible',err);
+              updateStatus('Impossible de charger le modèle humain. La partie discussion reste disponible.');
+              const fallback=$('#webgl-fallback');
+              if(fallback){fallback.hidden=false;fallback.textContent='Le modèle humain V3 ne s’est pas chargé. Aucun faux avatar géométrique ne sera affiché. Ouvre les réglages ou relance l’application.';}
+            }
+          }
+
+          async function initScene(){
+            if(!canvas)return;
+            try {
+              renderer=new THREE.WebGLRenderer({canvas,antialias:saved.quality!=='eco',powerPreference:'high-performance',alpha:false});
+              renderer.setClearColor(0xe6d3d2);
+              renderer.outputColorSpace=THREE.SRGBColorSpace;
+              renderer.toneMapping=THREE.ACESFilmicToneMapping;
+              renderer.toneMappingExposure=1.18;
+              renderer.shadowMap.enabled=false;
+              scene=new THREE.Scene();
+              scene.fog = new THREE.Fog(0xd6c2c1,6,14);
+              scene.add(new THREE.HemisphereLight(0xfff7f4,0x968b8d,2.55));
+              const key = new THREE.DirectionalLight(0xffe3d4,3.0);
+              key.position.set(-2.0,4.4,3.8);scene.add(key);
+              const fill = new THREE.DirectionalLight(0xdae9f5,1.15);
+              fill.position.set(2.1,2.5,-2.1);scene.add(fill);
+              camera=new THREE.PerspectiveCamera(38,1,.06,22);
+              buildRoom();onResize();
+              bindSceneControls();
+              await loadHuman();
+              animationLast=performance.now();
+              requestAnimationFrame(tick);
+            }catch(err){
+              console.error('JULIE V3 — erreur 3D',err);
+              const f=$('#webgl-fallback'); if(f){f.hidden=false;f.textContent='Affichage 3D indisponible sur ce téléphone.';}
+            }
+          }
+
+          function qualityLimit(){return clampFps(saved.quality);}
+          function onResize(){
+            if(!renderer||!camera||!canvas)return;
+            const r=canvas.getBoundingClientRect();
+            if(r.width<12||r.height<12)return;
+            renderer.setPixelRatio(rendererDpr(saved.quality,window.devicePixelRatio||1));
+            renderer.setSize(Math.floor(r.width),Math.floor(r.height),false);
+            camera.aspect=r.width/r.height;
+            camera.fov=r.height>r.width*1.1?43:38;
+            camera.updateProjectionMatrix();
+          }
+          function bindSceneControls(){
+            canvas.addEventListener('pointerdown',e=>{
+              pointer={id:e.pointerId,x:e.clientX,y:e.clientY};
+              canvas.setPointerCapture?.(e.pointerId);
+            });
+            canvas.addEventListener('pointermove',e=>{
+              if(!pointer||e.pointerId!==pointer.id)return;
+              angle+=(e.clientX-pointer.x)*.010;
+              tilt=THREE.MathUtils.clamp(tilt+(e.clientY-pointer.y)*.005,-.28,.42);
+              pointer.x=e.clientX;pointer.y=e.clientY;
+            });
+            const up=()=>{pointer=null;};
+            canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
+            canvas.addEventListener('wheel',e=>{
+              e.preventDefault();distance=THREE.MathUtils.clamp(distance+e.deltaY*.003,2.25,5.5);
+            },{passive:false});
+            window.addEventListener('resize',onResize);
+            window.addEventListener('orientationchange',()=>setTimeout(onResize,150));
+          }
+          function tick(now){
+            requestAnimationFrame(tick);
+            if(!renderer||!scene||!camera||document.hidden)return;
+            const deltaMs=Math.min(50,Math.max(0,now-animationLast));animationLast=now;
+            if(now-renderLast<1000/qualityLimit())return;
+            const delta=Math.min(.05,(now-renderLast)/1000 || deltaMs/1000);
+            renderLast=now;
+            if(mixer&&loadedHuman)mixer.update(delta);
+            if(avatar){
+              if(turnOn)angle+=delta*.35;
+              avatar.rotation.y=angle;
+            }
+            camera.position.set(0,1.45+tilt,distance);
+            camera.lookAt(0,1.01,0);
+            renderer.render(scene,camera);
+          }
+          $('#btn-turn')?.addEventListener('click',()=>{
+            turnOn=!turnOn;
+            $('#btn-turn').setAttribute('aria-pressed',String(turnOn));
+            $('#btn-turn').style.color=turnOn?'#a9dfb7':'#fff';
+          });
+          $('#btn-wave')?.addEventListener('click',()=>{
+            // Cette version possède un idle riggé ; l'animation de salut arrive après.
+            $('#julie-line').textContent='« Coucou ! Je peux déjà bouger et te regarder avec mon nouveau corps humain. Le salut animé arrivera ensuite. 💕 »';
+          });
+          $('#btn-outfit')?.addEventListener('click',()=>{
+            $('#julie-line').textContent='« Je garde cette tenue pour le premier modèle humain. Les vêtements personnalisables arriveront après. 😉 »';
+          });
+          renderChat();
+          initScene();
+          JULIE_GENESIS_V3_FILE_2_END
+          cat > 'julie-v3-genesis/www/avatar-utils.mjs' <<'JULIE_GENESIS_V3_FILE_3_END'
+          // Calculs purs de l'affichage V3 ; testables sans navigateur ou moteur graphique.
+          export function clampFps(quality='balanced') {
+            return quality==='eco'?30:quality==='high'?120:60;
+          }
+          export function rendererDpr(quality='balanced',devicePixelRatio=1) {
+            const cap = quality==='eco'?1:quality==='high'?1.7:1.25;
+            return Math.min(cap,Math.max(1,Number(devicePixelRatio)||1));
+          }
+          export function isAuthorizedAssetUrl(path) {
+            return typeof path==='string'&&/^\.\/models\/[a-zA-Z0-9_-]+\.glb$/.test(path);
+          }
+          export function fitHumanModel(THREE, model,{heightMeters=1.75}={}){
+            const bbox=new THREE.Box3().setFromObject(model);
+            const height=bbox.max.y-bbox.min.y;
+            if(!Number.isFinite(height)||height<.1||height>1000)throw new Error('Dimensions du modèle invraisemblables');
+            if(!Number.isFinite(heightMeters)||heightMeters<1.3||heightMeters>2.3)throw new Error('Taille cible incorrecte');
+            const centerX=(bbox.min.x+bbox.max.x)/2;
+            const centerZ=(bbox.min.z+bbox.max.z)/2;
+            const scale=heightMeters/height;
+            model.scale.multiplyScalar(scale);
+            model.position.set(-centerX*scale,-bbox.min.y*scale,-centerZ*scale);
+            return {height:heightMeters,scale,centerX,centerZ};
+          }
+          JULIE_GENESIS_V3_FILE_3_END
+          cat > 'julie-v3-genesis/www/eve-derived.mjs' <<'JULIE_GENESIS_V3_FILE_4_END'
+          /**
+           * Adaptation ciblée des principes du rendu féminin de Genesis.
+           * Base commune : MakeHuman/MPFB CC0 (vsim human.glb, également employé dans Genesis).
+           * Ce module ne copie PAS l'identité narrative ni les données personnelles d'Ève.
+           * Les variations anatomiques sont modestes, continues et appliquées au maillage skinné,
+           * sans ajouter de sphères/cylindres et sans toucher aux poids d'armature.
+           */
+          const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+          const bell=(x,center,width)=>Math.exp(-Math.pow((x-center)/width,2));
+
+          export function eveDerivedFemaleWidthAtHeight(fraction){
+            const y=clamp(fraction,0,1);
+            // Variation très légère : épaules moins larges, taille dessinée, bassin naturel.
+            return 1-.035*bell(y,.79,.09)-.072*bell(y,.57,.09)+.055*bell(y,.47,.075);
+          }
+
+          export function eveDerivedFemaleDepthAtHeight(fraction,front=false){
+            const y=clamp(fraction,0,1);
+            return 1-.028*bell(y,.55,.10)+.035*bell(y,.49,.08)+(front ? .035*bell(y,.71,.065) : 0);
+          }
+
+          export function adaptEveDerivedFemaleMesh(root){
+            if(!root?.traverse)throw new Error('Scène 3D absente');
+            let candidates=0,vertices=0;
+            root.traverse(node=>{
+              if(!node.isSkinnedMesh||!node.geometry?.attributes?.position)return;
+              const geometry=node.geometry;
+              const position=geometry.attributes.position;
+              if(position.count<5000)return;
+              if(!geometry.boundingBox)geometry.computeBoundingBox();
+              const box=geometry.boundingBox;
+              const height=box.max.y-box.min.y;
+              if(!Number.isFinite(height)||height<.2)return;
+              // Les autres maillages, les textures, les os et les clips restent inchangés.
+              for(let i=0;i<position.count;i++){
+                const x=position.getX(i),y=position.getY(i),z=position.getZ(i);
+                const fraction=(y-box.min.y)/height;
+                const w=eveDerivedFemaleWidthAtHeight(fraction);
+                const d=eveDerivedFemaleDepthAtHeight(fraction,z>(box.min.z+box.max.z)*.5);
+                position.setXYZ(i,x*w,y,z*d);
+              }
+              position.needsUpdate=true;
+              geometry.computeVertexNormals?.();
+              geometry.computeBoundingBox?.();
+              geometry.computeBoundingSphere?.();
+              geometry.userData={...geometry.userData,julieEveDerivedFemale:true};
+              candidates++;vertices+=position.count;
+            });
+            if(candidates<1)throw new Error('Maillage skinné humain absent du modèle importé');
+            return {modifiedMeshes:candidates,modifiedVertices:vertices,source:'genesis-eve-female-approach'};
+          }
+
+          export function normalizeGenesisMaterials(THREE,root){
+            let corrected=0,eyeTinted=0,hairTinted=0;
+            root.traverse(node=>{
+              if(!node.isMesh)return;
+              const materials=Array.isArray(node.material)?node.material:[node.material];
+              for(const m of materials){
+                if(!m)return;
+                const n=String(m.name||'').toLowerCase();
+                // Correction du GLB utilisée également dans Genesis : l'alpha BLEND de
+                // l'atlas corporel fait disparaître des pans de peau (depthWrite=false).
+                // Ne toucher ni aux cils, ni aux cheveux découpés par alpha.
+                if((/human.*body|body.*skin|skin.*body/.test(n)||
+                    (node.isSkinnedMesh&&!/hair|eye|lash|cloth|dress/.test(n)))&&
+                    m.opacity>=.999&&!m.alphaMap){
+                  if(m.transparent||m.depthWrite===false){m.transparent=false;m.depthWrite=true;m.needsUpdate=true;corrected++;}
+                }
+                if(/iris/.test(n)&&m.color){m.color.set(0x568c70);m.needsUpdate=true;eyeTinted++;}
+                if(/hair/.test(n)&&m.color){m.color.copy(new THREE.Color(0xdab77e));m.needsUpdate=true;hairTinted++;}
+              }
+            });
+            return {corrected,eyeTinted,hairTinted};
+          }
+          JULIE_GENESIS_V3_FILE_4_END
+          cat > 'julie-v3-genesis/android/AndroidManifest.xml' <<'JULIE_GENESIS_V3_FILE_5_END'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <application
+                android:allowBackup="false"
+                android:label="JULIE V3 • Genesis"
+                android:icon="@drawable/julie_icon"
+                android:usesCleartextTraffic="false"
+                android:theme="@style/AppTheme">
+              <activity android:name=".MainActivity" android:exported="true">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN" />
+                  <category android:name="android.intent.category.LAUNCHER" />
+                </intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          JULIE_GENESIS_V3_FILE_5_END
+          cat > 'julie-v3-genesis/android/MainActivity.java' <<'JULIE_GENESIS_V3_FILE_6_END'
+          package com.humanpartner;
+
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebResourceResponse;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.widget.Toast;
+          import org.json.JSONObject;
+          import java.io.ByteArrayInputStream;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+          import java.io.ByteArrayOutputStream;
+          import java.nio.charset.StandardCharsets;
+          import java.util.HashMap;
+          import java.util.Map;
+
+          /**
+           * JULIE V3 : WebView à origine HTTPS locale, avec maillage GLB dans les assets.
+           * Pas d'autorisation INTERNET, ni de chargement de contenus distants.
+           * L'import/export JSON ne fonctionne que sur une action explicite de l'utilisateur.
+           */
+          public final class MainActivity extends Activity {
+              private static final String HOST = "appassets.androidplatform.net";
+              private static final String APP_URL = "https://appassets.androidplatform.net/julie/index.html";
+              private static final String PREFIX = "/julie/";
+              private static final String PREF = "julie_v3_preview_state";
+              private static final String KEY = "julie_v3_preview_JULIE_001";
+              private static final int EXPORT_REQUEST = 9041;
+              private static final int IMPORT_REQUEST = 9042;
+              private static final int MAX_JSON_BYTES = 2_000_000;
+
+              private WebView web;
+              private String pendingExport;
+
+              private SharedPreferences prefs(){return getSharedPreferences(PREF,MODE_PRIVATE);}
+              public final class JulieBridge {
+                  @JavascriptInterface public String readState(){return prefs().getString(KEY, "");}
+                  @JavascriptInterface public void writeState(String json){
+                      if(json==null||json.length()>MAX_JSON_BYTES)return;
+                      prefs().edit().putString(KEY,json).apply();
+                  }
+                  @JavascriptInterface public void exportData(String json){
+                      if(json==null||json.length()>MAX_JSON_BYTES)return;
+                      runOnUiThread(()->{
+                          pendingExport=json;
+                          Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                          intent.addCategory(Intent.CATEGORY_OPENABLE);
+                          intent.setType("application/json");
+                          intent.putExtra(Intent.EXTRA_TITLE,"Julie_souvenirs_V3.json");
+                          try{startActivityForResult(intent,EXPORT_REQUEST);}catch(Exception ex){
+                              Toast.makeText(MainActivity.this,"Export indisponible",Toast.LENGTH_SHORT).show();
+                          }
+                      });
+                  }
+                  @JavascriptInterface public void importData(){
+                      runOnUiThread(()->{
+                          Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                          intent.addCategory(Intent.CATEGORY_OPENABLE);
+                          intent.setType("application/json");
+                          try{startActivityForResult(intent,IMPORT_REQUEST);}catch(Exception ex){
+                              Toast.makeText(MainActivity.this,"Import indisponible",Toast.LENGTH_SHORT).show();
+                          }
+                      });
+                  }
+              }
+
+              private String mime(String file){
+                  if(file.endsWith(".html"))return "text/html";
+                  if(file.endsWith(".js"))return "text/javascript";
+                  if(file.endsWith(".css"))return "text/css";
+                  if(file.endsWith(".glb"))return "model/gltf-binary";
+                  if(file.endsWith(".png"))return "image/png";
+                  if(file.endsWith(".jpg")||file.endsWith(".jpeg"))return "image/jpeg";
+                  if(file.endsWith(".json"))return "application/json";
+                  return "application/octet-stream";
+              }
+              private WebResourceResponse errorResponse(int status,String reason){
+                  final WebResourceResponse r=new WebResourceResponse("text/plain","utf-8",
+                          new ByteArrayInputStream(new byte[0]));
+                  r.setStatusCodeAndReasonPhrase(status,reason);
+                  return r;
+              }
+              private WebResourceResponse serveLocalResource(Uri uri){
+                  if(uri==null||!"https".equals(uri.getScheme())||!HOST.equals(uri.getHost()))
+                      return errorResponse(403,"Forbidden");
+                  String path=uri.getPath();
+                  if(path==null||!path.startsWith(PREFIX)||path.contains("..")||path.indexOf('\\')>=0)
+                      return errorResponse(403,"Forbidden");
+                  final String asset="julie/"+path.substring(PREFIX.length());
+                  try{
+                      final InputStream stream=getAssets().open(asset);
+                      final WebResourceResponse response=new WebResourceResponse(mime(asset),
+                              asset.endsWith(".glb")?null:"utf-8",stream);
+                      // Toutes les requêtes de WebGL/GLTFLoader viennent de cette même origine HTTPS.
+                      final Map<String,String> headers=new HashMap<>();
+                      headers.put("Access-Control-Allow-Origin","https://"+HOST);
+                      headers.put("X-Content-Type-Options","nosniff");
+                      headers.put("Cache-Control","no-store");
+                      response.setResponseHeaders(headers);
+                      return response;
+                  }catch(Exception ex){return errorResponse(404,"Not Found");}
+              }
+
+              @Override protected void onCreate(Bundle state){
+                  super.onCreate(state);
+                  getWindow().setStatusBarColor(Color.rgb(15,17,27));
+                  getWindow().setNavigationBarColor(Color.rgb(15,17,27));
+                  web=new WebView(this);
+                  web.setBackgroundColor(Color.rgb(15,17,27));
+                  WebSettings settings=web.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setAllowFileAccess(false);
+                  settings.setAllowContentAccess(false);
+                  settings.setAllowFileAccessFromFileURLs(false);
+                  settings.setAllowUniversalAccessFromFileURLs(false);
+                  settings.setJavaScriptCanOpenWindowsAutomatically(false);
+                  settings.setSupportMultipleWindows(false);
+                  settings.setDefaultTextEncodingName("utf-8");
+                  settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+                  settings.setMediaPlaybackRequiresUserGesture(true);
+                  web.addJavascriptInterface(new JulieBridge(),"JulieAndroid");
+                  web.setWebViewClient(new WebViewClient(){
+                      @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){
+                          return serveLocalResource(request.getUrl());
+                      }
+                      @Override public WebResourceResponse shouldInterceptRequest(WebView view,String url){
+                          return serveLocalResource(Uri.parse(url));
+                      }
+                      @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
+                          return !APP_URL.equals(request.getUrl().toString());
+                      }
+                      @Override public boolean shouldOverrideUrlLoading(WebView view,String url){
+                          return !APP_URL.equals(url);
+                      }
+                  });
+                  setContentView(web);
+                  web.loadUrl(APP_URL);
+              }
+
+              @Override protected void onActivityResult(int request,int result,Intent intent){
+                  super.onActivityResult(request,result,intent);
+                  if(result!=RESULT_OK||intent==null||intent.getData()==null)return;
+                  Uri uri=intent.getData();
+                  if(request==EXPORT_REQUEST){
+                      if(pendingExport==null)return;
+                      try(OutputStream out=getContentResolver().openOutputStream(uri)){
+                          if(out==null)throw new IllegalStateException("Destination inaccessible");
+                          out.write(pendingExport.getBytes(StandardCharsets.UTF_8));
+                          Toast.makeText(this,"Souvenirs exportés",Toast.LENGTH_SHORT).show();
+                      }catch(Exception ex){Toast.makeText(this,"Échec export",Toast.LENGTH_LONG).show();}
+                      finally{pendingExport=null;}
+                  }else if(request==IMPORT_REQUEST){
+                      try(InputStream in=getContentResolver().openInputStream(uri)){
+                          if(in==null)throw new IllegalStateException("Source inaccessible");
+                          ByteArrayOutputStream buf=new ByteArrayOutputStream();
+                          byte[] bytes=new byte[8192];int count;
+                          while((count=in.read(bytes))>=0){
+                              if(buf.size()+count>MAX_JSON_BYTES)throw new IllegalArgumentException("Fichier trop grand");
+                              buf.write(bytes,0,count);
+                          }
+                          final String json=buf.toString("UTF-8");
+                          // Le texte est échappé par JSONObject.quote, puis contrôlé par JS
+                          // (identifiant JULIE_001 + schéma). Aucune importation silencieuse.
+                          web.evaluateJavascript("window.JulieReceiveImport("+JSONObject.quote(json)+")",null);
+                      }catch(Exception ex){Toast.makeText(this,"Import impossible",Toast.LENGTH_LONG).show();}
+                  }
+              }
+              @Override protected void onDestroy(){
+                  if(web!=null){web.removeJavascriptInterface("JulieAndroid");web.destroy();}
+                  super.onDestroy();
+              }
+          }
+          JULIE_GENESIS_V3_FILE_6_END
+          cat > 'julie-v3-genesis/android/julie_icon.xml' <<'JULIE_GENESIS_V3_FILE_7_END'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+            android:width="108dp" android:height="108dp"
+            android:viewportWidth="108" android:viewportHeight="108">
+            <path android:fillColor="#171924" android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
+            <path android:fillColor="#30433B" android:pathData="M54,8 C28,8 8,28 8,54 C8,80 28,100 54,100 C80,100 100,80 100,54 C100,28 80,8 54,8 Z"/>
+            <path android:fillColor="#B4E6C7" android:pathData="M62,25 L82,25 L82,61 C82,79 69,89 51,89 C34,89 23,78 23,62 L41,62 C41,70 44,75 51,75 C59,75 62,70 62,62 Z"/>
+            <path android:fillColor="#EBC0C3" android:pathData="M24,28 C30,17 42,11 54,11 C45,18 37,29 34,39 Z"/>
+          </vector>
+          JULIE_GENESIS_V3_FILE_7_END
+          cat > 'julie-v3-genesis/tests/eve-derived.test.mjs' <<'JULIE_GENESIS_V3_FILE_8_END'
+          import test from 'node:test';
+          import assert from 'node:assert/strict';
+          import {eveDerivedFemaleWidthAtHeight,eveDerivedFemaleDepthAtHeight,adaptEveDerivedFemaleMesh,normalizeGenesisMaterials} from '../www/eve-derived.mjs';
+
+          const attr=(values)=>({
+           count:values.length,getX:i=>values[i][0],getY:i=>values[i][1],getZ:i=>values[i][2],
+           setXYZ:(i,x,y,z)=>values[i]=[x,y,z],needsUpdate:false
+          });
+
+          test('Morphologie Ève : taille affinée, bassin naturel, épaules proportionnées',()=>{
+           assert.ok(eveDerivedFemaleWidthAtHeight(.57)<.95);
+           assert.ok(eveDerivedFemaleWidthAtHeight(.47)>1);
+           assert.ok(eveDerivedFemaleWidthAtHeight(.79)<1);
+           for(let i=0;i<=100;i++){
+            const y=i/100;
+            const w=eveDerivedFemaleWidthAtHeight(y),d=eveDerivedFemaleDepthAtHeight(y,true);
+            assert.ok(w>.8&&w<1.15&&Number.isFinite(w));
+            assert.ok(d>.8&&d<1.15&&Number.isFinite(d));
+           }
+          });
+
+          test('Maillage skinné reste continu et les os ne changent pas',()=>{
+           const points=Array.from({length:6001},(_,i)=>[i%2?.08:-.08,.1+(i%101)*.015,(i%3-1)*.07]);
+           const before=[...points.map(v=>v.slice())];
+           const position=attr(points);const geometry={attributes:{position},userData:{existing:'genesis'},
+             boundingBox:{min:{y:.1,z:-.07},max:{y:1.6,z:.07}},
+             computeVertexNormals(){this.normals=true},computeBoundingBox(){},computeBoundingSphere(){}};
+           const bones=Array.from({length:53},(_,i)=>({name:'joint_'+i}));
+           const material={name:'Human.body',opacity:1,transparent:true,depthWrite:false,needsUpdate:false};
+           const skinned={isSkinnedMesh:true,isMesh:true,geometry,material,skeleton:{bones}};
+           const root={traverse(fn){fn(skinned)}};
+           const result=adaptEveDerivedFemaleMesh(root);
+           assert.equal(result.modifiedVertices,6001);
+           assert.equal(skinned.skeleton.bones,bones);
+           assert.equal(skinned.material,material);
+           assert.ok(geometry.normals);
+           assert.ok(geometry.userData.julieEveDerivedFemale);
+           assert.ok(points.some((v,i)=>v[0]!==before[i][0]));
+           assert.ok(points.every(v=>v.every(Number.isFinite)));
+           const state=normalizeGenesisMaterials({},root);
+           assert.equal(state.corrected,1);
+           assert.equal(material.transparent,false);
+           assert.equal(material.depthWrite,true);
+          });
+
+          test('Aucun modèle jouet de secours si le maillage humain est absent',()=>{
+           assert.throws(()=>adaptEveDerivedFemaleMesh({traverse(fn){fn({isSkinnedMesh:false})}}),/Maillage skinné/);
+          });
+          JULIE_GENESIS_V3_FILE_8_END
+          cat > 'julie-v3-genesis/README.md' <<'JULIE_GENESIS_V3_FILE_9_END'
+          # JULIE V3 — Maillage humain d'origine Genesis / Ève
+
+          ## Objectif
+          Remplacer la figurine stylisée des prototypes V1/V2 par un véritable maillage humanoïde texturé et skinné, basé sur le **même GLB MakeHuman/MPFB CC0 que le simulateur Genesis**. Julie conserve son identifiant `JULIE_001` et ses paramètres initiaux (22 ans, 1,75 m, silhouette fine).
+
+          ## Ce que cette V3 fait réellement
+          - Télécharge le modèle source public `vsim/packages/assets/library/human.glb` pendant la compilation GitHub Actions et l'embarque localement dans l'APK (pas d'accès Internet à l'exécution).
+          - Animation GLB de repos, squelette d'animation existant (environ 53 os), rotation tactile, proportions à 1,75 m.
+          - Ajustement féminin **simplifié et prudent** reprenant la méthode de morphologie morphométrique de Genesis ; conserve les textures et les poids des os.
+          - Corrige les surfaces de peau parfois déclarées transparentes par erreur (problème déjà traité dans Genesis).
+          - Conserve la maquette Android (chat de démonstration hors ligne, export/import de souvenirs de test). Identifiant Android distinct `com.julie.preview.v3`.
+
+          ## Ce qui reste à faire pour reproduire exactement Ève
+          Le modèle Genesis d'Ève n'est **pas** un second fichier GLB distinct. Genesis charge un modèle commun, puis applique de multiples modules : variantes anatomiques, visage, peau, morphs, cheveux, mouvements et état physiologique. La V3 réutilise la base et une première adaptation féminine, **pas encore l'ensemble** des adaptations d'Ève. Les cheveux blonds mi-longs et la couleur des iris nécessiteront une validation visuelle et des assets/contrôles supplémentaires. L'apparence n'est pas encore photoréaliste.
+
+          ## Sécurité
+          Aucune donnée Genesis ou mémoire d'Ève n'est transférée ; aucun abonnement ni service payant ajouté. Le dépôt Genesis reste inchangé. Le prototype ne synchronise pas avec le vrai moteur de mémoire de Human Partner. Exporter les souvenirs de V1/V2/V2.1 avant désinstallation : aucune importation silencieuse. Ne pas stocker d'informations sensibles dans la mémoire de démonstration non chiffrée.
+
+          ## Source et licence
+          Voir `CREDITS_MODELE.md`. La source humaine CC0 est publique ; toute future texture tierce devra faire l'objet d'une vérification de licence distincte.
+
+          ## Compilation
+          Ajouter `.github/workflows/julie-v3-genesis.yml` à la branche `julie-v1`. GitHub Actions vérifie le GLB, effectue les tests JS et compile l'APK. Si le téléchargement public échoue, l'installation échoue explicitement plutôt que de retomber sur un mannequin géométrique trompeur.
+          JULIE_GENESIS_V3_FILE_9_END
+          cat > 'julie-v3-genesis/CREDITS_MODELE.md' <<'JULIE_GENESIS_V3_FILE_10_END'
+          # Origine du modèle humain de Julie V3
+
+          Le projet privé Genesis utilise `web/public/assets/human-realistic.glb` et cite comme source `kunalkushwaha/vsim/packages/assets/library/human.glb` (MakeHuman/MPFB, CC0).
+
+          L’APK V3 télécharge **le même fichier source public** à la compilation, sans accéder aux données ni au serveur de Genesis. La morphologie féminine initiale s’inspire des principes du moteur Genesis, mais la version V3 ne reproduit pas encore toutes les transformations de l’Ève du jeu (peau dynamique, morphs complets, historique biologique).
+
+          Source : https://github.com/kunalkushwaha/vsim/blob/main/packages/assets/library/human.glb
+          Guide : https://github.com/kunalkushwaha/vsim/blob/main/docs/guides/blender-characters.md
+          Licence du modèle généré : CC0 ; vérifier séparément tout futur accessoire ou texture de tiers.
+
+          Identité de Julie : JULIE_001. Les données d’Ève et la base Genesis ne sont jamais copiées.
+          JULIE_GENESIS_V3_FILE_10_END
+
+      - name: Charger à la compilation la base humaine CC0 utilisée dans Genesis
+        shell: bash
+        run: |
+          set -euo pipefail
+          MODEL="julie-v3-genesis/www/models/julie_genesis_human.glb"
+          curl --fail --location --retry 3 --retry-delay 3 --connect-timeout 20 --max-time 180 \
+            "https://raw.githubusercontent.com/kunalkushwaha/vsim/main/packages/assets/library/human.glb" \
+            --output "$MODEL"
+          test -s "$MODEL"
+          python3 - <<'PYCHECK'
+          import json,struct
+          from pathlib import Path
+          path=Path('julie-v3-genesis/www/models/julie_genesis_human.glb')
+          b=path.read_bytes()
+          assert len(b)>500_000, 'Le GLB est trop petit'
+          magic,version,declared=struct.unpack_from('<4sII',b,0)
+          assert magic==b'glTF' and version==2 and declared==len(b), 'Entête GLB invalide'
+          n,kind=struct.unpack_from('<I4s',b,12)
+          assert kind==b'JSON', 'JSON glTF absent'
+          gltf=json.loads(b[20:20+n])
+          mesh_count=len(gltf.get('meshes',[]))
+          skins=gltf.get('skins',[])
+          clips=gltf.get('animations',[])
+          joint_count=max((len(x.get('joints',[])) for x in skins),default=0)
+          assert mesh_count>0 and joint_count>=30 and len(clips)>0, f'Maillage/rig/animations incomplets: {mesh_count}, {joint_count}, {len(clips)}'
+          print(f'MODELE GENESIS CC0 : {len(b):,} octets, {mesh_count} maillages, {joint_count} os, {len(clips)} animations')
+          PYCHECK
+
+      - name: Tests JS et intégrité hors ligne
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check julie-v3-genesis/www/app.mjs
+          node --check julie-v3-genesis/www/avatar-utils.mjs
+          node --check julie-v3-genesis/www/eve-derived.mjs
+          node --test julie-v3-genesis/tests/eve-derived.test.mjs
+          python3 - <<'PYSAFETY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          d=Path('julie-v3-genesis')
+          xml=(d/'android/AndroidManifest.xml').read_text()
+          ET.fromstring(xml)
+          assert 'android.permission.INTERNET' not in xml
+          assert 'allowBackup="false"' in xml
+          app=(d/'www/app.mjs').read_text()
+          assert './models/julie_genesis_human.glb' in app
+          assert 'adaptEveDerivedFemaleMesh' in app
+          assert 'GLTFLoader' in app
+          html=(d/'www/index.html').read_text()
+          assert all(v in html for v in ['julie-3d','Souvenirs','Réglages'])
+          assert (d/'www/models/julie_genesis_human.glb').stat().st_size>500000
+          print('Contrôle sécurité, origine GLB, interface, mémoire de démo : OK')
+          PYSAFETY
+
+      - name: Construire le JavaScript 3D local
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix julie-v3-genesis --no-save --no-audit --no-fund \
+            three@0.181.1 esbuild@0.25.12
+          ./julie-v3-genesis/node_modules/.bin/esbuild julie-v3-genesis/www/app.mjs \
+            --bundle --format=iife --platform=browser --target=es2020 \
+            --outfile=julie-v3-genesis/www/app.js
+          test -s julie-v3-genesis/www/app.js
+
+      - name: Préparer une APK distincte (ne remplace ni V1 ni V2.1)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp julie-v3-genesis/android/MainActivity.java android/app/src/main/java/com/humanpartner/MainActivity.java
+          cp julie-v3-genesis/android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/assets/julie/models android/app/src/main/res/drawable
+          cp julie-v3-genesis/android/julie_icon.xml android/app/src/main/res/drawable/julie_icon.xml
+          cp julie-v3-genesis/www/index.html julie-v3-genesis/www/style.css \
+            julie-v3-genesis/www/app.js android/app/src/main/assets/julie/
+          cp julie-v3-genesis/www/models/julie_genesis_human.glb android/app/src/main/assets/julie/models/
+          python3 - <<'PYBUILD'
+          from pathlib import Path
+          f=Path('android/app/build.gradle')
+          text=f.read_text()
+          assert text.count("applicationId 'com.humanpartner'")==1, 'Identifiant historique introuvable'
+          text=text.replace("applicationId 'com.humanpartner'","applicationId 'com.julie.preview.v3'")
+          text=text.replace("versionCode 9","versionCode 12")
+          text=text.replace("versionName '0.1.8'","versionName '0.3.0-genesis'")
+          f.write_text(text)
+          print('Application Android séparée : com.julie.preview.v3')
+          PYBUILD
+
+      - name: Compiler l'APK Android
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Vérifier le contenu réel de l'APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -Z1 "$APK" | grep -Fx 'assets/julie/models/julie_genesis_human.glb'
+          unzip -Z1 "$APK" | grep -Fx 'assets/julie/app.js'
+          unzip -Z1 "$APK" | grep -Fx 'classes.dex'
+          mkdir -p julie-v3-genesis-artifact
+          cp "$APK" julie-v3-genesis-artifact/JULIE-V3-Genesis-debug.apk
+          cp julie-v3-genesis/README.md julie-v3-genesis-artifact/LIRE_AVANT_INSTALLATION.md
+          cp julie-v3-genesis/CREDITS_MODELE.md julie-v3-genesis-artifact/CREDITS_MODELE.md
+          sha256sum julie-v3-genesis-artifact/JULIE-V3-Genesis-debug.apk > julie-v3-genesis-artifact/SHA256SUMS.txt
+          ls -lh julie-v3-genesis-artifact
+
+      - name: Publier l'APK V3
+        uses: actions/upload-artifact@v4
+        with:
+          name: Julie-V3-Genesis-APK
+          path: julie-v3-genesis-artifact/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Archiver le code V3 sur julie-v1 après tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -- julie-v3-genesis/www/index.html julie-v3-genesis/www/style.css \
+            julie-v3-genesis/www/app.mjs julie-v3-genesis/www/avatar-utils.mjs \
+            julie-v3-genesis/www/eve-derived.mjs julie-v3-genesis/android/MainActivity.java \
+            julie-v3-genesis/android/AndroidManifest.xml julie-v3-genesis/android/julie_icon.xml \
+            julie-v3-genesis/README.md julie-v3-genesis/CREDITS_MODELE.md \
+            julie-v3-genesis/tests/eve-derived.test.mjs
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'Code V3 déjà sauvegardé'
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'feat(julie): intégrer le maillage humain Genesis dans APK V3'
+          git push origin HEAD:julie-v1
