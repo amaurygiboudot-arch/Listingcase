@@ -1,0 +1,153 @@
+name: JULIE Android - canal unique
+
+on:
+  push:
+    branches: [julie-v1]
+    paths:
+      - '.github/workflows/julie-android.yml'
+      - 'julie-v3-genesis/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: julie-android-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Tester Julie et compiler Android
+    if: github.ref == 'refs/heads/julie-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Lire les sources et garder la sauvegarde
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Contrôler le périmètre de Julie
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = julie-v1
+          git ls-remote --exit-code origin refs/heads/backup-human-partner-20261009 >/dev/null
+          test -f android/app/build.gradle
+          test -f julie-v3-genesis/www/state-store.mjs
+          test -f julie-v3-genesis/android/JulieSecureStore.java
+          node -e "const p=require('./config/predefined-characters.json');if(!p.find(x=>x.personId==='JULIE_001')||!p.find(x=>x.personId==='CHLOE_001'))process.exit(1);"
+      - name: Installer Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Installer Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Préparer Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Télécharger et valider la base humaine CC0 de Genesis
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p julie-v3-genesis/www/models
+          curl --fail --location --retry 3 --retry-delay 3 --connect-timeout 20 --max-time 180 \
+            'https://raw.githubusercontent.com/kunalkushwaha/vsim/main/packages/assets/library/human.glb' \
+            -o julie-v3-genesis/www/models/julie_genesis_human.glb
+          python3 - <<'PYMODEL'
+          from pathlib import Path
+          import json,struct
+          blob=Path('julie-v3-genesis/www/models/julie_genesis_human.glb').read_bytes()
+          assert len(blob)>500000,'GLB trop petit'
+          magic,version,declared=struct.unpack_from('<4sII',blob,0)
+          assert magic==b'glTF' and version==2 and declared==len(blob),'GLB invalide'
+          length,kind=struct.unpack_from('<I4s',blob,12)
+          assert kind==b'JSON'
+          model=json.loads(blob[20:20+length])
+          bones=max((len(x.get('joints',[])) for x in model.get('skins',[])),default=0)
+          assert bones>=30 and model.get('meshes') and model.get('animations'),'Maillage humain/rig/animations manquants'
+          print(f'Maillage Genesis valide : {len(blob)} octets et {bones} os')
+          PYMODEL
+      - name: Tester mémoire, identité et JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in julie-v3-genesis/www/*.mjs; do node --check "$f"; done
+          node --test julie-v3-genesis/tests/*.mjs
+          python3 - <<'PYCHECK'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          d=Path('julie-v3-genesis')
+          manifest=(d/'android/AndroidManifest.xml').read_text()
+          ET.fromstring(manifest)
+          assert 'android.permission.INTERNET' not in manifest
+          assert 'allowBackup="false"' in manifest
+          java=(d/'android/JulieSecureStore.java').read_text()
+          assert 'AndroidKeyStore' in java and 'AES/GCM/NoPadding' in java
+          assert 'prefs.edit().putString(ENCRYPTED_KEY,encrypted).remove(OLD_KEY).commit()' in java
+          app=(d/'www/app.mjs').read_text()
+          assert 'appendConversation(saved' in app and 'mergeImport(saved' in app
+          assert 'slice(-120)' not in app and 'slice(-60)' not in app
+          assert './models/julie_genesis_human.glb' in app
+          print('Identité, schéma mémoire et permission réseau : OK')
+          PYCHECK
+      - name: Construire JavaScript 3D embarqué
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix julie-v3-genesis --no-save --no-audit --no-fund three@0.181.1 esbuild@0.25.12
+          ./julie-v3-genesis/node_modules/.bin/esbuild julie-v3-genesis/www/app.mjs \
+            --bundle --format=iife --platform=browser --target=es2020 \
+            --outfile=julie-v3-genesis/www/app.js
+          test -s julie-v3-genesis/www/app.js
+      - name: Préparer Android sans modifier Human Partner
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp julie-v3-genesis/android/MainActivity.java android/app/src/main/java/com/humanpartner/MainActivity.java
+          cp julie-v3-genesis/android/JulieSecureStore.java android/app/src/main/java/com/humanpartner/JulieSecureStore.java
+          cp julie-v3-genesis/android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/assets/julie/models android/app/src/main/res/drawable
+          cp julie-v3-genesis/android/julie_icon.xml android/app/src/main/res/drawable/julie_icon.xml
+          cp julie-v3-genesis/www/index.html julie-v3-genesis/www/style.css \
+            julie-v3-genesis/www/app.js android/app/src/main/assets/julie/
+          cp julie-v3-genesis/www/models/julie_genesis_human.glb android/app/src/main/assets/julie/models/
+          python3 - <<'PYGRADLE'
+          from pathlib import Path
+          p=Path('android/app/build.gradle');s=p.read_text()
+          assert s.count("applicationId 'com.humanpartner'")==1
+          s=s.replace("applicationId 'com.humanpartner'","applicationId 'com.julie.preview.v3'")
+          s=s.replace('versionCode 9',"versionCode "+str(300000+int('${{ github.run_number }}')))
+          s=s.replace("versionName '0.1.8'","versionName '0.3.1-dev.${{ github.run_number }}'")
+          p.write_text(s)
+          PYGRADLE
+      - name: Compiler APK Android de test
+        shell: bash
+        working-directory: android
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Contrôler APK et préparer téléchargement
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -Z1 "$APK" | grep -Fx assets/julie/models/julie_genesis_human.glb
+          unzip -Z1 "$APK" | grep -Fx assets/julie/app.js
+          unzip -Z1 "$APK" | grep -Fx classes.dex
+          mkdir -p julie-android-artifact
+          cp "$APK" julie-android-artifact/JULIE-Android-0.3.1-debug.apk
+          cp julie-v3-genesis/README.md julie-android-artifact/LIRE_AVANT_INSTALLATION.md
+          cp julie-v3-genesis/CREDITS_MODELE.md julie-android-artifact/CREDITS_MODELE.md
+          (cd julie-android-artifact && sha256sum JULIE-Android-0.3.1-debug.apk > SHA256SUMS.txt)
+      - name: Publier Julie Android
+        uses: actions/upload-artifact@v4
+        with:
+          name: Julie-Android-APK
+          path: julie-android-artifact/
+          retention-days: 14
+          if-no-files-found: error
