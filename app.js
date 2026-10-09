@@ -66,6 +66,15 @@ function ageGate(){
 
 function onboarding(){
   const adding=Boolean(appState.partner&&creatingNew);
+  // JULIE_MIGRATION_V1 : accueillir Julie sans effacer les autres personnages.
+  if(!adding)return `
+    <div class="modal"><section class="card modal-card">
+      <div class="badge">JULIE • Compagne virtuelle</div>
+      <h1>Bienvenue dans l’univers de Julie</h1>
+      <p class="muted">Vous êtes un couple virtuel déjà établi. Vos souvenirs communs fictifs seront construits ensemble.</p>
+      <div class="notice">Aucun souvenir réel inventé. Les profils historiques restent sauvegardés.</div>
+      <div class="actions"><button id="startJulie" class="primary">Retrouver Julie</button></div>
+    </section></div>`;
   const opts=TYPES.map(([t,e])=>`
     <button class="option ${selected.has(t)?"active":""}" data-interest="${esc(t)}">${e} ${esc(t)}</button>
   `).join("");
@@ -214,7 +223,7 @@ function dashboard(){
 
         ${canonicalPersona?`
         <section class="card panel" style="margin-top:18px">
-          <h2>Chloé canonique</h2>
+          <h2>Profil canonique de ${esc(p.name)}</h2>
           <div class="library engine-grid">
             <div class="visual engine-card">
               <strong>Relation</strong>
@@ -233,7 +242,7 @@ function dashboard(){
               <small>${esc(canonicalPersona.version||"—")}</small>
             </div>
           </div>
-          <p class="muted">Ce profil fixe la continuité de Chloé avec Amaury. L’identité vivante peut évoluer autour de ce socle sans le remplacer.</p>
+          <p class="muted">Ce profil définit l’identité initiale de ${esc(p.name)}. Son évolution est conservée dans l’historique.</p>
         </section>`:""}
 
         ${living?`
@@ -342,7 +351,7 @@ function render(){
   document.querySelector("#app").innerHTML=`
     <main class="shell">
       <div class="topbar">
-        <div class="brand">Human Partner</div>
+        <div class="brand">JULIE</div>
         <div class="badge">${appState.serverMode==="cloud"?"Cloud sécurisé • SQLite":((appState.providers?.llm?.configured?"IA locale":"Moteur local simple")+" • SQLite")}</div>
       </div>
       ${!appState.partner?landing():dashboard()}
@@ -372,6 +381,20 @@ function bind(){
     selected.has(v)?selected.delete(v):selected.add(v);
     render();
   }));
+
+  document.querySelector("#startJulie")?.addEventListener("click",async()=>{
+    const button=document.querySelector("#startJulie");
+    if(button)button.disabled=true;
+    try{
+      const julie=(appState.characters||[]).find(x=>x.personId==="JULIE_001");
+      if(!julie)throw new Error("Julie n’est pas encore enregistrée dans cette installation.");
+      appState=await api("/api/partner/select",{method:"POST",body:JSON.stringify({personId:"JULIE_001"})});
+      creatingNew=false; selected=new Set(); render();
+    }catch(error){
+      if(button)button.disabled=false;
+      alert(error?.message||"Impossible d’ouvrir Julie.");
+    }
+  });
 
   document.querySelector("#createPartner")?.addEventListener("click",async()=>{
     const interests=[...selected].filter(x=>x!=="personnalité");

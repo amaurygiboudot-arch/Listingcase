@@ -1,4 +1,7 @@
-# Human Partner — architecture locale
+# JULIE — compagnon virtuel évolutif (anciennement Human Partner)
+
+> Migration phase 1 : identité initiale JULIE_001, accueil de Julie et préservation des personnages historiques. Les anciennes bases SQLite conservent volontairement le nom human-partner.sqlite ; ne pas les renommer. Les fonctions 3D/Android ne sont pas encore ajoutées par cette migration.
+
 
 Application de compagnon virtuel avec personnalité stable, mémoire persistante et bibliothèque visuelle indexée.
 
