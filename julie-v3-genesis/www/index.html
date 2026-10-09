@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
   <meta name="theme-color" content="#10111b">
-  <title>Julie • Base humaine Genesis V3</title>
+  <title>Julie • Corps humain Genesis</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
     <header class="topbar">
       <div class="brand"><span class="dot"></span><span>JULIE</span></div>
-      <div class="rightmark"><span class="offtag">BASE GENESIS V3</span></div>
+      <div class="rightmark"><span class="offtag">JULIE · CORPS HUMAIN</span></div>
     </header>
     <main>
       <section id="avatar-view" class="view active" aria-label="Julie en 3D">
@@ -34,19 +34,19 @@
         <div class="pagehead"><span class="eyebrow">NOTRE CONVERSATION</span><h1>Parlons un peu…</h1><p>Réponses locales de démonstration, sans connexion Internet.</p></div>
         <div class="conversation" id="conversation" aria-live="polite"></div>
         <form class="composer" id="chat-form"><input type="text" maxlength="500" id="chat-input" placeholder="Un petit message à Julie…" autocomplete="off" aria-label="Ton message à Julie"><button type="submit" aria-label="Envoyer">➤</button></form>
-        <p class="note">Ce mode n'utilise pas encore de modèle d'IA. Les échanges sont conservés localement sur ce téléphone, sans chiffrement ni synchronisation.</p>
+        <p class="note">Ce mode n'utilise pas encore de modèle d'IA. Les échanges sont conservés dans le stockage local chiffré Android, sans synchronisation. Les exports JSON restent lisibles : conserve-les en lieu sûr.</p>
       </section>
       <section id="memory-view" class="view" aria-label="Souvenirs">
         <div class="pagehead"><span class="eyebrow">IDENTITÉ & HISTOIRE</span><h1>Ce qu'on construit</h1><p>Des souvenirs vérifiables, jamais inventés comme des faits réels.</p></div>
         <article class="info-card"><div class="subhead">IDENTITÉ PERMANENTE</div><h2>Julie <span class="green">✦</span></h2><p>Identifiant : <code>JULIE_001</code></p><p>22 ans au lancement · 1 jour réel = 1 jour virtuel</p><p>Couple virtuel établi · souvenirs communs à construire ensemble</p></article>
         <article class="info-card"><div class="subhead">SOUVENIRS ENREGISTRÉS DANS CETTE DÉMO</div><div id="memory-items" class="mem-items"></div></article>
-        <article class="info-card"><div class="subhead">CONSERVATION</div><p>Les messages et préférences de cette prévisualisation restent uniquement sur cet appareil. Ils ne sont pas encore reliés à la mémoire SQLite de Human Partner.</p></article>
+        <article class="info-card"><div class="subhead">CONSERVATION</div><p>Les messages et préférences de cette prévisualisation restent chiffrés uniquement sur cet appareil Android. L’export volontaire en JSON n’est pas chiffré. Ils ne sont pas encore reliés à la mémoire SQLite de Human Partner.</p></article>
       </section>
       <section id="settings-view" class="view" aria-label="Réglages">
         <div class="pagehead"><span class="eyebrow">PERSONNALISATION</span><h1>Ton espace Julie</h1><p>Un premier noyau à enrichir progressivement.</p></div>
         <article class="info-card"><div class="subhead">AFFICHAGE 3D</div><label for="quality">Qualité graphique</label><select id="quality"><option value="eco">Économique · 30 FPS maximum</option><option value="balanced" selected>Équilibrée · 60 FPS maximum</option><option value="high">Élevée · 120 FPS maximum</option></select><p class="smallline">La fluidité réelle dépend de ton téléphone. Plafond absolu : 120 FPS.</p></article>
-        <article class="info-card"><div class="subhead">TES DONNÉES DE DÉMO</div><button id="export-data" class="secondary-btn">Exporter mes échanges (JSON)</button><button id="import-data" class="secondary-btn">Importer un export Julie antérieur (JSON)</button><button id="clear-data" class="danger-btn">Effacer les échanges de démo</button><p class="smallline">L'effacement concerne seulement les messages stockés par cette APK, pas tes données GitHub ou Human Partner.</p></article>
-        <article class="info-card"><div class="subhead">VERSION</div><p>JULIE • Android V3 — Modèle humain 3D (prévisualisation)</p><p class="smallline">Prototype hors ligne · pas d'achat · pas de compte à créer · pas d'accès aux capteurs.</p><p class="smallline">Modèle humain riggé CC0 : MakeHuman/MPFB via vsim, même source que Genesis ; adaptation féminine progressive propre à Julie.</p></article>
+        <article class="info-card"><div class="subhead">TES DONNÉES DE DÉMO</div><button id="export-data" class="secondary-btn">Exporter mes échanges (JSON)</button><button id="import-data" class="secondary-btn">Importer un export Julie antérieur (JSON)</button><button id="clear-data" class="danger-btn">Effacer les échanges de démo</button><p class="smallline">L'effacement protège aussi contre la réimportation d'anciens souvenirs supprimés. Aucun transfert depuis les autres APK n'est automatique.</p></article>
+        <article class="info-card"><div class="subhead">VERSION</div><p>JULIE • Android 0.3.1 — modèle humain de développement</p><p class="smallline">Prototype hors ligne · pas d'achat · pas de compte à créer · pas d'accès aux capteurs.</p><p class="smallline">Modèle humain riggé CC0 : MakeHuman/MPFB via vsim, même source que Genesis ; adaptation féminine progressive propre à Julie.</p></article>
       </section>
     </main>
     <nav class="bottomnav" aria-label="Navigation"><button class="navitem active" data-view="avatar" type="button"><span>◈</span>Julie</button><button class="navitem" data-view="chat" type="button"><span>◉</span>Parler</button><button class="navitem" data-view="memory" type="button"><span>▤</span>Souvenirs</button><button class="navitem" data-view="settings" type="button"><span>⚙</span>Réglages</button></nav>
