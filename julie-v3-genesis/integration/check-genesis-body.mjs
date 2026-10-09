@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {stripGenesisConstructionHelpers,GENESIS_TOPOLOGY} from '../www/genesis-body-cleanup.mjs';
+import {cleanGenesisFemaleAnatomy} from '../www/genesis-female-topology.mjs';
 
 // Contrôle de la vraie ressource de Genesis utilisée dans l'APK (pas un mannequin
 // fictif de test). En Node on neutralise uniquement les images, afin de
@@ -36,6 +37,9 @@ const before=geometry.index.count;
 const report=stripGenesisConstructionHelpers(gltf.scene);
 assert.equal(report.removedComponents,4,'La fausse jupe doit être retirée');
 assert.ok(report.removedTriangles>0,'Des triangles parasites persistent');
+const fem=cleanGenesisFemaleAnatomy(gltf.scene);
+assert.equal(fem.malePartsRemoved,4,'Quatre composants attendus sur le GLB réel');
+assert.ok(fem.removedTriangles>0,'Le nettoyage anatomique doit retirer des triangles');
 assert.ok(geometry.index.count<before);
 assert.equal(mesh.skeleton.bones.length,originalBoneCount);
 assert.strictEqual(geometry.attributes.skinWeight,skinnedWeights);
@@ -48,6 +52,7 @@ console.log('PASS JULIE GLB GENESIS',JSON.stringify({
   skeletonBones:originalBoneCount,
   animations:gltf.animations.length,
   removedComponents:report.removedComponents,
-  removedTriangles:report.removedTriangles,
+  femaleComponents:fem.malePartsRemoved,
+  removedTriangles:report.removedTriangles+fem.removedTriangles,
   remainingTriangles:geometry.index.count/3
 }));
