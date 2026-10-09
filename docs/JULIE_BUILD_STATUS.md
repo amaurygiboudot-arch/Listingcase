@@ -1,7 +1,7 @@
 # Dernière compilation JULIE vérifiée
 
-Commit source : b9d4d024d8a51d416688c6fe7c188964ad93d41e
-Exécution : https://github.com/amaurygiboudot-arch/Listingcase/actions/runs/37936571697
+Commit source : cc05eab747beadb3dc06d80b835820af3b8ed5a4
+Exécution : https://github.com/amaurygiboudot-arch/Listingcase/actions/runs/37936728294
 Tests : morphologie, mémoire, mise à jour, topologie Genesis sur vrai GLB, APK Android
 Artefact : Julie-Android-APK
 Statut : compilation et publication réussies
