@@ -135,6 +135,7 @@ import { fitHumanModel, clampFps, rendererDpr, isAuthorizedAssetUrl } from './av
 import { adaptEveDerivedFemaleMesh, normalizeGenesisMaterials } from './eve-derived.mjs';
 import { stripGenesisConstructionHelpers } from './genesis-body-cleanup.mjs';
 import { cleanGenesisFemaleAnatomy } from './genesis-female-topology.mjs';
+import { attachJulieWardrobe,JULIE_OUTFITS } from './julie-wardrobe.mjs';
 
 const MODEL_URL = './models/julie_genesis_human.glb';
 const canvas = $('#julie-3d');
@@ -154,6 +155,7 @@ let animationLast = 0;
 let loadedHuman = false;
 let orbitDirection = 1;
 let modelStats = null;
+let wardrobe = null;
 
 function updateStatus(message) {
   if (assetStatus){assetStatus.hidden=false;assetStatus.textContent=message;}
@@ -238,6 +240,7 @@ async function loadHuman(){
     const femaleTopology=cleanGenesisFemaleAnatomy(root);
     const femaleAdaptation=adaptEveDerivedFemaleMesh(root);
     const genesisMaterials=normalizeGenesisMaterials(THREE,root);
+    wardrobe=attachJulieWardrobe(THREE,root,{outfit:saved.outfit||'rose'});
     console.info('JULIE — anatomie Genesis propre',anatomyCleanup,femaleAdaptation,genesisMaterials);
     const fitted=fitHumanModel(THREE,root,{heightMeters:1.75});
     avatar=new THREE.Group();
@@ -272,14 +275,14 @@ async function initScene(){
     renderer.setClearColor(0xe6d3d2);
     renderer.outputColorSpace=THREE.SRGBColorSpace;
     renderer.toneMapping=THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure=1.18;
+    renderer.toneMappingExposure=1.02;
     renderer.shadowMap.enabled=false;
     scene=new THREE.Scene();
     scene.fog = new THREE.Fog(0xd6c2c1,6,14);
-    scene.add(new THREE.HemisphereLight(0xfff7f4,0x968b8d,2.55));
-    const key = new THREE.DirectionalLight(0xffe3d4,3.0);
+    scene.add(new THREE.HemisphereLight(0xfff7f4,0x968b8d,1.45));
+    const key = new THREE.DirectionalLight(0xffe3d4,2.1);
     key.position.set(-2.0,4.4,3.8);scene.add(key);
-    const fill = new THREE.DirectionalLight(0xdae9f5,1.15);
+    const fill = new THREE.DirectionalLight(0xdae9f5,.82);
     fill.position.set(2.1,2.5,-2.1);scene.add(fill);
     camera=new THREE.PerspectiveCamera(38,1,.06,22);
     buildRoom();onResize();
@@ -349,7 +352,13 @@ $('#btn-wave')?.addEventListener('click',()=>{
   $('#julie-line').textContent='« Coucou ! Je peux déjà bouger et te regarder avec mon nouveau corps humain. Le salut animé arrivera ensuite. 💕 »';
 });
 $('#btn-outfit')?.addEventListener('click',()=>{
-  $('#julie-line').textContent='« Je garde cette tenue pour le premier modèle humain. Les vêtements personnalisables arriveront après. 😉 »';
+  if(!wardrobe){$('#julie-line').textContent='« Ma tenue n’est pas encore disponible. 💕 »';return;}
+  const current=JULIE_OUTFITS.includes(saved.outfit)?saved.outfit:'rose';
+  const next=JULIE_OUTFITS[(JULIE_OUTFITS.indexOf(current)+1)%JULIE_OUTFITS.length];
+  if(persist({...saved,outfit:next})){
+    wardrobe.setOutfit(next);
+    $('#julie-line').textContent='« J’ai choisi une tenue '+next+' pour aujourd’hui. 😉 »';
+  }
 });
 
 // Appels natifs réservés aux ressources WebView locales. Aucune URL de mise
