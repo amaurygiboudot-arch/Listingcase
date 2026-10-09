@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 const JULIE_ID = 'JULIE_001';
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.2.1';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -264,38 +264,42 @@ function makeAvatar(){
       {y:.49,x:s*.113,z:.00,rx:.062,rz:.066},
       {y:.58,x:s*.12,z:.02,rx:.080,rz:.086},
       {y:.72,x:s*.128,z:.01,rx:.091,rz:.097},
-      {y:.83,x:s*.125,z:.0,rx:.087,rz:.090}
+      {y:.83,x:s*.125,z:.0,rx:.072,rz:.083}
     ],24);
     const foot=oval(avatar,mats.shoes,x,.071,.055,.075,.063,.146,24);
     foot.rotation.x=-.025;
     // Légère démarcation chaussure / cheville.
     orgSurface(avatar,mats.shoes,[{y:.13,x,z:.002,rx:.047,rz:.052},{y:.175,x,z:.0,rx:.043,rz:.050}],16);
   }
-  // Bassin et taille en courbes continues.
-  orgSurface(avatar,mats.skin,[
-    {y:.79,rx:.135,rz:.097}, {y:.87,rx:.214,rz:.114},
-    {y:.97,rx:.195,rz:.106}, {y:1.08,rx:.136,rz:.098}
-  ],26);
-  // Robe ajustée, sans bourrelets ni sphères rapportées.
-  const skirt=orgSurface(avatar,outfitMaterial,[
-    {y:.64,rx:.235,rz:.19},
-    {y:.675,rx:.25,rz:.183},
+  // JULIE_V21_NO_CLIPPING: noyau anatomique sous le tissu (jamais plus large que la robe).
+  // L'ancien bassin etait plus large que la robe et transpercait visiblement sa taille.
+  const pelvicSkinRings=[
+    {y:.79,rx:.116,rz:.084},
+    {y:.87,rx:.155,rz:.090},
+    {y:.97,rx:.132,rz:.082},
+    {y:1.08,rx:.105,rz:.075}
+  ];
+  orgSurface(avatar,mats.skin,pelvicSkinRings,32);
+  // JULIE_V21_CONTINUOUS_DRESS: une seule coque continue des hanches jusqu'au buste.
+  // Pas de jonction entre deux maillages qui laisse apparaitre un trou au ventre.
+  const dressRings=[
+    {y:.64,rx:.235,rz:.190},
+    {y:.675,rx:.250,rz:.183},
     {y:.735,rx:.226,rz:.164},
-    {y:.83,rx:.201,rz:.124},
-    {y:.94,rx:.182,rz:.107},
-    {y:1.02,rx:.135,rz:.103}
-  ],32);
-  const hem=orgSurface(avatar,trim,[{y:.644,rx:.235,rz:.187},{y:.663,rx:.243,rz:.179}],32);
-  torso=new THREE.Group();torso.position.y=1.02;avatar.add(torso);
-  orgSurface(torso,outfitMaterial,[
-    {y:-.015,rx:.135,rz:.098},
-    {y:.065,rx:.138,rz:.1},
-    {y:.15,rx:.152,rz:.118},
-    {y:.25,rx:.184,rz:.143},
-    {y:.33,rx:.183,rz:.135},
-    {y:.385,rx:.185,rz:.102},
-    {y:.415,rx:.180,rz:.080}
-  ],32);
+    {y:.83,rx:.210,rz:.140},
+    {y:.94,rx:.185,rz:.115},
+    {y:1.02,rx:.141,rz:.105},
+    {y:1.085,rx:.139,rz:.101},
+    {y:1.17,rx:.154,rz:.118},
+    {y:1.27,rx:.184,rz:.143},
+    {y:1.35,rx:.183,rz:.135},
+    {y:1.405,rx:.185,rz:.102},
+    {y:1.435,rx:.180,rz:.080}
+  ];
+  const skirt=orgSurface(avatar,outfitMaterial,dressRings,40);
+  const hem=orgSurface(avatar,trim,[{y:.644,rx:.236,rz:.191},{y:.663,rx:.246,rz:.183}],40);
+  torso=skirt; // Animation de respiration douce, sans detacher le corsage.
+
   // Encolure avec clavicules, poitrine suggérée par volume du tissu.
   orgSurface(avatar,mats.skin,[
     {y:1.365,rx:.13,rz:.085},
@@ -313,7 +317,9 @@ function makeAvatar(){
       {y:-.172,x:s*.041,z:.006,rx:.057,rz:.061},
       {y:-.080,x:s*.018,z:0,rx:.068,rz:.069},
       {y:-.015,x:0,z:0,rx:.070,rz:.071},
-      {y:.037,x:-s*.016,z:0,rx:.055,rz:.059}
+      {y:.037,x:-s*.016,z:0,rx:.060,rz:.064},
+      {y:.067,x:-s*.020,z:0,rx:.043,rz:.049},
+      {y:.085,x:-s*.025,z:0,rx:.006,rz:.008}
     ],20);
     const forearm=new THREE.Group();forearm.position.set(s*.05,-.273,.014);arm.add(forearm);
     orgSurface(forearm,mats.skin,[
@@ -435,7 +441,7 @@ function tick(now){
   const t=now*.001,breath=Math.sin(t*1.18),gentle=Math.sin(t*.63);
   if(spin)angular+=frameDt*.44;
   avatar.rotation.y=angular;avatar.rotation.z=gentle*.0065;
-  torso.scale.y=1+breath*.008;
+  torso.scale.z=1+breath*.003; // respiration tres discrete, robe sans jointure
   head.rotation.y=Math.sin(t*.48)*.042;
   head.rotation.z=Math.sin(t*.69)*.019;
   head.rotation.x=Math.sin(t*.42)*.017;

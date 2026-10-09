@@ -1,3 +1,9 @@
+# JULIE V2.1 — Correctif silhouette et robe
+
+Correctif ciblé V2 : robe continue, correction du chevauchement peau/tissu à la taille, jambes et épaules adoucies.
+
+**Prototype 3D stylisé, pas une femme photoréaliste.** Ce correctif ne contient aucune nouvelle IA ni véritable mémoire permanente. La mémoire locale V2 n’est pas automatiquement transférée dans ce nouvel identifiant d’application.
+
 # JULIE — Avatar 3D V2 (prévisualisation autonome)
 
 Cette branche ajoute une **V2 du prototype Android hors ligne**, construite sur le travail existant sans détruire Human Partner, Julie V1 ou leurs données.
@@ -16,7 +22,7 @@ Cette branche ajoute une **V2 du prototype Android hors ligne**, construite sur 
 
 Ceci est une prévisualisation, **pas l'avatar photoréaliste définitif**, ni la mémoire permanente complète définie par le document maître. Les données locales de cette démonstration ne sont pas chiffrées par l’application ni synchronisées. Évitez d'y mettre des secrets. La perte de l'application ou des données peut effacer cette mémoire de démonstration ; exportez-la avant toute désinstallation.
 
-Cette V2 est installée **à côté de Julie V1** (sans importer automatiquement ses données) grâce à un **applicationId Android distinct** (`com.julie.preview.v2`) afin de ne pas remplacer l'ancienne application Human Partner et ses données. L'application Android historique et le backend Node/SQLite restent intacts dans le dépôt.
+Cette V2 est installée **à côté de Julie V1** (sans importer automatiquement ses données) grâce à un **applicationId Android distinct** (`com.julie.preview.v21`) afin de ne pas remplacer l'ancienne application Human Partner et ses données. L'application Android historique et le backend Node/SQLite restent intacts dans le dépôt.
 
 ## Génération de l'APK
 

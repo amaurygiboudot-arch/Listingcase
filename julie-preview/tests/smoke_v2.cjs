@@ -7,7 +7,7 @@ const script=fs.readFileSync(path.join(root,'www/app.mjs'),'utf8');
 const html=fs.readFileSync(path.join(root,'www/index.html'),'utf8');
 const manifest=fs.readFileSync(path.join(root,'android/AndroidManifest.xml'),'utf8');
 assert(script.includes("const JULIE_ID = 'JULIE_001'"));
-assert(script.includes("const APP_VERSION = '0.2.0'"));
+assert(script.includes("const APP_VERSION = '0.2.1'"));
 assert(script.includes('JULIE_AVATAR_V2'));
 assert(!script.includes('fetch('));
 assert(!/android\.permission\.INTERNET/.test(manifest));
@@ -51,3 +51,17 @@ console.log('PASS: syntaxes et invariants de sécurité');
 console.log('PASS: scène et avatar V2 instanciés dans un environnement simulé');
 console.log('PASS: dialogue de démonstration conservé et palette de tenues fonctionnelle');
 console.log('Geometry allocations:',geometries,'materials:',materialCount);
+
+// Régression JULIE V2.1 : une robe unifiée doit couvrir le bassin sans surfaces percées.
+assert(script.includes('JULIE_V21_NO_CLIPPING'));
+assert(script.includes('JULIE_V21_CONTINUOUS_DRESS'));
+assert(script.includes('torso=skirt'));
+const findRings=(name)=>{
+  const match=script.match(new RegExp('const '+name+'=\\[([\\s\\S]*?)\\];'));
+  assert(match,'Profil absent: '+name);
+  return Array.from(match[1].matchAll(/\{([^}]+)\}/g),([,block])=>Object.fromEntries(Array.from(block.matchAll(/([a-z]+):(-?(?:\d+(?:\.\d*)?|\.\d+))/g),([,key,value])=>[key,Number(value)])));
+};
+const skin=findRings('pelvicSkinRings'),cloth=findRings('dressRings');
+const at=(arr,y,key)=>{for(let i=0;i<arr.length-1;i++){const a=arr[i],b=arr[i+1];if(y>=a.y&&y<=b.y){const t=(y-a.y)/(b.y-a.y);return a[key]*(1-t)+b[key]*t}}throw new Error('profil y='+y)};
+for(let i=0;i<59;i++){const y=.79+i*.005;for(const dim of ['rx','rz'])assert(at(cloth,y,dim)>at(skin,y,dim)+.009,`Intersection robe/bassin à y=${y}, dim=${dim}`)}
+console.log('PASS: aucune intersection robe/bassin de 0.79 à 1.08 m (profil géométrique)');
