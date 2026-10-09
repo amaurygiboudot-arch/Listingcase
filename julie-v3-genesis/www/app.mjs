@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
 
-const APP_VERSION = '0.3.3';
+const APP_VERSION = '0.3.4';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));

@@ -131,7 +131,7 @@ jobs:
           assert s.count("applicationId 'com.humanpartner'")==1
           s=s.replace("applicationId 'com.humanpartner'","applicationId 'com.julie.preview.v3'")
           s=s.replace('versionCode 9',"versionCode "+str(300000+int('${{ github.run_number }}')))
-          s=s.replace("versionName '0.1.8'","versionName '0.3.3-dev.${{ github.run_number }}'")
+          s=s.replace("versionName '0.1.8'","versionName '0.3.4-dev.${{ github.run_number }}'")
           p.write_text(s)
           PYGRADLE
       - name: Compiler APK Android de test
@@ -150,10 +150,10 @@ jobs:
           unzip -Z1 "$APK" | grep -Fx assets/julie/app.js
           unzip -Z1 "$APK" | grep -Fx classes.dex
           mkdir -p julie-android-artifact
-          cp "$APK" julie-android-artifact/JULIE-Android-0.3.3-debug.apk
+          cp "$APK" julie-android-artifact/JULIE-Android-0.3.4-debug.apk
           cp julie-v3-genesis/README.md julie-android-artifact/LIRE_AVANT_INSTALLATION.md
           cp julie-v3-genesis/CREDITS_MODELE.md julie-android-artifact/CREDITS_MODELE.md
-          (cd julie-android-artifact && sha256sum JULIE-Android-0.3.3-debug.apk > SHA256SUMS.txt)
+          (cd julie-android-artifact && sha256sum JULIE-Android-0.3.4-debug.apk > SHA256SUMS.txt)
       - name: Publier Julie Android
         uses: actions/upload-artifact@v4
         with:
@@ -242,7 +242,7 @@ jobs:
           fi
           export JULIE_RELEASE_APK="$APK"
           export JULIE_RELEASE_VERSIONCODE="$((300000+${{ github.run_number }}))"
-          export JULIE_RELEASE_VERSIONNAME="0.3.3-dev.${{ github.run_number }}"
+          export JULIE_RELEASE_VERSIONNAME="0.3.4-dev.${{ github.run_number }}"
           python3 - <<'PYRELEASE'
           import hashlib,json,os
           from pathlib import Path
