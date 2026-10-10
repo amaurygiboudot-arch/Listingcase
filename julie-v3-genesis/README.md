@@ -55,3 +55,12 @@ Références : `Julie_Document_Maitre_V1.docx` (document de conception approuvé
 - La première capture a révélé des mèches hérissées et un matériau de construction sombre sur les membres ; les tests unitaires ne suffisaient pas.
 - Correctif : les mèches suivent désormais la gravité à partir des racines latérales du crâne ; le matériau de la peau n'utilise plus l'atlas vestimentaire d'origine sur la surface corporelle vérifiée de 4 170 sommets.
 - Ces changements seront à nouveau comparés à une capture visuelle et restent un prototype, pas un avatar photoréaliste approuvé.
+
+
+## Apprentissage documentaire autonome V0.2 — développement local non livré
+
+Un premier service Android JobScheduler prévoit une recherche documentaire best-effort environ une fois par jour, sur réseau non facturé uniquement, y compris lorsque la WebView est fermée. La collecte est limitée à une courte introduction de Wikipédia francophone, depuis un domaine HTTPS fixe, sans transmettre les messages ou souvenirs personnels.
+
+Une information récupérée reste une piste à corroborer, pas une connaissance scientifiquement vérifiée. La file native est chiffrée avec AndroidKeyStore ; le module learning-engine.mjs vérifie provenance et format avant intégration dans JULIE_001. La file est acquittée seulement après écriture confirmée. La rubrique Apprentissage local propose l'activation Wi-Fi, une demande manuelle et l'effacement des connaissances sans toucher aux messages.
+
+L'exécution dépend d'Android, de la batterie et du réseau. Aucun moteur de raisonnement général, aucune confrontation à une seconde source scientifique, aucun réentraînement du modèle ne sont encore implémentés. Les tests de source et la compilation Java ne remplacent pas une validation sur téléphone.

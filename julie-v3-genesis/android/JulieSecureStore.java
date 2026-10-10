@@ -7,6 +7,7 @@ import android.security.keystore.KeyProperties;
 import android.util.Base64;
 import android.util.Log;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import java.security.KeyStore;
 import java.nio.charset.StandardCharsets;
 import javax.crypto.Cipher;
@@ -27,12 +28,17 @@ final class JulieSecureStore {
     private static final String ENCRYPTED_KEY = "julie_JULIE_001_encrypted_v1";
     private static final String KEY_ALIAS = "julie_JULIE_001_key_v1";
     private static final byte[] AAD = "JULIE_001".getBytes(StandardCharsets.UTF_8);
+    private static final String RESEARCH_INBOX = "julie_JULIE_001_research_inbox_v1";
+    private static final String RESEARCH_ENABLED = "julie_JULIE_001_research_enabled_v1";
+    private static final String RESEARCH_INDEX = "julie_JULIE_001_research_index_v1";
+    private static final Object RESEARCH_LOCK = new Object();
     private final SharedPreferences prefs;
 
     JulieSecureStore(Context context) {
         prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE);
     }
     private SecretKey key() throws Exception {
+        synchronized(RESEARCH_LOCK) {
         final KeyStore store = KeyStore.getInstance("AndroidKeyStore");
         store.load(null);
         if (store.containsAlias(KEY_ALIAS)) {
@@ -47,6 +53,7 @@ final class JulieSecureStore {
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256).build());
         return generator.generateKey();
+        }
     }
     private String encrypt(String plaintext) throws Exception {
         final Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -90,6 +97,92 @@ final class JulieSecureStore {
         } catch(Exception error) {
             Log.e("JulieSecureStore","Sauvegarde refusée sans effacer les souvenirs",error);
             return false;
+        }
+    }
+
+    // File séparée du JSON de conversation pour éviter les écritures concurrentes.
+    // Toute donnée externe y reste une piste de lecture, jamais une vérité validée.
+    boolean researchEnabled() {
+        return prefs.getBoolean(RESEARCH_ENABLED, true);
+    }
+    boolean setResearchEnabled(boolean enabled) {
+        synchronized(RESEARCH_LOCK) {
+            return prefs.edit().putBoolean(RESEARCH_ENABLED,enabled).commit();
+        }
+    }
+    int researchCursor() {
+        synchronized(RESEARCH_LOCK) { return prefs.getInt(RESEARCH_INDEX,0); }
+    }
+    boolean advanceResearchCursor(int next) {
+        synchronized(RESEARCH_LOCK) {
+            return prefs.edit().putInt(RESEARCH_INDEX,next).commit();
+        }
+    }
+    String readResearchInbox() {
+        synchronized(RESEARCH_LOCK) {
+            try {
+                final String packed=prefs.getString(RESEARCH_INBOX,"");
+                if(packed==null||packed.isEmpty())return "{\"schema\":1,\"items\":[]}";
+                return decrypt(packed);
+            } catch(Exception error) {
+                Log.e("JulieSecureStore","File scientifique illisible, aucune suppression",error);
+                return UNREADABLE;
+            }
+        }
+    }
+    boolean appendResearchItem(JSONObject item) {
+        synchronized(RESEARCH_LOCK) {
+            try {
+                if(!researchEnabled()||item==null||item.toString().length()>2500)return false;
+                final String raw=readResearchInbox();
+                if(UNREADABLE.equals(raw))return false;
+                final JSONObject inbox=new JSONObject(raw);
+                if(inbox.optInt("schema",-1)!=1)return false;
+                final JSONArray entries=inbox.getJSONArray("items");
+                final String id=item.getString("id");
+                if(!id.matches("wiki-fr-[0-9]{1,15}"))return false;
+                for(int i=0;i<entries.length();i++) {
+                    if(id.equals(entries.getJSONObject(i).optString("id")))return true;
+                }
+                if(entries.length()>=12)return false;
+                entries.put(item);
+                final String payload=inbox.toString();
+                if(payload.getBytes(StandardCharsets.UTF_8).length>32000)return false;
+                return prefs.edit().putString(RESEARCH_INBOX,encrypt(payload)).commit();
+            } catch(Exception error) {
+                Log.e("JulieSecureStore","Recherche non sauvegardée, file préservée",error);
+                return false;
+            }
+        }
+    }
+    boolean acknowledgeResearchItem(String id) {
+        synchronized(RESEARCH_LOCK) {
+            try {
+                if(id==null||!id.matches("wiki-fr-[0-9]{1,15}"))return false;
+                final String raw=readResearchInbox();
+                if(UNREADABLE.equals(raw))return false;
+                final JSONObject inbox=new JSONObject(raw);
+                if(inbox.optInt("schema",-1)!=1)return false;
+                final JSONArray entries=inbox.getJSONArray("items");
+                final JSONArray remaining=new JSONArray();
+                for(int i=0;i<entries.length();i++) {
+                    final JSONObject entry=entries.getJSONObject(i);
+                    if(!id.equals(entry.optString("id")))remaining.put(entry);
+                }
+                if(remaining.length()==entries.length())return true;
+                final JSONObject updated=new JSONObject();
+                updated.put("schema",1);
+                updated.put("items",remaining);
+                return prefs.edit().putString(RESEARCH_INBOX,encrypt(updated.toString())).commit();
+            } catch(Exception error) {
+                Log.e("JulieSecureStore","Accusé de réception non enregistré",error);
+                return false;
+            }
+        }
+    }
+    boolean clearResearchInbox() {
+        synchronized(RESEARCH_LOCK) {
+            return prefs.edit().remove(RESEARCH_INBOX).commit();
         }
     }
 }

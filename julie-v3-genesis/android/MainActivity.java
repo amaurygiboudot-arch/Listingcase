@@ -45,6 +45,19 @@ public final class MainActivity extends Activity {
     public final class JulieBridge {
         @JavascriptInterface public String readState(){return secureStore.read();}
         @JavascriptInterface public boolean writeState(String json){return secureStore.write(json);}
+        @JavascriptInterface public String readResearchInbox(){return secureStore.readResearchInbox();}
+        @JavascriptInterface public boolean acknowledgeResearchItem(String id){return secureStore.acknowledgeResearchItem(id);}
+        @JavascriptInterface public boolean researchEnabled(){return secureStore.researchEnabled();}
+        @JavascriptInterface public boolean setResearchEnabled(boolean enabled){
+            if(!secureStore.setResearchEnabled(enabled))return false;
+            if(enabled)JulieResearchJobService.scheduleDaily(MainActivity.this);
+            else JulieResearchJobService.cancelAll(MainActivity.this);
+            return true;
+        }
+        @JavascriptInterface public boolean requestResearchNow(){
+            return JulieResearchJobService.requestNow(MainActivity.this);
+        }
+        @JavascriptInterface public boolean clearResearchInbox(){return secureStore.clearResearchInbox();}
         @JavascriptInterface public void exportData(String json){
             if(json==null||json.getBytes(StandardCharsets.UTF_8).length>MAX_JSON_BYTES)return;
             runOnUiThread(()->{
@@ -110,6 +123,8 @@ public final class MainActivity extends Activity {
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
         secureStore=new JulieSecureStore(getApplicationContext());
+        try { JulieResearchJobService.scheduleDaily(this); }
+        catch(Exception error){android.util.Log.w("JulieResearch","Planification indisponible",error);}
         getWindow().setStatusBarColor(Color.rgb(15,17,27));
         getWindow().setNavigationBarColor(Color.rgb(15,17,27));
         web=new WebView(this);

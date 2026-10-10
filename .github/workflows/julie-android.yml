@@ -126,7 +126,7 @@ jobs:
           set -euo pipefail
           cp julie-v3-genesis/android/MainActivity.java android/app/src/main/java/com/humanpartner/MainActivity.java
           cp julie-v3-genesis/android/JulieSecureStore.java android/app/src/main/java/com/humanpartner/JulieSecureStore.java
-          cp julie-v3-genesis/android/JulieUpdateManager.java julie-v3-genesis/android/JulieInstallReceiver.java android/app/src/main/java/com/humanpartner/
+          cp julie-v3-genesis/android/JulieUpdateManager.java julie-v3-genesis/android/JulieInstallReceiver.java julie-v3-genesis/android/JulieResearchJobService.java android/app/src/main/java/com/humanpartner/
           cp julie-v3-genesis/android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
           mkdir -p android/app/src/main/assets/julie/models android/app/src/main/res/drawable
           cp julie-v3-genesis/android/julie_icon.xml android/app/src/main/res/drawable/julie_icon.xml

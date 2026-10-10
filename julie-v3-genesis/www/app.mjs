@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
-import {offlineLearningTick,reviewLearning,eraseLearning} from './learning-engine.mjs';
+import {offlineLearningTick,reviewLearning,eraseLearning,ingestResearchLead} from './learning-engine.mjs';
 
 const APP_VERSION = '0.3.5';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
@@ -32,13 +32,47 @@ function persist(next){
   }catch(e){console.error('Sauvegarde JULIE non effectuée',e);alert(e?.message||'Impossible de sauvegarder. Les données précédentes sont conservées.');return false;}
 }
 
-// Une séance de préparation/revue hors ligne au maximum par jour d'ouverture.
-// Sans service Android en arrière-plan, rien n'est déclaré exécuté pendant la fermeture.
+let researchProblem='';
+function syncResearchInbox(){
+  const bridge=window.JulieAndroid;
+  if(!storageHealthy||typeof bridge?.readResearchInbox!=='function')return 0;
+  try{
+    if(saved.learning.disabled){
+      bridge.setResearchEnabled?.(false);
+      return 0;
+    }
+    const raw=bridge.readResearchInbox();
+    if(raw==='__ERROR_SECURE_STORAGE__')throw new Error('File scientifique illisible : données préservées');
+    const batch=JSON.parse(raw);
+    if(batch.schema!==1||!Array.isArray(batch.items)||batch.items.length>12)
+      throw new Error('Format de recherche incompatible');
+    let count=0;
+    for(const item of batch.items){
+      const result=ingestResearchLead(saved.learning,item);
+      if(result.changed){
+        if(!persist({...saved,learning:result.learning}))return count;
+        count++;
+      }
+      if(bridge.acknowledgeResearchItem(item.id)!==true)
+        throw new Error('Accusé de réception non enregistré');
+    }
+    researchProblem='';
+    return count;
+  }catch(error){
+    researchProblem=error?.message||'Recherche indisponible';
+    console.error('Recherche JULIE : file préservée',error);
+    return 0;
+  }
+}
+
+// Préparation hors ligne à l'ouverture ; recherches documentaires différées
+// exécutées séparément par Android, si le réseau non facturé est disponible.
 if(storageHealthy){
   try{
     const cycle=offlineLearningTick(saved.learning,Date.now());
     if(cycle.changed)persist({...saved,learning:cycle.learning});
   }catch(error){console.error('Apprentissage local : aucune donnée modifiée',error);}
+  syncResearchInbox();
 }
 
 function switchView(name){
@@ -100,14 +134,30 @@ function renderLearning(){
   const passed=l.events.filter(e=>e.kind==='révision'&&e.result==='réussi').length;
   status.textContent=l.disabled
     ? 'Apprentissage effacé et nouvelles séances désactivées. Aucun contenu supprimé n’est restauré automatiquement.'
-    : l.records.length+' référence(s) embarquée(s) · '+passed+' test(s) locaux réussis · '+l.errors.length+' erreur(s) suivie(s).';
+    : l.records.length+' référence(s) et piste(s) · '+passed+' test(s) locaux réussis · '+l.errors.length+' erreur(s) suivie(s).';
+  const toggle=$('#learning-auto-research');
+  const manual=$('#learning-research-now');
+  const network=$('#learning-network-status');
+  const native=window.JulieAndroid;
+  let networkOn=false;
+  try{networkOn=typeof native?.researchEnabled==='function'&&native.researchEnabled()===true;}
+  catch(error){researchProblem='Contrôle réseau indisponible';}
+  if(toggle){toggle.checked=networkOn&&!l.disabled;toggle.disabled=!native?.setResearchEnabled||l.disabled||!storageHealthy;}
+  if(manual)manual.disabled=!networkOn||l.disabled||!native?.requestResearchNow||!storageHealthy;
+  if(network)network.textContent=researchProblem
+    ? researchProblem
+    : !native?.readResearchInbox?'Recherche différée disponible uniquement dans l’APK Android.'
+    : l.disabled?'Apprentissage désactivé après suppression volontaire.'
+    : networkOn?'Consultation différée activée · réseau non facturé · résultat non corroboré.'
+    : 'Recherche automatique désactivée.';
   for(const record of l.records.slice().reverse()){
     const card=document.createElement('div');card.className='mem-item';
     const meta=document.createElement('small');
     meta.textContent=record.topic+' · '+record.status+' · '+record.source.title;
     const title=document.createElement('strong');title.textContent=record.question;
     const answer=document.createElement('p');answer.textContent=record.answer;
-    card.append(meta,title,answer);panel.appendChild(card);
+    const source=document.createElement('small');source.textContent=record.source.url;
+    card.append(meta,title,answer,source);panel.appendChild(card);
   }
   if(!l.records.length&&!l.disabled){
     const empty=document.createElement('p');
@@ -115,6 +165,25 @@ function renderLearning(){
     panel.appendChild(empty);
   }
 }
+$('#learning-auto-research')?.addEventListener('change',event=>{
+  const bridge=window.JulieAndroid;
+  try{
+    if(saved.learning.disabled||typeof bridge?.setResearchEnabled!=='function'||
+       bridge.setResearchEnabled(event.target.checked)!==true)
+      throw new Error('Configuration Android refusée');
+    renderLearning();
+  }catch(error){alert(error.message);renderLearning();}
+});
+$('#learning-research-now')?.addEventListener('click',()=>{
+  try{
+    if(typeof window.JulieAndroid?.requestResearchNow!=='function'||
+       window.JulieAndroid.requestResearchNow()!==true){
+      alert('Recherche non programmée : réseau non facturé requis ou demande récente déjà enregistrée.');
+      return;
+    }
+    alert('Demande de recherche transmise à Android. Elle sera exécutée si les contraintes le permettent.');
+  }catch(error){alert(error?.message||'Recherche indisponible');}
+});
 $('#learning-review')?.addEventListener('click',()=>{
   try{
     const result=reviewLearning(saved.learning,{at:Date.now()});
@@ -129,11 +198,19 @@ $('#learning-erase')?.addEventListener('click',()=>{
   if(!confirm('Effacer définitivement les connaissances et tests locaux ? Les anciens exports ne pourront pas les réintroduire. Les séances automatiques seront désactivées.'))return;
   try{
     if(persist({...saved,learning:eraseLearning(saved.learning,Date.now())})){
-      renderLearning();alert('Apprentissage local effacé. Messages et souvenirs de conversation conservés.');
+      try{
+        if(window.JulieAndroid?.setResearchEnabled?.(false)===false)
+          throw new Error('Recherche Android non désactivée');
+        if(window.JulieAndroid?.clearResearchInbox?.()===false)
+          throw new Error('File de recherche Android non purgée');
+      }catch(error){researchProblem=error.message;}
+      renderLearning();
+      alert('Connaissances locales effacées. Les échanges restent conservés. '+researchProblem);
     }
   }catch(error){alert(error?.message||'Apprentissage non effacé');}
 });
 function showMemories(){
+  syncResearchInbox();
   renderLearning();
   const root=$('#memory-items');root.textContent='';
   if(!saved.memories.length){const el=document.createElement('p');el.textContent='Aucun goût personnel enregistré pour le moment. Tu peux me dire ce que tu aimes dans l’onglet Parler.';root.appendChild(el);return;}

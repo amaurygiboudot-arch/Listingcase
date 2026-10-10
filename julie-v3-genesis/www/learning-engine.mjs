@@ -96,7 +96,7 @@ function appendEvent(state,event){return {...state,events:[...state.events,event
 export function reviewLearning(state,{at=Date.now(),recordId=null,classifier=classifyAtomicExample}={}){
   const original=normalizeLearningState(state);
   if(original.disabled)return {learning:original,changed:false,reason:'désactivé'};
-  const selected=original.records.filter(v=>(recordId===null||v.id===recordId))
+  const selected=original.records.filter(v=>(recordId===null||v.id===recordId)&&OFFLINE_LESSONS.some(q=>q.id===v.id))
     .sort((a,b)=>a.nextReviewAt-b.nextReviewAt)[0];
   if(!selected)return {learning:original,changed:false,reason:'aucune connaissance à vérifier'};
   const lesson=OFFLINE_LESSONS.find(v=>v.id===selected.id);
@@ -139,7 +139,7 @@ export function offlineLearningTick(state,at=Date.now()){
     });
     outcome='question préparée';
   }else{
-    const due=original.records.filter(v=>v.nextReviewAt<=currentTime)
+    const due=original.records.filter(v=>v.nextReviewAt<=currentTime&&OFFLINE_LESSONS.some(q=>q.id===v.id))
       .sort((a,b)=>a.nextReviewAt-b.nextReviewAt)[0];
     if(due){
       const check=reviewLearning(original,{at:currentTime,recordId:due.id});
@@ -193,4 +193,46 @@ export function mergeLearningStates(current,incoming){
     records:unionById(a.records.filter(x=>x.createdAt>cutoff),b.records.filter(x=>x.createdAt>cutoff),'updatedAt'),
     events:unionById(a.events.filter(x=>x.at>cutoff),b.events.filter(x=>x.at>cutoff),'at'),
     errors:unionById(a.errors.filter(x=>x.at>cutoff),b.errors.filter(x=>x.at>cutoff),'at')});
+}
+
+// Une recherche reçue d'Android reste une piste documentaire non vérifiée.
+export function ingestResearchLead(state,candidate){
+  const existing=normalizeLearningState(state);
+  if(existing.disabled)return {learning:existing,changed:false,reason:'désactivé'};
+  if(!candidate||typeof candidate!=='object'||Array.isArray(candidate))
+    throw new Error('Découverte documentaire invalide');
+  for(const name of ['id','topic','title','excerpt','url'])requireText(candidate[name],name);
+  if(!/^wiki-fr-[0-9]{1,15}$/.test(candidate.id))throw new Error('Identifiant documentaire invalide');
+  if(candidate.topic.length>80||candidate.title.length>180||candidate.excerpt.length<40||candidate.excerpt.length>950)
+    throw new Error('Taille de découverte invalide');
+  const url=new URL(candidate.url);
+  if(url.protocol!=='https:'||url.hostname!=='fr.wikipedia.org'||url.port||
+      !url.pathname.startsWith('/wiki/')||url.username||url.password)
+    throw new Error('Source documentaire non autorisée');
+  const fetchedAt=candidate.fetchedAt;
+  if(!Number.isSafeInteger(fetchedAt)||fetchedAt<=0)throw new Error('Date documentaire invalide');
+  if(fetchedAt<=existing.deletedBefore)return {learning:existing,changed:false,reason:'supprimé'};
+  if(existing.records.some(x=>x.id===candidate.id))
+    return {learning:existing,changed:false,reason:'déjà présent'};
+  if(existing.records.length>=1999||existing.events.length>=4999)
+    throw new Error('Mémoire scientifique pleine');
+  const record={
+    id:candidate.id,topic:candidate.topic,
+    question:'Que doit-on vérifier au sujet de '+candidate.title+' ?',
+    answer:candidate.excerpt,
+    source:{title:'Wikipédia francophone — '+candidate.title,url:url.href,
+      kind:'encyclopédie collaborative',license:'Consulter la licence et les auteurs sur la page source'},
+    status:'piste documentaire, source unique non corroborée',
+    confidence:0.1,createdAt:fetchedAt,updatedAt:fetchedAt,
+    nextReviewAt:fetchedAt+7*DAY_MS,reviews:0,passes:0
+  };
+  const event={
+    id:eventId('discovery',fetchedAt,existing.events.length+1),
+    kind:'recherche documentaire reçue',recordId:record.id,
+    result:'à corroborer',at:fetchedAt,
+    detail:'Source publique reçue ; vérification scientifique indépendante non effectuée'
+  };
+  const next=normalizeLearningState({...existing,
+    records:[...existing.records,record],events:[...existing.events,event]});
+  return {learning:next,changed:true,reason:'piste documentaire à enregistrer'};
 }

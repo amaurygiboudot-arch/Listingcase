@@ -1,7 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <!-- Réseau uniquement pour vérifier/télécharger les APK signés depuis GitHub. -->
+  <!-- Réseau natif limité aux mises à jour signées et à une recherche documentaire sur réseau non facturé. -->
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
   <!-- Nécessaire pour proposer une APK hors Play Store ; confirmation Android obligatoire. -->
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
   <application
@@ -17,5 +18,8 @@
       </intent-filter>
     </activity>
     <receiver android:name=".JulieInstallReceiver" android:exported="false"/>
+    <service android:name=".JulieResearchJobService"
+        android:permission="android.permission.BIND_JOB_SERVICE"
+        android:exported="false"/>
   </application>
 </manifest>
