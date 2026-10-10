@@ -37,14 +37,14 @@ public final class JulieResearchJobService extends JobService {
     private static final String MANUAL_PREF = "julie_research_jobs_v1";
     // Sélection tournante de thèmes : pas de donnée privée dans les requêtes.
     private static final String[][] TOPICS = {
-        {"Liaison chimique","Chimie"},
-        {"Neurone","Biologie"},
-        {"Photosynthèse","Biologie"},
-        {"Écosystème","Écologie"},
-        {"Mémoire (psychologie)","Cognition"},
-        {"Mitochondrie","Biologie"},
-        {"Gravitation","Physique"},
-        {"Cycle de l'eau","Terre"}
+        {"Liaison chimique","Chimie","chemical bonding"},
+        {"Neurone","Biologie","neuron"},
+        {"Photosynthèse","Biologie","photosynthesis"},
+        {"Écosystème","Écologie","ecosystem"},
+        {"Mémoire (psychologie)","Cognition","memory consolidation"},
+        {"Mitochondrie","Biologie","mitochondria"},
+        {"Gravitation","Physique",""},
+        {"Cycle de l'eau","Terre",""}
     };
     private volatile Thread worker;
     private volatile HttpURLConnection connection;
@@ -102,6 +102,20 @@ public final class JulieResearchJobService extends JobService {
                 if(Thread.currentThread().isInterrupted()||!isUnmetered())return;
                 final int index=Math.floorMod(store.researchCursor(),TOPICS.length);
                 final JSONObject found=fetchArticle(TOPICS[index][0],TOPICS[index][1]);
+                // Deuxième source uniquement pour les thèmes couverts par Europe PMC.
+                // Une publication trouvée n'implique pas que l'affirmation est vraie.
+                if(!TOPICS[index][2].isEmpty()&&
+                   !Thread.currentThread().isInterrupted()&&isUnmetered()){
+                    try{
+                        final JSONObject literature=JulieLiteratureSource.findCandidate(TOPICS[index][2]);
+                        if(literature!=null){
+                            found.put("secondary",literature);
+                            found.put("sourceType","encyclopédie et notice scientifique à examiner ; aucune validation automatique");
+                        }
+                    }catch(Exception e){
+                        Log.i(TAG,"Recherche bibliographique secondaire non concluante",e);
+                    }
+                }
                 if(Thread.currentThread().isInterrupted()||!store.researchEnabled())return;
                 if(store.appendResearchItem(found))store.advanceResearchCursor(index+1);
             } catch(Exception error) {

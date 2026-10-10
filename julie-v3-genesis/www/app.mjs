@@ -157,7 +157,15 @@ function renderLearning(){
     const title=document.createElement('strong');title.textContent=record.question;
     const answer=document.createElement('p');answer.textContent=record.answer;
     const source=document.createElement('small');source.textContent=record.source.url;
-    card.append(meta,title,answer,source);panel.appendChild(card);
+    card.append(meta,title,answer,source);
+    const publication=record.source.publication;
+    if(publication){
+      const reference=document.createElement('small');
+      reference.textContent='À comparer : '+publication.sourceName+' ('+publication.year+') — '+
+        publication.title+' — '+publication.url;
+      card.appendChild(reference);
+    }
+    panel.appendChild(card);
   }
   if(!l.records.length&&!l.disabled){
     const empty=document.createElement('p');

@@ -92,3 +92,57 @@ test('Service Android séparé, réseau borné et permission non exportée',()=>
   assert.match(app,/bridge\.acknowledgeResearchItem\(item\.id\)/);
   assert.match(workflow,/cp julie-v3-genesis\/android\/JulieUpdateManager\.java .*JulieResearchJobService\.java/);
 });
+
+const doubleSourceLead={
+  id:'wiki-fr-9876',topic:'Biologie',title:'Photosynthèse',
+  excerpt:'La photosynthèse est une conversion de l’énergie lumineuse en énergie chimique. Cette hypothèse documentaire reste à vérifier.',
+  url:'https://fr.wikipedia.org/wiki/Photosynth%C3%A8se',fetchedAt:T+100,
+  secondary:{
+    sourceName:'Europe PMC',year:'2026',
+    title:'Turnover rates of photosynthesis determined by fluorescence kinetic analysis.',
+    url:'https://europepmc.org/article/MED/42799945',
+    excerpt:'Maximum turnover rates of photosynthesis impose an upper limit on global primary production.',
+    status:'publication à examiner, confrontation non effectuée'
+  }
+};
+
+test('Deux références indépendantes sont conservées sans inventer une validation scientifique',()=>{
+  const result=ingestResearchLead(newLearningState(),doubleSourceLead);
+  assert.equal(result.changed,true);
+  assert.equal(result.learning.records[0].source.publication.sourceName,'Europe PMC');
+  assert.equal(result.learning.records[0].source.publication.year,'2026');
+  assert.match(result.learning.records[0].status,/non recoupées/);
+  assert.equal(result.learning.records[0].confidence,0.1);
+  assert.equal(result.learning.events[0].result,'à corroborer');
+  const exported={...createInitialState(T),learning:result.learning};
+  const restored=mergeImport(createInitialState(T),exported).state;
+  assert.equal(restored.learning.records[0].source.publication.url,
+    'https://europepmc.org/article/MED/42799945');
+});
+
+test('Une fausse publication ou une URL redirigée n’entre jamais dans la mémoire',()=>{
+  const baseline=newLearningState();
+  const malformed=[
+    {...doubleSourceLead,secondary:{...doubleSourceLead.secondary,url:'https://europepmc.org.attacker.example/article/MED/42799945'}},
+    {...doubleSourceLead,secondary:{...doubleSourceLead.secondary,url:'https://europepmc.org/other/MED/42799945'}},
+    {...doubleSourceLead,secondary:{...doubleSourceLead.secondary,url:'http://europepmc.org/article/MED/42799945'}},
+    {...doubleSourceLead,secondary:{...doubleSourceLead.secondary,sourceName:'Fake PMC'}},
+    {...doubleSourceLead,secondary:{...doubleSourceLead.secondary,url:'https://europepmc.org/article/PPR/1234'}},
+    {...doubleSourceLead,secondary:{...doubleSourceLead.secondary,year:'not-a-year'}}
+  ];
+  for(const candidate of malformed)assert.throws(()=>ingestResearchLead(baseline,candidate));
+  assert.equal(baseline.records.length,0);
+});
+
+test('L’application reconnaît la présence de la seconde source scientifique sans la déclarer probante',()=>{
+  const fsNative=fs.readFileSync(new URL('../android/JulieLiteratureSource.java',import.meta.url),'utf8');
+  const service=fs.readFileSync(new URL('../android/JulieResearchJobService.java',import.meta.url),'utf8');
+  const pipeline=fs.readFileSync(new URL('../../.github/workflows/julie-android.yml',import.meta.url),'utf8');
+  assert.match(fsNative,/Europe PMC/);
+  assert.match(fsNative,/www\.ebi\.ac\.uk/);
+  assert.match(fsNative,/setInstanceFollowRedirects\(false\)/);
+  assert.match(fsNative,/OPEN_ACCESS:y/);
+  assert.match(service,/JulieLiteratureSource\.findCandidate/);
+  assert.match(service,/found\.put\("secondary",literature\)/);
+  assert.match(pipeline,/JulieLiteratureSource\.java/);
+});

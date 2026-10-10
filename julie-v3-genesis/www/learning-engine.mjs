@@ -31,6 +31,25 @@ export const OFFLINE_LESSONS = Object.freeze([
 const safeTime=value=>Number.isFinite(value)&&value>=0?Math.trunc(value):0;
 const requireText=(value,field)=>{if(typeof value!=='string'||value.length>4000)throw new Error('Apprentissage incompatible : '+field);return value;};
 const requireArray=(value,field,max)=>{if(!Array.isArray(value)||value.length>max)throw new Error('Apprentissage incompatible : '+field);return value;};
+function normalizePublication(value){
+  if(value===undefined||value===null)return null;
+  if(!value||typeof value!=='object'||Array.isArray(value))
+    throw new Error('Source bibliographique invalide');
+  if(value.sourceName!=='Europe PMC')throw new Error('Fournisseur bibliographique inconnu');
+  for(const field of ['title','url','year','excerpt'])requireText(value[field],field);
+  if(value.title.length<12||value.title.length>240||value.excerpt.length>250||
+     !/^[0-9]{4}$/.test(value.year))
+    throw new Error('Référence bibliographique excessive ou invalide');
+  const url=new URL(value.url);
+  if(url.protocol!=='https:'||url.hostname!=='europepmc.org'||url.port||
+     url.username||url.password||url.search||url.hash||
+     !/^\/article\/(MED|PMC)\/[A-Za-z0-9]{1,20}$/.test(url.pathname))
+    throw new Error('Adresse bibliographique non autorisée');
+  return {
+    sourceName:'Europe PMC',title:value.title,year:value.year,url:url.href,
+    excerpt:value.excerpt,status:'publication à examiner ; aucun fait confirmé automatiquement'
+  };
+}
 const dayOf=at=>Math.floor(at/DAY_MS);
 const eventId=(type,at,n)=>type+'-'+at+'-'+n;
 
@@ -49,7 +68,8 @@ export function normalizeLearningState(input){
     if(!/^https:\/\/[^\s]+$/.test(v.source.url))throw new Error('URL de provenance invalide');
     for(const key of ['createdAt','updatedAt','nextReviewAt','reviews','passes'])
       if(!Number.isSafeInteger(v[key])||v[key]<0)throw new Error('Métadonnée de mémoire invalide : '+key);
-    return {...v,source:{...v.source}};
+    const publication=normalizePublication(v.source.publication);
+    return {...v,source:{...v.source,...(publication?{publication}:{})}};
   });
   const events=requireArray(input.events,'events',5000).map(v=>{
     if(!v||typeof v!=='object')throw new Error('Événement d’apprentissage invalide');
@@ -216,6 +236,7 @@ export function ingestResearchLead(state,candidate){
     return {learning:existing,changed:false,reason:'déjà présent'};
   if(existing.records.length>=1999||existing.events.length>=4999)
     throw new Error('Mémoire scientifique pleine');
+  const publication=normalizePublication(candidate.secondary);
   const record={
     id:candidate.id,topic:candidate.topic,
     question:'Que doit-on vérifier au sujet de '+candidate.title+' ?',
@@ -226,6 +247,10 @@ export function ingestResearchLead(state,candidate){
     confidence:0.1,createdAt:fetchedAt,updatedAt:fetchedAt,
     nextReviewAt:fetchedAt+7*DAY_MS,reviews:0,passes:0
   };
+  if(publication){
+    record.source.publication=publication;
+    record.status='deux références documentaires, non recoupées';
+  }
   const event={
     id:eventId('discovery',fetchedAt,existing.events.length+1),
     kind:'recherche documentaire reçue',recordId:record.id,
