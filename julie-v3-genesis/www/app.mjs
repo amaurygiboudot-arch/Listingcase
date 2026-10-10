@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
+import {offlineLearningTick,reviewLearning,eraseLearning} from './learning-engine.mjs';
 
 const APP_VERSION = '0.3.5';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
@@ -29,6 +30,15 @@ function persist(next){
     saved=next;
     return true;
   }catch(e){console.error('Sauvegarde JULIE non effectuée',e);alert(e?.message||'Impossible de sauvegarder. Les données précédentes sont conservées.');return false;}
+}
+
+// Une séance de préparation/revue hors ligne au maximum par jour d'ouverture.
+// Sans service Android en arrière-plan, rien n'est déclaré exécuté pendant la fermeture.
+if(storageHealthy){
+  try{
+    const cycle=offlineLearningTick(saved.learning,Date.now());
+    if(cycle.changed)persist({...saved,learning:cycle.learning});
+  }catch(error){console.error('Apprentissage local : aucune donnée modifiée',error);}
 }
 
 function switchView(name){
@@ -81,7 +91,50 @@ $('#chat-form').addEventListener('submit',(event)=>{
     if(persist(next)){field.value='';renderChat();}
   }catch(e){alert(e?.message||'Message non enregistré. Aucun ancien souvenir effacé.');}
 });
+function renderLearning(){
+  const panel=$('#learning-items'),status=$('#learning-status'),button=$('#learning-review');
+  if(!panel||!status||!button)return;
+  panel.textContent='';
+  const l=saved.learning;
+  button.disabled=l.disabled||l.records.length===0||!storageHealthy;
+  const passed=l.events.filter(e=>e.kind==='révision'&&e.result==='réussi').length;
+  status.textContent=l.disabled
+    ? 'Apprentissage effacé et nouvelles séances désactivées. Aucun contenu supprimé n’est restauré automatiquement.'
+    : l.records.length+' référence(s) embarquée(s) · '+passed+' test(s) locaux réussis · '+l.errors.length+' erreur(s) suivie(s).';
+  for(const record of l.records.slice().reverse()){
+    const card=document.createElement('div');card.className='mem-item';
+    const meta=document.createElement('small');
+    meta.textContent=record.topic+' · '+record.status+' · '+record.source.title;
+    const title=document.createElement('strong');title.textContent=record.question;
+    const answer=document.createElement('p');answer.textContent=record.answer;
+    card.append(meta,title,answer);panel.appendChild(card);
+  }
+  if(!l.records.length&&!l.disabled){
+    const empty=document.createElement('p');
+    empty.textContent='Les premières questions seront préparées lors d’un démarrage de Julie.';
+    panel.appendChild(empty);
+  }
+}
+$('#learning-review')?.addEventListener('click',()=>{
+  try{
+    const result=reviewLearning(saved.learning,{at:Date.now()});
+    if(!result.changed){alert(result.reason);return;}
+    if(persist({...saved,learning:result.learning})){
+      renderLearning();
+      alert('Contrôle local '+result.reason+'. Il ne constitue pas un entraînement du modèle.');
+    }
+  }catch(error){alert(error?.message||'Aucune révision sauvegardée');}
+});
+$('#learning-erase')?.addEventListener('click',()=>{
+  if(!confirm('Effacer définitivement les connaissances et tests locaux ? Les anciens exports ne pourront pas les réintroduire. Les séances automatiques seront désactivées.'))return;
+  try{
+    if(persist({...saved,learning:eraseLearning(saved.learning,Date.now())})){
+      renderLearning();alert('Apprentissage local effacé. Messages et souvenirs de conversation conservés.');
+    }
+  }catch(error){alert(error?.message||'Apprentissage non effacé');}
+});
 function showMemories(){
+  renderLearning();
   const root=$('#memory-items');root.textContent='';
   if(!saved.memories.length){const el=document.createElement('p');el.textContent='Aucun goût personnel enregistré pour le moment. Tu peux me dire ce que tu aimes dans l’onglet Parler.';root.appendChild(el);return;}
   saved.memories.slice().reverse().forEach(m=>{
@@ -112,9 +165,9 @@ $('#clear-data').addEventListener('click',()=>{
 function importOlderMemories(raw){
   if(typeof raw!=='string'||new TextEncoder().encode(raw).length>MAX_STATE_BYTES)throw new Error('Export trop volumineux');
   const merged=mergeImport(saved,raw);
-  const removals=merged.removedMessages+merged.removedMemories;
-  const warning=removals?` ATTENTION : la sauvegarde contient une suppression plus récente ; ${merged.removedMessages} messages et ${merged.removedMemories} souvenirs déjà présents sur cet appareil seraient aussi retirés.`:' Les données actuelles non supprimées seront conservées.';
-  const msg=`Ajouter ${merged.addedMessages} messages et ${merged.addedMemories} souvenirs ?${warning} ${merged.blocked} entrées antérieurement supprimées resteront effacées. Confirmer l'importation ?`;
+  const removals=merged.removedMessages+merged.removedMemories+merged.removedLearnings;
+  const warning=removals?` ATTENTION : cette sauvegarde retirerait ${merged.removedMessages} messages, ${merged.removedMemories} souvenirs et ${merged.removedLearnings} connaissances déjà présentes.`:' Les données actuelles non supprimées seront conservées.';
+  const msg=`Ajouter ${merged.addedMessages} messages, ${merged.addedMemories} souvenirs et ${merged.addedLearnings} connaissances ?${warning}${merged.learningDisabled?' ATTENTION : l’apprentissage automatique serait désactivé par la suppression importée.':''} ${merged.blocked} entrées antérieurement supprimées resteront effacées. Confirmer l’importation ?`;
   if(!confirm(msg))return false;
   if(!persist(merged.state))return false;
   renderChat();showMemories();

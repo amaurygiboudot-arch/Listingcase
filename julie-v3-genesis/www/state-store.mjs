@@ -1,5 +1,6 @@
 // JULIE_001 — données de démonstration locales, sans suppression silencieuse.
 // Module pur : aucun accès au stockage ni au réseau.
+import {newLearningState,normalizeLearningState,mergeLearningStates} from './learning-engine.mjs';
 export const JULIE_ID = 'JULIE_001';
 export const STATE_SCHEMA = 2;
 export const MAX_STATE_BYTES = 8_000_000;
@@ -15,7 +16,7 @@ export function checkCapacity(state){
 }
 export function createInitialState(now=Date.now()){
   return {id:JULIE_ID,schemaVersion:STATE_SCHEMA,version:'0.3.5',
-    firstOpened:now,quality:'balanced',deletedBefore:0,messages:[],memories:[]};
+    firstOpened:now,quality:'balanced',deletedBefore:0,messages:[],memories:[],learning:newLearningState()};
 }
 function stamp(v){return Number.isFinite(Number(v))&&Number(v)>=0?Number(v):0;}
 function validateMessages(messages){
@@ -44,7 +45,8 @@ export function parseJulieState(raw,{allowEmpty=false}={}){
     quality:qualities.has(input.quality)?input.quality:'balanced',
     // Garder les champs inconnus : une mise à jour ne doit pas effacer des données futures.
     messages:input.messages.map(m=>({...m,role:m.role==='partner'?'julie':m.role})),
-    memories:input.memories.map(m=>({...m}))};
+    memories:input.memories.map(m=>({...m})),
+    learning:normalizeLearningState(input.learning)};
   checkCapacity(result);
   return result;
 }
@@ -76,9 +78,16 @@ export function mergeImport(current,external){
   }
   messages.sort((a,b)=>stamp(a.at)-stamp(b.at));
   memories.sort((a,b)=>stamp(a.at)-stamp(b.at));
-  const merged={...before,deletedBefore:cutoff,messages,memories};
+  const learning=mergeLearningStates(before.learning,incoming.learning);
+  const beforeLearnIds=new Set(before.learning.records.map(r=>r.id));
+  const afterLearnIds=new Set(learning.records.map(r=>r.id));
+  const addedLearnings=learning.records.filter(r=>!beforeLearnIds.has(r.id)).length;
+  const removedLearnings=before.learning.records.filter(r=>!afterLearnIds.has(r.id)).length;
+  const learningDisabled=!before.learning.disabled&&learning.disabled;
+  const merged={...before,deletedBefore:cutoff,messages,memories,learning};
   checkCapacity(merged);
-  return {state:merged,addedMessages,addedMemories,removedMessages,removedMemories,blocked};
+  return {state:merged,addedMessages,addedMemories,removedMessages,removedMemories,
+    addedLearnings,removedLearnings,learningDisabled,blocked};
 }
 export function eraseDemoHistory(current,at=Date.now()){
   const state=parseJulieState(current);
