@@ -7,7 +7,7 @@
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
   <application
       android:allowBackup="false"
-      android:label="JULIE - Test apprentissage"
+      android:label="TEST - JULIE Apprentissage"
       android:icon="@drawable/julie_icon"
       android:usesCleartextTraffic="false"
       android:theme="@style/AppTheme">
