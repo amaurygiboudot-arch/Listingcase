@@ -1,0 +1,25 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.humanpartner'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.julie.learning.experimental'
+        minSdk 26
+        targetSdk 35
+        versionCode 300001
+        versionName '0.3.5-verification-locale'
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+        }
+        release {
+            minifyEnabled false
+        }
+    }
+}
