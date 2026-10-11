@@ -68,3 +68,13 @@ Demande Amaury : controles directement dans Parler. Conservation apres fermeture
 Commande controle surprise : examen, correction, source et note ajoutes au dialogue avec sauvegarde atomique de l historique. Affichage vrai/faux.
 Deux tests Node cibles passes. Le test navigateur a expire pendant la navigation localhost ; validation interface non acquise. Compilation Android lancee, resultat encore non confirme. Aucune mise a jour installee pour ce changement.
 Limite : commande de lancement uniquement, questions libres non encore prises en charge.
+
+## Audit moteur conversationnel local, 11 octobre 2026
+Ollama present. Modeles disponibles : qwen2.5 0.5b/1.5b/3b, qwen3 0.6b/1.7b, moondream.
+PC : 6219928 kB RAM totale, 271344 kB libres lors du controle. Applications Chrome et Blender actives, non fermees.
+Telephone ADB : 7569356 kB RAM totale, 1720416 kB disponibles, 149 Go stockage disponible. NDK/CMake non trouves aux emplacements SDK controles.
+Essai REEL Ollama localhost /api/chat : qwen2.5:0.5b, contexte 512, 1 thread, maximum 80 tokens, keep_alive=0. Aucun service distant payant.
+Resultat : 47 tokens en 58.123 secondes, reponse FAUSSE confondant protons et atomes hydrogene. Ce modele dans ces conditions ne satisfait pas le besoin. Voir local-model-probe.json.
+Aucun moteur conversationnel ajoute a l APK. Avant integration : mesurer un modele plus capable avec assez de memoire libre, puis tester connaissances sourcees et questions inconnues. Ne pas assimiler modele installe et moteur valide.
+La compilation precedente des commandes de controle a abouti en 7m26s ; elle ne contient pas de modele de langage et reste non installee.
+References techniques : https://docs.ollama.com/api/chat ; https://github.com/ggml-org/llama.cpp/blob/master/docs/android.md
