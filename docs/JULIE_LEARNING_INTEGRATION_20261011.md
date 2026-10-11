@@ -62,3 +62,9 @@ Package : com.julie.learning.experimental.
 ADB install : Success. Lancement a froid : Status ok, 1608 ms.
 Deux packages presents. JULIE originale conserve versionCode 300035, versionName 0.3.4-dev.35 et lastUpdateTime 2026-10-09 15:52:46.
 Aucune desinstallation ni remplacement de JULIE originale. Les examens et la persistance Android restent a verifier ; le premier arbre UI ne montre que le conteneur WebView.
+
+## Controles dans la conversation
+Demande Amaury : controles directement dans Parler. Conservation apres fermeture confirmee par Amaury le 11/10/2026.
+Commande controle surprise : examen, correction, source et note ajoutes au dialogue avec sauvegarde atomique de l historique. Affichage vrai/faux.
+Deux tests Node cibles passes. Le test navigateur a expire pendant la navigation localhost ; validation interface non acquise. Compilation Android lancee, resultat encore non confirme. Aucune mise a jour installee pour ce changement.
+Limite : commande de lancement uniquement, questions libres non encore prises en charge.

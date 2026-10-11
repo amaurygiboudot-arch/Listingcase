@@ -1,3 +1,4 @@
+import {frenchAnswer} from './chat-exams.mjs';
 import {latestVersion,revisionQueue,learningPriorities} from './documentary-memory.mjs';
 import {runSurpriseExam} from './exam-engine.mjs';
 export function mountLearningExams({getState,persist,isHealthy}){
@@ -18,7 +19,7 @@ export function mountLearningExams({getState,persist,isHealthy}){
     for(const attempt of [...d.attempts].reverse()){
       const details=document.createElement('details'),summary=document.createElement('summary');
       summary.textContent=new Date(attempt.at).toLocaleString('fr-FR')+' — '+attempt.score+'/20'+(attempt.reviewDay?' · J+'+attempt.reviewDay:' · surprise');details.append(summary);
-      for(const item of attempt.items){const p=document.createElement('p');p.textContent=item.prompt+' Réponse JULIE : '+String(item.observed??'abstention')+'. Corrigé : '+String(item.expected)+'. '+item.explanation+' '+item.points+'/5.';details.append(p);}
+      for(const item of attempt.items){const p=document.createElement('p');p.textContent=item.prompt+' Réponse JULIE : '+frenchAnswer(item.observed)+'. Corrigé : '+frenchAnswer(item.expected)+'. '+item.explanation+' '+item.points+'/5.';details.append(p);}
       const p=document.createElement('p');p.textContent=attempt.mode+' · Source : '+attempt.source;details.append(p);root.append(details);
     }
   }

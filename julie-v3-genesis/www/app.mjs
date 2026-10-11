@@ -7,6 +7,7 @@ import snapshot from './science-drive-snapshot.json';
 import {syncDriveLearning} from './drive-learning-sync.mjs';
 import {documentaryAnswer} from './documentary-answer.mjs';
 import {mountLearningExams} from './learning-exams-ui.mjs';
+import {examConversation} from './chat-exams.mjs';
 
 const APP_VERSION = '0.3.5';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
@@ -121,17 +122,26 @@ function renderChat(){
   for(const entry of entries){
     const e=document.createElement('div');e.className='bubble '+(entry.role==='user'?'user':'julie');
     if(entry.role!=='user'){const small=document.createElement('span');small.className='who';small.textContent='Julie';e.appendChild(small)}
-    e.appendChild(document.createTextNode(String(entry.text).slice(0,1500)));root.appendChild(e);
+    e.appendChild(document.createTextNode(String(entry.text)));root.appendChild(e);
   }
   root.scrollTop=root.scrollHeight;
 }
+let chatBusy=false;
+$('#chat-input').placeholder='Écris à Julie ou tape contrôle surprise';
 $('#chat-form').addEventListener('submit',async(event)=>{
-  event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t)return;
+  event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t||chatBusy||!storageHealthy)return;
+  chatBusy=true;
+  const baseline=JSON.stringify(saved);
   try{
-    const reply=await documentaryAnswer(saved.learning.documentary,t);
-    const next=appendConversation(saved,t,reply||answer(t),Date.now());
-    if(persist(next)){field.value='';renderChat();}
+    let next=await examConversation(saved,t);
+    if(!next){
+      const reply=await documentaryAnswer(saved.learning.documentary,t);
+      next=appendConversation(saved,t,reply||answer(t),Date.now());
+    }
+    if(JSON.stringify(saved)!==baseline)throw new Error('Mémoire modifiée pendant la réponse ; renvoie ton message.');
+    if(persist(next)){field.value='';renderChat();renderLearning();}
   }catch(e){alert(e?.message||'Message non enregistré. Aucun ancien souvenir effacé.');}
+  finally{chatBusy=false;}
 });
 function renderLearning(){
   document.dispatchEvent(new Event('julie-learning-changed'));
