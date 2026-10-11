@@ -52,3 +52,6 @@ APK debug non installée, aucune compatibilité de mise à jour sur téléphone 
 - Copie de compilation adaptee : applicationId com.julie.learning.experimental, libelle JULIE - Test apprentissage. Compilation hors ligne.
 - Aucune installation ni modification de donnees sur le telephone. Conservation apres redemarrage Android encore non testee.
 - Export actuel de memoire non confirme dans Download. Les tests precedents concernent une ancienne sauvegarde et un navigateur isole.
+
+Compilation isolee : BUILD SUCCESSFUL (3m41s), 31 taches. APK com.julie.learning.experimental, non installee. Voir learning-build-20261011/isolated-build.log.
+
