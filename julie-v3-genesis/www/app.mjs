@@ -3,6 +3,11 @@ import * as THREE from 'three';
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
 import {offlineLearningTick,reviewLearning,eraseLearning,ingestResearchLead} from './learning-engine.mjs';
 
+import snapshot from './science-drive-snapshot.json';
+import {syncDriveLearning} from './drive-learning-sync.mjs';
+import {documentaryAnswer} from './documentary-answer.mjs';
+import {mountLearningExams} from './learning-exams-ui.mjs';
+
 const APP_VERSION = '0.3.5';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
@@ -27,6 +32,8 @@ function persist(next){
     if(typeof window.JulieAndroid?.writeState==='function'){
       if(window.JulieAndroid.writeState(data)!==true)throw new Error('Le stockage chiffré Android a refusé la sauvegarde');
     }else localStorage.setItem(KEY,data);
+    const reread=typeof window.JulieAndroid?.readState==='function'?window.JulieAndroid.readState():localStorage.getItem(KEY);
+    if(reread!==data){storageHealthy=false;throw new Error('Sauvegarde non confirmée par relecture : arrêt des écritures');}
     saved=next;
     return true;
   }catch(e){console.error('Sauvegarde JULIE non effectuée',e);alert(e?.message||'Impossible de sauvegarder. Les données précédentes sont conservées.');return false;}
@@ -118,14 +125,16 @@ function renderChat(){
   }
   root.scrollTop=root.scrollHeight;
 }
-$('#chat-form').addEventListener('submit',(event)=>{
+$('#chat-form').addEventListener('submit',async(event)=>{
   event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t)return;
   try{
-    const next=appendConversation(saved,t,answer(t),Date.now());
+    const reply=await documentaryAnswer(saved.learning.documentary,t);
+    const next=appendConversation(saved,t,reply||answer(t),Date.now());
     if(persist(next)){field.value='';renderChat();}
   }catch(e){alert(e?.message||'Message non enregistré. Aucun ancien souvenir effacé.');}
 });
 function renderLearning(){
+  document.dispatchEvent(new Event('julie-learning-changed'));
   const panel=$('#learning-items'),status=$('#learning-status'),button=$('#learning-review');
   if(!panel||!status||!button)return;
   panel.textContent='';
@@ -576,3 +585,15 @@ window.addEventListener('load',()=>{
 
 renderChat();
 initScene();
+
+mountLearningExams({getState:()=>saved,persist,isHealthy:()=>storageHealthy});
+// Instantané Drive lu le 11/10/2026, inclus hors ligne : ceci ne constitue pas une connexion Drive active.
+(async()=>{
+  if(!storageHealthy||saved.learning.disabled)return;
+  const baseline=JSON.stringify(saved.learning);
+  try{
+    const result=await syncDriveLearning(saved.learning,{readDocument:async()=>snapshot});
+    if(JSON.stringify(saved.learning)!==baseline)return; // ne jamais écraser une modification concurrente
+    if(result.changed&&persist({...saved,learning:result.learning}))renderLearning();
+  }catch(error){console.error('Import documentaire non effectué',error);}
+})();

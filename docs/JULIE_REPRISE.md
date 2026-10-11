@@ -44,3 +44,9 @@ Avant toute nouvelle action : lire ce journal, consulter le document maître, v�
 - Inscrire la date et l'heure, la dernière opération vérifiée, les fichiers/commits concernés, les tests et leurs résultats, les blocages, et UNE prochaine action précise.
 - Si une opération est encore en cours, indiquer son identifiant de processus et la manière de vérifier sa fin ; ne pas prétendre qu'elle continue sans preuve.
 - Ne jamais écraser ce journal avec un état plus ancien. Préserver les données et les suppressions.
+
+
+## Point de reprise expérimental — 11/10/2026, intégration apprentissage
+Ce complément concerne uniquement feat/julie-learning-integration-20261011 dans C:\Dev\JULIE\learning-integration-20261011. La branche source précédente est intacte. Audit et preuves : docs/JULIE_LEARNING_INTEGRATION_20261011.md, learning-test-results.txt (56/56), learning-browser-results.json (4 scénarios).
+Mémoire documentaire SCI-003, examens déterministes /20, corrigés séparés, échéances J+1/J+7/J+30, réponses sourcées et anti-résurrection réalisés en expérimentation. Synchronisation Drive continue, modèle IA général et validation Android restent NON TERMINÉS. Ne pas confondre l'instantané embarqué avec une connexion Drive active.
+Prochaine action : raccordement Drive authentifié de test et validation sur appareil isolé. Aucune installation ni publication. Le document maître et ER-001 sur Drive restent inchangés.

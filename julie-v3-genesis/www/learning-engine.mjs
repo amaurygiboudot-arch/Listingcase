@@ -1,3 +1,4 @@
+import {emptyDocumentary,normalizeDocumentary,mergeDocumentary} from './documentary-memory.mjs';
 // JULIE_001 — noyau de connaissances hors ligne (phase 2, prototype).
 // Ce module ne recherche pas sur Internet et ne réentraîne aucun modèle.
 // Il planifie des questions sourcées embarquées, évalue des règles locales et trace les corrections.
@@ -54,7 +55,7 @@ const dayOf=at=>Math.floor(at/DAY_MS);
 const eventId=(type,at,n)=>type+'-'+at+'-'+n;
 
 export function newLearningState(){
-  return {schema:LEARNING_SCHEMA,disabled:false,deletedBefore:0,lastCycleDay:-1,records:[],events:[],errors:[]};
+  return {schema:LEARNING_SCHEMA,disabled:false,deletedBefore:0,lastCycleDay:-1,records:[],events:[],errors:[],documentary:emptyDocumentary()};
 }
 export function normalizeLearningState(input){
   if(input===undefined||input===null)return newLearningState();
@@ -87,6 +88,7 @@ export function normalizeLearningState(input){
   const lastCycleDay=Number.isSafeInteger(input.lastCycleDay)?input.lastCycleDay:-1;
   return {...input,schema:LEARNING_SCHEMA,disabled:input.disabled===true,
     deletedBefore,lastCycleDay,
+    documentary:input.disabled===true?emptyDocumentary():normalizeDocumentary(input.documentary),
     records:records.filter(v=>v.createdAt>deletedBefore),
     events:events.filter(v=>v.at>deletedBefore),
     errors:errors.filter(v=>v.at>deletedBefore)};
@@ -192,7 +194,7 @@ export function correctLearningRecord(state,{id,answer,reason,source,at=Date.now
 export function eraseLearning(state,at=Date.now()){
   const before=normalizeLearningState(state),cutoff=Math.max(before.deletedBefore,safeTime(at));
   // Désactiver la réinsertion automatique après une suppression volontaire.
-  return {...before,disabled:true,deletedBefore:cutoff,records:[],events:[],errors:[]};
+  return {...before,disabled:true,deletedBefore:cutoff,records:[],events:[],errors:[],documentary:emptyDocumentary()};
 }
 function unionById(first,second,keyName){
   const result=new Map();
@@ -206,9 +208,10 @@ export function mergeLearningStates(current,incoming){
   const a=normalizeLearningState(current),b=normalizeLearningState(incoming);
   const cutoff=Math.max(a.deletedBefore,b.deletedBefore);
   const disabled=a.disabled||b.disabled;
-  if(disabled)return {...a,disabled:true,deletedBefore:cutoff,records:[],events:[],errors:[],
+  if(disabled)return {...a,disabled:true,deletedBefore:cutoff,records:[],events:[],errors:[],documentary:emptyDocumentary(),
     lastCycleDay:Math.max(a.lastCycleDay,b.lastCycleDay)};
   return normalizeLearningState({...a,deletedBefore:cutoff,
+    documentary:mergeDocumentary(a.documentary,b.documentary),
     lastCycleDay:Math.max(a.lastCycleDay,b.lastCycleDay),
     records:unionById(a.records.filter(x=>x.createdAt>cutoff),b.records.filter(x=>x.createdAt>cutoff),'updatedAt'),
     events:unionById(a.events.filter(x=>x.at>cutoff),b.events.filter(x=>x.at>cutoff),'at'),
