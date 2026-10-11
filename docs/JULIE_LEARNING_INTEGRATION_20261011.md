@@ -78,3 +78,12 @@ Resultat : 47 tokens en 58.123 secondes, reponse FAUSSE confondant protons et at
 Aucun moteur conversationnel ajoute a l APK. Avant integration : mesurer un modele plus capable avec assez de memoire libre, puis tester connaissances sourcees et questions inconnues. Ne pas assimiler modele installe et moteur valide.
 La compilation precedente des commandes de controle a abouti en 7m26s ; elle ne contient pas de modele de langage et reste non installee.
 References techniques : https://docs.ollama.com/api/chat ; https://github.com/ggml-org/llama.cpp/blob/master/docs/android.md
+
+## Demande moteur directement sur telephone
+Amaury autorise l installation du moteur local sur son telephone dans TEST - JULIE. Aucun service payant ni production.
+Appareil ADB 40b0f1cc : arm64-v8a. Outils NDK/CMake absents du SDK controle.
+Preparation dans C:/Dev/JULIE/native-engine-tools. CMake 4.4.4 archive recue et SHA256 verifie bace36e94b31c68ab6fa295f26dfa11219e0701cf7c94b0284a7d1cb13dac536 ; extraction en cours au dernier controle.
+NDK r30 Windows officiel : 727980788 octets, SHA1 attendu 9bf167a1985fa7d4a036186b78f702eab9179408. Telechargement partiel 129211456 octets ; reprise HTTP Range lancee, verification complete non acquise. Ne pas compiler avec archive incomplete.
+Modele candidat deja local : Qwen2.5 1.5B, blob Ollama sha256:183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4, taille 986048512 octets. Pas encore transfere, ni teste sur Android.
+Moteur llama.cpp : source officielle https://github.com/ggml-org/llama.cpp ; HEAD observe f2cc7282ce0042641df55e0e563b75e824e2b647. Compilation puis integration native, memoire, test hors reseau et conservation apres relance restent a faire.
+Aucun moteur installe sur le telephone a ce stade. Blocage actuel : acquisition outils native incomplete, debit observe environ 107 ko/s via curl.
