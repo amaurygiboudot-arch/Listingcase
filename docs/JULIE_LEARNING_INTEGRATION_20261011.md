@@ -42,3 +42,13 @@ APK : C:\Dev\JULIE\learning-build-20261011\android\app\build\outputs\apk\debug\a
 Taille : 2585865 octets. SHA-256 : f89e235ad46aa1fc84c7807667d7681406e31af8ac2942458bb86ea953a10528.
 Les assets app.js et index.html de l'APK sont identiques octet par octet aux fichiers testés ; classes.dex et modèle GLB présents. Script tools/verify-learning-build.py, preuve learning-apk-result.json.
 APK debug non installée, aucune compatibilité de mise à jour sur téléphone prouvée. Code : commit local fb97f8b. Aucun push.
+
+## Verification USB et isolation Android, 11 octobre 2026
+- Redmi Note 15 5G reconnu par ADB.
+- Application installee : com.julie.preview.v3, 0.3.4-dev.35, versionCode 300035.
+- Certificat SHA256 installe : a63bd831455e647f017c621d061386bc341d780b9785ee233377ca2c1a135f32.
+- Certificat SHA256 experimental : 668bbf6dbcc590da70a37b0102a59407a3539f0146ccf24b68c3d0f6061499c2.
+- Mise a jour directe incompatible (signature differente et versionCode experimental 300001 inferieur). Ne pas desinstaller ni forcer un downgrade.
+- Copie de compilation adaptee : applicationId com.julie.learning.experimental, libelle JULIE - Test apprentissage. Compilation hors ligne.
+- Aucune installation ni modification de donnees sur le telephone. Conservation apres redemarrage Android encore non testee.
+- Export actuel de memoire non confirme dans Download. Les tests precedents concernent une ancienne sauvegarde et un navigateur isole.
