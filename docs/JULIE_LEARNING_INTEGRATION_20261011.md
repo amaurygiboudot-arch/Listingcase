@@ -55,3 +55,10 @@ APK debug non installée, aucune compatibilité de mise à jour sur téléphone 
 
 Compilation isolee : BUILD SUCCESSFUL (3m41s), 31 taches. APK com.julie.learning.experimental, non installee. Voir learning-build-20261011/isolated-build.log.
 
+
+## Installation autorisee avec TEST en premier
+Libelle APK verifie : TEST - JULIE Apprentissage.
+Package : com.julie.learning.experimental.
+ADB install : Success. Lancement a froid : Status ok, 1608 ms.
+Deux packages presents. JULIE originale conserve versionCode 300035, versionName 0.3.4-dev.35 et lastUpdateTime 2026-10-09 15:52:46.
+Aucune desinstallation ni remplacement de JULIE originale. Les examens et la persistance Android restent a verifier ; le premier arbre UI ne montre que le conteneur WebView.
