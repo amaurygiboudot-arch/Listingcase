@@ -35,3 +35,10 @@ Aucune publication, installation, dépense ou modification du document maître.
 L'intégration complète demandée reste partielle : seule SCI-003 est intégrée, pas toute la bibliothèque. La récupération périodique authentifiée Drive sur Android nécessite un raccordement OAuth en lecture seule ; l'accès Drive de cette conversation n'est pas transmis à l'application. Les nouvelles connaissances doivent être corroborées avant adoption. Aucun modèle général de compréhension n'est connecté.
 Aucun appareil ADB détecté. Le chiffrement Android, la compatibilité de signature, les mises à jour sans perte et le fonctionnement écran verrouillé restent non testés. Ne pas installer l'APK expérimentale par-dessus une installation utilisateur.
 Prochaine étape : préparer une authentification Drive de test et un appareil Android isolé, puis vérifier de bout en bout lecture Drive, modification de fiche, synchronisation, interruption réseau, redémarrage et effacement. Aucun passage en production autorisé.
+
+## APK expérimentale vérifiée
+Compilation hors ligne : BUILD SUCCESSFUL in 5m ; 31 tâches (17 exécutées, 14 en cache).
+APK : C:\Dev\JULIE\learning-build-20261011\android\app\build\outputs\apk\debug\app-debug.apk
+Taille : 2585865 octets. SHA-256 : f89e235ad46aa1fc84c7807667d7681406e31af8ac2942458bb86ea953a10528.
+Les assets app.js et index.html de l'APK sont identiques octet par octet aux fichiers testés ; classes.dex et modèle GLB présents. Script tools/verify-learning-build.py, preuve learning-apk-result.json.
+APK debug non installée, aucune compatibilité de mise à jour sur téléphone prouvée. Code : commit local fb97f8b. Aucun push.
