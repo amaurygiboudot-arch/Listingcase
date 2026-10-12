@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge} from './google-research.mjs';
+import {isDailyLearningQuestion,replyDailyLearning} from './learning-journal.mjs';
 
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
 
@@ -79,7 +80,7 @@ $('#chat-form').addEventListener('submit',(event)=>{
   event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t)return;
   try{
     const webQuery=requestedGoogleSearch(t);
-    const reply=webQuery?'Je prépare ta recherche sur Google.com. Tu pourras choisir une page dans le navigateur et me transmettre son lien pour que je la lise.':answer(t);
+    const reply=isDailyLearningQuestion(t)?replyDailyLearning(saved):webQuery?'Je prépare ta recherche sur Google.com. Tu pourras choisir une page dans le navigateur et me transmettre son lien pour que je la lise.':answer(t);
     const next=appendConversation(saved,t,reply,Date.now());
     if(persist(next)){field.value='';renderChat();if(webQuery)openGoogleResearch(webQuery);}
   }catch(e){alert(e?.message||'Message non enregistré. Aucun ancien souvenir effacé.');}
@@ -93,6 +94,20 @@ function showMemories(){
     const meta=document.createElement('small');meta.textContent=`${m.kind} · ${new Date(m.at).toLocaleDateString('fr-FR')} · ${m.source}`;
     el.appendChild(meta);el.appendChild(document.createTextNode(m.text));root.appendChild(el);
   });
+  const learningPanel=$('#learning-items');
+  if(learningPanel){
+    learningPanel.textContent='';
+    const entries=Array.isArray(saved.learning)?saved.learning:[];
+    if(!entries.length){learningPanel.textContent='Aucun apprentissage explicite pour le moment.';}
+    entries.slice(-30).reverse().forEach(item=>{
+      const block=document.createElement('div');block.className='mem-item';
+      const meta=document.createElement('small');
+      meta.textContent=item.kind+' · '+new Date(item.at).toLocaleDateString('fr-FR')+' · '+item.confidence;
+      block.appendChild(meta);
+      const content=document.createElement('span');content.textContent=item.content;block.appendChild(content);
+      learningPanel.appendChild(block);
+    });
+  }
   const web=$('#research-items');if(!web)return;
   web.textContent='';
   const known=Array.isArray(saved.research)?saved.research:[];
@@ -186,7 +201,7 @@ $('#clear-data').addEventListener('click',()=>{
 function importOlderMemories(raw){
   if(typeof raw!=='string'||new TextEncoder().encode(raw).length>MAX_STATE_BYTES)throw new Error('Export trop volumineux');
   const merged=mergeImport(saved,raw);
-  const msg=`Ajouter ${merged.addedMessages} messages, ${merged.addedMemories} souvenirs et ${merged.addedResearch||0} sources Web ? Les données actuelles seront conservées. ${merged.blocked} entrées antérieurement supprimées resteront effacées.`;
+  const msg=`Ajouter ${merged.addedMessages} messages, ${merged.addedMemories} souvenirs et ${merged.addedResearch||0} sources Web ainsi que les apprentissages explicites ? Les données actuelles seront conservées. ${merged.blocked} entrées antérieurement supprimées resteront effacées.`;
   if(!confirm(msg))return false;
   if(!persist(merged.state))return false;
   renderChat();showMemories();
