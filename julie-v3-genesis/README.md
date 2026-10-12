@@ -36,6 +36,12 @@ Paquet Android de développement : `com.julie.preview.v3` (inchangé par rapport
 - Le visage, les cheveux, les vêtements physiques et les mouvements réalistes avancés restent à développer ; la correction doit être validée visuellement sur Android.
 
 
+## Journal d'apprentissage local — étape expérimentale (12 octobre 2026)
+- Chaque échange reste dans l'historique existant. Un journal séparé conserve seulement les déclarations explicites et corrections de l'utilisateur (non vérifiées automatiquement), avec date et provenance.
+- La question « Julie, qu'as-tu appris aujourd'hui ? » reçoit directement dans le dialogue un bilan des éléments explicitement enregistrés ce jour-là et des sources Web enregistrées. En l'absence de nouvelles entrées, JULIE le dit sans inventer.
+- Journal intégré aux exports/imports et effacements, sans restauration d'éléments supprimés depuis un ancien export.
+- Le modèle Qwen réel, l'analyse sémantique avancée de *toutes* les conversations et la recherche Google entièrement autonome ne sont **pas** encore raccordés à cette prévisualisation. Il s'agit d'un prototype local, pas d'une intelligence autonome livrée.
+
 ## Recherche Google.com — développement séparé (12 octobre 2026)
 
 Décision : **Google.com est le moteur principal** de recherche JULIE. Cette intégration est développée sur `feature/julie-google-research-20261012`, à valider avant toute fusion dans `julie-v1`. La version **TEST** avec Qwen 3B n'est ni modifiée ni remplacée. Les deux APK restent distinctes jusqu'à identification/contrôle des identifiants de paquet et signatures.
