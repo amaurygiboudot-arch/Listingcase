@@ -56,3 +56,22 @@ export function requestedSourceFromConversation(text){
   let candidate=matches[0].replace(/[),.;!?]+$/,'');
   try{return normalizeSourceUrl(candidate);}catch{return null;}
 }
+
+/** Recherche autonome seulement pour des demandes explicites et non ciblées Google. */
+export function requestedPublicSearch(value){
+  const text=String(value||'').trim();
+  if(requestedGoogleSearch(text))return null;
+  const match=text.match(/^(?:(?:julie[,\s]+)?(?:cherche|recherche|renseigne[- ]toi|trouve des informations|fais une recherche)\s+(?:sur\s+|à propos de\s+|au sujet de\s+|des informations sur\s+)?)(.{3,180})$/i);
+  if(!match)return null;
+  try{return cleanGoogleQuery(match[1]);}catch{return null;}
+}
+export function normalizePublicSearchResult(value){
+  if(!value||value.ok!==true||value.engine!=='Wikimedia Action API'||!Array.isArray(value.results))
+    throw new Error(value?.error||'Recherche publique indisponible.');
+  return {query:cleanGoogleQuery(value.query),results:value.results.slice(0,3).map(x=>{
+    const url=normalizeSourceUrl(x.url);
+    if(new URL(url).hostname!=='fr.wikipedia.org')throw new Error('Source non autorisée.');
+    return {title:String(x.title||'').slice(0,160),
+      excerpt:String(x.excerpt||'').replace(/\s+/g,' ').slice(0,460),url};
+  })};
+}
