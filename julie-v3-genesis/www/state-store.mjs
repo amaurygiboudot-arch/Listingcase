@@ -145,6 +145,13 @@ export function eraseDemoHistory(current,at=Date.now()){
   const state=parseJulieState(current);
   return {...state,deletedBefore:Math.max(state.deletedBefore,stamp(at)),messages:[],memories:[],research:[],learning:[],externalResearch:[]};
 }
+export function appendJulieReply(current,reply,at=Date.now()){
+  if(typeof reply!=='string'||!reply.trim()||reply.length>1500)
+    throw new Error('Réponse de Julie invalide');
+  const state=parseJulieState(current);
+  const next={...state,messages:[...state.messages,{role:'julie',text:reply,at}]};
+  checkCapacity(next);return next;
+}
 export function appendConversation(current,text,reply,at=Date.now()){
   if(typeof text!=='string'||!text.trim()||typeof reply!=='string')throw new Error('Message invalide');
   const state=parseJulieState(current);
