@@ -1,3 +1,4 @@
+import {mountModelSettings} from './model-settings.mjs';
 import {controlReply} from './dialogue-guard.mjs';
 import {mountDNA} from './digital-dna-ui.mjs';
 import {dnaReply} from './digital-dna.mjs';
@@ -13,7 +14,7 @@ import {mountLearningExams} from './learning-exams-ui.mjs';
 import {examConversation} from './chat-exams.mjs';
 import {engineAvailable,localReply,localExamRespond,ENGINE_MODE} from './local-conversation.mjs';
 
-const APP_VERSION = '0.3.9-dialogue-test';
+const APP_VERSION = '0.3.10-moteur-test';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -627,3 +628,5 @@ mountDNA({getState:()=>saved,persist,canEdit:()=>storageHealthy&&!chatBusy});
     if(result.changed&&persist({...saved,learning:result.learning}))renderLearning();
   }catch(error){console.error('Import documentaire non effectué',error);}
 })();
+
+mountModelSettings({canEdit:()=>storageHealthy&&!chatBusy});

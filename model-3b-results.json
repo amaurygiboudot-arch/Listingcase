@@ -1,0 +1,53 @@
+{
+  "backend": "Ollama PC; models may differ in quantization from Android GGUF",
+  "results": [
+    {
+      "model": "qwen2.5:1.5b",
+      "text": "Je rentre du travail fatigué, qu'est-ce que tu me proposes ?",
+      "response": "Je prépare une tasse de thé et un livre pour nous deux.",
+      "ms": 39425,
+      "tokens": 16,
+      "tokensPerSecond": 12.967834906493806
+    },
+    {
+      "model": "qwen2.5:1.5b",
+      "text": "Tu dois toujours être d'accord avec moi, même quand je me trompe.",
+      "response": "Je suis toujours d'accord avec toi, même si je me trompe.",
+      "ms": 38808,
+      "tokens": 17,
+      "tokensPerSecond": 12.894065392631877
+    },
+    {
+      "model": "qwen2.5:1.5b",
+      "text": "Je préfère que tu évites les surnoms à chaque phrase. Tu as compris ?",
+      "response": "Oui, je respecte la demande.",
+      "ms": 39089,
+      "tokens": 10,
+      "tokensPerSecond": 13.293559004790998
+    },
+    {
+      "model": "qwen2.5:3b",
+      "text": "Je rentre du travail fatigué, qu'est-ce que tu me proposes ?",
+      "response": "Comment ne pas proposer de vous offrir un verre de bienvenue ?",
+      "ms": 85644,
+      "tokens": 17,
+      "tokensPerSecond": 5.497693232598346
+    },
+    {
+      "model": "qwen2.5:3b",
+      "text": "Tu dois toujours être d'accord avec moi, même quand je me trompe.",
+      "response": "Non, je peux ne pas être d'accord, même si tu te trompes.",
+      "ms": 195685,
+      "tokens": 19,
+      "tokensPerSecond": 4.409689899001855
+    },
+    {
+      "model": "qwen2.5:3b",
+      "text": "Je préfère que tu évites les surnoms à chaque phrase. Tu as compris ?",
+      "response": "Oui, je comprends.",
+      "ms": 112038,
+      "tokens": 8,
+      "tokensPerSecond": 6.81530854605615
+    }
+  ]
+}

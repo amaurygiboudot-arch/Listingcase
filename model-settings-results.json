@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "backend": "Isolated Edge with simulated Android bridge",
+  "checks": [
+    "3B unavailable until verified",
+    "download and import explicit",
+    "controls locked during import",
+    "active label changes",
+    "return to 1.5B"
+  ]
+}

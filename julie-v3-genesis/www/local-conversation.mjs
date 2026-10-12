@@ -3,7 +3,7 @@ import {dnaPrompt,dnaReply,dnaSnapshot} from './digital-dna.mjs';
 import {profileReply} from './dialogue-profile.mjs';
 import {DIALOGUE_SYSTEM,DIALOGUE_EXAMPLES,dialogueContext} from './dialogue-context.mjs';
 import {verifiedRules} from './documentary-memory.mjs';
-export const ENGINE_MODE='Modèle local Qwen2.5 1.5B expérimental, avec fiche vérifiée';
+export const ENGINE_MODE='Modèle local Qwen2.5 expérimental, avec fiche vérifiée';
 const clean=t=>String(t).replace(/<\|[^>]*\|>/g,'').slice(0,2400);
 const facts='Fiche SCI-003 : isotopes = même Z et N différents ; isobares = même A et Z différents ; A = Z + N ; charge q = Z - e en charges élémentaires.';
 export function buildPrompt(messages,text,hasRules=false,exam=false,dna){

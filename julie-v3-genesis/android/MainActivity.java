@@ -35,6 +35,7 @@ public final class MainActivity extends Activity {
     private static final String KEY = "julie_v3_preview_JULIE_001";
     private static final int EXPORT_REQUEST = 9041;
     private static final int IMPORT_REQUEST = 9042;
+    private static final int MODEL_REQUEST = 9043;
     private static final int MAX_JSON_BYTES = JulieSecureStore.MAX_JSON_BYTES;
 
     private JulieSecureStore secureStore;
@@ -44,6 +45,18 @@ public final class MainActivity extends Activity {
     private String pendingExport;
 
     public final class JulieBridge {
+        @JavascriptInterface public void downloadModel3b(){
+            runOnUiThread(()->{
+                try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf?download=true")));}
+                catch(Exception e){Toast.makeText(MainActivity.this,"Navigateur indisponible",Toast.LENGTH_LONG).show();}
+            });
+        }
+        @JavascriptInterface public void importModel3b(){
+            runOnUiThread(()->{
+                Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("*/*");
+                try{startActivityForResult(i,MODEL_REQUEST);}catch(Exception e){Toast.makeText(MainActivity.this,"Sélecteur indisponible",Toast.LENGTH_LONG).show();}
+            });
+        }
         @JavascriptInterface public String readState(){return secureStore.read();}
         @JavascriptInterface public boolean writeState(String json){return secureStore.write(json);}
         @JavascriptInterface public String readResearchInbox(){return secureStore.readResearchInbox();}
@@ -169,7 +182,9 @@ public final class MainActivity extends Activity {
         super.onActivityResult(request,result,intent);
         if(result!=RESULT_OK||intent==null||intent.getData()==null)return;
         Uri uri=intent.getData();
-        if(request==EXPORT_REQUEST){
+        if(request==MODEL_REQUEST){
+            if(!localEngine.importModel(uri))Toast.makeText(this,"Import indisponible : consulte les réglages du moteur.",Toast.LENGTH_LONG).show();
+        }else if(request==EXPORT_REQUEST){
             if(pendingExport==null)return;
             try(OutputStream out=getContentResolver().openOutputStream(uri)){
                 if(out==null)throw new IllegalStateException("Destination inaccessible");
