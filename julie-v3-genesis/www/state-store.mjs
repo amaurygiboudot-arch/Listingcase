@@ -2,6 +2,7 @@
 // Module pur : aucun accès au stockage ni au réseau.
 import {normalizeSourceUrl,RESEARCH_LIMIT,MAX_SOURCE_TEXT} from './google-research.mjs';
 import {captureLearning,LEARNING_MAX} from './learning-journal.mjs';
+import {validateImportedResearch,MAX_IMPORTED_RESEARCH} from './chatgpt-research.mjs';
 export const JULIE_ID = 'JULIE_001';
 export const STATE_SCHEMA = 2;
 export const MAX_STATE_BYTES = 8_000_000;
@@ -17,7 +18,7 @@ export function checkCapacity(state){
 }
 export function createInitialState(now=Date.now()){
   return {id:JULIE_ID,schemaVersion:STATE_SCHEMA,version:'0.3.5',
-    firstOpened:now,quality:'balanced',deletedBefore:0,messages:[],memories:[],research:[],learning:[]};
+    firstOpened:now,quality:'balanced',deletedBefore:0,messages:[],memories:[],research:[],learning:[],externalResearch:[]};
 }
 function stamp(v){return Number.isFinite(Number(v))&&Number(v)>=0?Number(v):0;}
 function validateMessages(messages){
@@ -60,6 +61,7 @@ export function parseJulieState(raw,{allowEmpty=false}={}){
   validateMessages(input.messages);validateMemories(input.memories);
   validateResearch(input.research??[]);
   validateLearning(input.learning??[]);
+  validateImportedResearch(input.externalResearch??[]);
   const result={...input,id:JULIE_ID,schemaVersion:STATE_SCHEMA,
     version:'0.3.5',firstOpened:stamp(input.firstOpened)||Date.now(),
     deletedBefore:stamp(input.deletedBefore),
@@ -68,7 +70,8 @@ export function parseJulieState(raw,{allowEmpty=false}={}){
     messages:input.messages.map(m=>({...m,role:m.role==='partner'?'julie':m.role})),
     memories:input.memories.map(m=>({...m})),
     research:(input.research??[]).map(x=>({...x})),
-    learning:(input.learning??[]).map(x=>({...x}))};
+    learning:(input.learning??[]).map(x=>({...x})),
+    externalResearch:(input.externalResearch??[]).map(x=>({...x,sources:x.sources.map(y=>({...y}))}))};
   checkCapacity(result);
   return result;
 }
@@ -84,6 +87,9 @@ export function mergeImport(current,external){
   const webSeen=new Set(before.research.map(webKey));
   const research=before.research.map(x=>({...x}));
   const learning=before.learning.map(x=>({...x}));
+  const externalResearch=before.externalResearch.map(x=>({...x,sources:x.sources.map(y=>({...y}))}));
+  const externalKey=x=>JSON.stringify([x.title,x.summary,x.at]);
+  const seenExternal=new Set(externalResearch.map(externalKey));
   const learnKey=x=>JSON.stringify([x.kind,x.content]);
   const learned=new Set(learning.map(learnKey));
   const messages=before.messages.map(m=>({...m}));
@@ -118,17 +124,26 @@ export function mergeImport(current,external){
       learning.push({...entry});learned.add(key);
     }
   }
+  for(const entry of incoming.externalResearch){
+    if(cutoff>0&&stamp(entry.at)<=cutoff){blocked++;continue;}
+    const key=externalKey(entry);
+    if(!seenExternal.has(key)){
+      if(externalResearch.length>=MAX_IMPORTED_RESEARCH)throw new Error('Registre de recherches importées plein : aucun effacement silencieux');
+      externalResearch.push({...entry,sources:entry.sources.map(x=>({...x}))});seenExternal.add(key);
+    }
+  }
+  externalResearch.sort((a,b)=>stamp(a.at)-stamp(b.at));
   learning.sort((a,b)=>stamp(a.at)-stamp(b.at));
   research.sort((a,b)=>stamp(a.at)-stamp(b.at));
   messages.sort((a,b)=>stamp(a.at)-stamp(b.at));
   memories.sort((a,b)=>stamp(a.at)-stamp(b.at));
-  const merged={...before,messages,memories,research,learning};
+  const merged={...before,messages,memories,research,learning,externalResearch};
   checkCapacity(merged);
   return {state:merged,addedMessages,addedMemories,addedResearch,blocked};
 }
 export function eraseDemoHistory(current,at=Date.now()){
   const state=parseJulieState(current);
-  return {...state,deletedBefore:Math.max(state.deletedBefore,stamp(at)),messages:[],memories:[],research:[],learning:[]};
+  return {...state,deletedBefore:Math.max(state.deletedBefore,stamp(at)),messages:[],memories:[],research:[],learning:[],externalResearch:[]};
 }
 export function appendConversation(current,text,reply,at=Date.now()){
   if(typeof text!=='string'||!text.trim()||typeof reply!=='string')throw new Error('Message invalide');
