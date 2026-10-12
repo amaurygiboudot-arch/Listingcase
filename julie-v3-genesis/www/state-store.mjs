@@ -1,6 +1,7 @@
 // JULIE_001 — données de démonstration locales, sans suppression silencieuse.
 // Module pur : aucun accès au stockage ni au réseau.
 import {normalizeSourceUrl,RESEARCH_LIMIT,MAX_SOURCE_TEXT} from './google-research.mjs';
+import {captureLearning,LEARNING_MAX} from './learning-journal.mjs';
 export const JULIE_ID = 'JULIE_001';
 export const STATE_SCHEMA = 2;
 export const MAX_STATE_BYTES = 8_000_000;
@@ -16,7 +17,7 @@ export function checkCapacity(state){
 }
 export function createInitialState(now=Date.now()){
   return {id:JULIE_ID,schemaVersion:STATE_SCHEMA,version:'0.3.5',
-    firstOpened:now,quality:'balanced',deletedBefore:0,messages:[],memories:[],research:[]};
+    firstOpened:now,quality:'balanced',deletedBefore:0,messages:[],memories:[],research:[],learning:[]};
 }
 function stamp(v){return Number.isFinite(Number(v))&&Number(v)>=0?Number(v):0;}
 function validateMessages(messages){
@@ -42,6 +43,15 @@ function validateResearch(entries){
       throw new Error('Source Web incompatible ou dangereuse');
   }
 }
+function validateLearning(items){
+  if(!Array.isArray(items)||items.length>LEARNING_MAX)throw new Error('Journal d’apprentissage invalide');
+  for(const item of items){
+    if(!item||!['déclaration utilisateur','correction utilisateur'].includes(item.kind)||
+       typeof item.content!=='string'||item.content.length>360||
+       !Number.isFinite(Number(item.at))||item.source!=='message utilisateur')
+       throw new Error('Entrée d’apprentissage invalide');
+  }
+}
 export function parseJulieState(raw,{allowEmpty=false}={}){
   if((raw===null||raw===undefined||raw==='')&&allowEmpty)return createInitialState();
   const input=typeof raw==='string'?JSON.parse(raw):raw;
@@ -49,6 +59,7 @@ export function parseJulieState(raw,{allowEmpty=false}={}){
     throw new Error('Cet export ne correspond pas à l’identité JULIE_001');
   validateMessages(input.messages);validateMemories(input.memories);
   validateResearch(input.research??[]);
+  validateLearning(input.learning??[]);
   const result={...input,id:JULIE_ID,schemaVersion:STATE_SCHEMA,
     version:'0.3.5',firstOpened:stamp(input.firstOpened)||Date.now(),
     deletedBefore:stamp(input.deletedBefore),
@@ -56,7 +67,8 @@ export function parseJulieState(raw,{allowEmpty=false}={}){
     // Garder les champs inconnus : une mise à jour ne doit pas effacer des données futures.
     messages:input.messages.map(m=>({...m,role:m.role==='partner'?'julie':m.role})),
     memories:input.memories.map(m=>({...m})),
-    research:(input.research??[]).map(x=>({...x}))};
+    research:(input.research??[]).map(x=>({...x})),
+    learning:(input.learning??[]).map(x=>({...x}))};
   checkCapacity(result);
   return result;
 }
@@ -71,6 +83,9 @@ export function mergeImport(current,external){
   const webKey=x=>JSON.stringify([x.url,x.excerpt,x.at]);
   const webSeen=new Set(before.research.map(webKey));
   const research=before.research.map(x=>({...x}));
+  const learning=before.learning.map(x=>({...x}));
+  const learnKey=x=>JSON.stringify([x.kind,x.content]);
+  const learned=new Set(learning.map(learnKey));
   const messages=before.messages.map(m=>({...m}));
   const memories=before.memories.map(m=>({...m}));
   let blocked=0,addedMessages=0,addedMemories=0,addedResearch=0;
@@ -95,16 +110,25 @@ export function mergeImport(current,external){
       research.push(entry);webSeen.add(key);addedResearch++;
     }
   }
+  for(const entry of incoming.learning){
+    if(cutoff>0&&stamp(entry.at)<=cutoff){blocked++;continue;}
+    const key=learnKey(entry);
+    if(!learned.has(key)){
+      if(learning.length>=LEARNING_MAX)throw new Error('Journal d’apprentissage plein : aucun effacement silencieux');
+      learning.push({...entry});learned.add(key);
+    }
+  }
+  learning.sort((a,b)=>stamp(a.at)-stamp(b.at));
   research.sort((a,b)=>stamp(a.at)-stamp(b.at));
   messages.sort((a,b)=>stamp(a.at)-stamp(b.at));
   memories.sort((a,b)=>stamp(a.at)-stamp(b.at));
-  const merged={...before,messages,memories,research};
+  const merged={...before,messages,memories,research,learning};
   checkCapacity(merged);
   return {state:merged,addedMessages,addedMemories,addedResearch,blocked};
 }
 export function eraseDemoHistory(current,at=Date.now()){
   const state=parseJulieState(current);
-  return {...state,deletedBefore:Math.max(state.deletedBefore,stamp(at)),messages:[],memories:[],research:[]};
+  return {...state,deletedBefore:Math.max(state.deletedBefore,stamp(at)),messages:[],memories:[],research:[],learning:[]};
 }
 export function appendConversation(current,text,reply,at=Date.now()){
   if(typeof text!=='string'||!text.trim()||typeof reply!=='string')throw new Error('Message invalide');
@@ -115,5 +139,5 @@ export function appendConversation(current,text,reply,at=Date.now()){
     if(!memories.some(m=>m.text.toLocaleLowerCase('fr')===text.toLocaleLowerCase('fr')))
       memories.push({kind:'déclaration utilisateur',text,at,source:'message utilisateur',confidence:1});
   }
-  const result={...state,messages,memories};checkCapacity(result);return result;
+  const result=captureLearning({...state,messages,memories},text,at);checkCapacity(result);return result;
 }
