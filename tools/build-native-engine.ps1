@@ -1,12 +1,19 @@
+param([switch]$RedmiOptimized)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 $toolsRoot='C:\Dev\JULIE\native-engine-tools'
 $build="$toolsRoot\build-android-arm64"
 $ndk="$toolsRoot\android-ndk-r30"
 $cmake="$toolsRoot\cmake-4.4.4-windows-x86_64\bin\cmake.exe"
+$armArch=''
+if($RedmiOptimized){
+    $features=& 'C:\Users\amaur\AppData\Local\Android\Sdk\platform-tools\adb.exe' -s 40b0f1cc shell cat /proc/cpuinfo
+    if($LASTEXITCODE -ne 0 -or ($features -join ' ') -notmatch 'asimddp' -or ($features -join ' ') -notmatch 'asimdhp'){throw 'Required target CPU features unavailable'}
+    $armArch='armv8.2-a+dotprod+fp16'
+}
 $revision=git -C "$toolsRoot\llama.cpp" rev-parse HEAD
 if($revision -ne 'f2cc7282ce0042641df55e0e563b75e824e2b647'){throw 'Unexpected llama.cpp revision'}
-& $cmake -S "$toolsRoot\llama.cpp" -B $build -G Ninja "-DCMAKE_MAKE_PROGRAM=$toolsRoot\ninja\ninja.exe" "-DCMAKE_TOOLCHAIN_FILE=$ndk\build\cmake\android.toolchain.cmake" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_LLAMAFILE=OFF -DLLAMA_OPENSSL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_SERVER=OFF -DLLAMA_BUILD_APP=OFF -DLLAMA_BUILD_TOOLS=OFF -DLLAMA_BUILD_EXAMPLES=ON
+& $cmake -S "$toolsRoot\llama.cpp" -B $build -G Ninja "-DCMAKE_MAKE_PROGRAM=$toolsRoot\ninja\ninja.exe" "-DCMAKE_TOOLCHAIN_FILE=$ndk\build\cmake\android.toolchain.cmake" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 -DCMAKE_BUILD_TYPE=Release "-DGGML_CPU_ARM_ARCH=$armArch" -U HAVE_DOTPROD -U HAVE_FP16_VECTOR_ARITHMETIC -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF -DGGML_LLAMAFILE=OFF -DLLAMA_OPENSSL=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_SERVER=OFF -DLLAMA_BUILD_APP=OFF -DLLAMA_BUILD_TOOLS=OFF -DLLAMA_BUILD_EXAMPLES=ON
 if($LASTEXITCODE -ne 0){throw 'CMake configuration failed'}
 & $cmake --build $build --target llama-simple -j 1
 if($LASTEXITCODE -ne 0){throw 'Native build failed'}
