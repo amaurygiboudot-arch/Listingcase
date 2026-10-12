@@ -1,0 +1,27 @@
+/* Tests unitaires sans dépendance externe : node tests/personality.test.cjs */
+const assert = require("node:assert/strict");
+const p = require("../www/julie-personality.js");
+const t0 = Date.parse("2026-10-12T18:00:00Z");
+let state = p.initial();
+assert.equal(state.identity.id, "JULIE_001");
+assert.equal(p.currentMood(state, t0), "neutre");
+state = p.setMood(state, "taquine", t0);
+assert.equal(p.currentMood(state, t0 + 1000), "taquine");
+assert.equal(p.currentMood(state, t0 + 4 * 3600000 + 1), "neutre");
+assert.throws(() => p.observe(state, { trait: "affection", delta: .03, confidence: 1, source: "test", at: "2026-10-12T18:00:00Z" }), /non vérifiée/);
+assert.throws(() => p.observe(state, { trait: "affection", delta: 1, confidence: 1, verified: true, source: "test", at: "2026-10-12T18:00:00Z" }), /trop forte/);
+const original = state.traits.affection;
+for (let i=0;i<2;i++) state = p.observe(state, { trait: "affection", delta: .05, confidence: .9, verified: true, source: "echange-" + i, at: "2026-10-12T18:00:00Z" });
+state = p.review(state, "affection", "2026-10-13T18:00:00Z");
+assert.equal(state.changed, false);
+assert.equal(state.traits.affection, original);
+state = p.observe(state, { trait: "affection", delta: .05, confidence: .9, verified: true, source: "echange-2", at: "2026-10-12T18:00:00Z" });
+state = p.review(state, "affection", "2026-10-13T18:00:00Z");
+assert.equal(state.changed, true);
+assert.equal(state.traits.affection, original + .02);
+assert.equal(state.identity.id, "JULIE_001");
+assert.equal(state.history.length, 1);
+assert.equal(state.observations.length, 0);
+assert.match(p.systemGuidance(), /Ne rappelle pas sans raison/);
+assert.match(p.systemGuidance(), /réponds clairement et sincèrement/);
+console.log("JULIE personality: 13 assertions passed");
