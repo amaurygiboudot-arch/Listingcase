@@ -62,6 +62,9 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void openGoogleSearch(String query){
             if(research!=null)research.openGoogleSearch(query);
         }
+        @JavascriptInterface public void searchPublicKnowledge(String query){
+            if(research!=null)research.searchPublicKnowledge(query);
+        }
         @JavascriptInterface public void readResearchSource(String url){
             if(research!=null)research.readSource(url);
         }
