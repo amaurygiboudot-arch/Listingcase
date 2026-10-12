@@ -1,3 +1,4 @@
+import {controlReply,checkDialogueReply} from './dialogue-guard.mjs';
 import {dnaPrompt,dnaReply,dnaSnapshot} from './digital-dna.mjs';
 import {profileReply} from './dialogue-profile.mjs';
 import {DIALOGUE_SYSTEM,DIALOGUE_EXAMPLES,dialogueContext} from './dialogue-context.mjs';
@@ -46,13 +47,15 @@ export function needsScienceContext(messages,text){
   return /isotop|isobar|masse|charge|neutron|proton|nucléon|nucleon|électron|electron|\b[ZNA]\s*=/i.test(text+' '+messages.slice(-2).filter(m=>m.role==='user').map(m=>m.text).join(' '));
 }
 export async function localReply(state,text){
+  const control=controlReply(text);
+  if(control)return control;
   const identity=dnaReply(state.dna,text);
   if(identity)return identity;
   const profile=profileReply(text);
   if(profile)return profile;
   if(text.length>2400)throw new Error('Message trop long pour ce moteur : limite de 2 400 caractères.');
   const rules=state.learning.disabled||!needsScienceContext(state.messages,text)?null:await verifiedRules(state.learning.documentary);
-  const reply=await generateLocal(buildPrompt(state.messages,text,!!rules,false,state.dna));
+  const reply=checkDialogueReply(await generateLocal(buildPrompt(state.messages,text,!!rules,false,state.dna)),state.messages,text);
   return reply+(rules&&/isotop|isobar|masse|charge|neutron|proton/i.test(text)?'\nSource documentaire fournie au modèle : '+rules.source:'');
 }
 export async function localExamRespond(question,rules){

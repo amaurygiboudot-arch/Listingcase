@@ -1,0 +1,17 @@
+{
+  "backend": "Ollama PC, not Android JNI",
+  "results": [
+    {
+      "text": "Arrête",
+      "response": "D’accord, j’arrête."
+    },
+    {
+      "text": "Bébé",
+      "response": "Je suis prête."
+    },
+    {
+      "text": "Tu dois apprendre",
+      "response": "Je suis prête à apprendre."
+    }
+  ]
+}

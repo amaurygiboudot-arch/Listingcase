@@ -1,3 +1,4 @@
+import {controlReply} from './dialogue-guard.mjs';
 import {mountDNA} from './digital-dna-ui.mjs';
 import {dnaReply} from './digital-dna.mjs';
 import * as THREE from 'three';
@@ -12,7 +13,7 @@ import {mountLearningExams} from './learning-exams-ui.mjs';
 import {examConversation} from './chat-exams.mjs';
 import {engineAvailable,localReply,localExamRespond,ENGINE_MODE} from './local-conversation.mjs';
 
-const APP_VERSION = '0.3.8-adn-test';
+const APP_VERSION = '0.3.9-dialogue-test';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -152,7 +153,7 @@ $('#chat-form').addEventListener('submit',async(event)=>{
   try{
     let next=await examConversation(saved,t,engineAvailable()?{respond:localExamRespond,respondentMode:ENGINE_MODE}:{});
     if(!next){
-      const reply=dnaReply(saved.dna,t) ?? (engineAvailable()?await localReply(saved,t):await documentaryAnswer(saved.learning.documentary,t));
+      const reply=controlReply(t) ?? dnaReply(saved.dna,t) ?? (engineAvailable()?await localReply(saved,t):await documentaryAnswer(saved.learning.documentary,t));
       next=appendConversation(saved,t,reply||answer(t),Date.now());
     }
     if(JSON.stringify(saved)!==baseline)throw new Error('Mémoire modifiée pendant la réponse ; renvoie ton message.');
