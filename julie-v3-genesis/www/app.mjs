@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge} from './google-research.mjs';
 import {isDailyLearningQuestion,replyDailyLearning} from './learning-journal.mjs';
+import {parseChatGPTResearch,addChatGPTResearch} from './chatgpt-research.mjs';
 
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
 
@@ -112,6 +113,23 @@ function showMemories(){
   web.textContent='';
   const known=Array.isArray(saved.research)?saved.research:[];
   if(!known.length){const p=document.createElement('p');p.textContent='Aucune source Web enregistrée.';web.appendChild(p);}
+  const chatGPT=$('#chatgpt-research-items');
+  if(chatGPT){
+    chatGPT.textContent='';
+    const entries=Array.isArray(saved.externalResearch)?saved.externalResearch:[];
+    entries.slice().reverse().forEach(entry=>{
+      const box=document.createElement('div');box.className='mem-item';
+      const meta=document.createElement('small');meta.textContent='ChatGPT · '+new Date(entry.at).toLocaleDateString('fr-FR')+' · non vérifiée dans JULIE';
+      const title=document.createElement('strong');title.textContent=entry.title;
+      const summary=document.createElement('p');summary.textContent=entry.summary;
+      box.append(meta,title,summary);
+      for(const source of entry.sources){
+        const item=document.createElement('small');item.textContent=(source.title||'Source')+' — '+source.url;
+        box.appendChild(item);
+      }
+      chatGPT.appendChild(box);
+    });
+  }
   known.slice().reverse().forEach(source=>{
     const div=document.createElement('div');div.className='mem-item';
     const meta=document.createElement('small');
@@ -178,6 +196,19 @@ $('#research-save').addEventListener('click',()=>{
       $('#research-save').disabled=true;showMemories();
     }
   }catch(e){$('#research-status').textContent=e.message||'Enregistrement refusé, données conservées.';}
+});
+$('#chatgpt-import-form')?.addEventListener('submit',event=>{
+  event.preventDefault();
+  try{
+    const entry=parseChatGPTResearch($('#chatgpt-import-json').value);
+    const next=addChatGPTResearch(saved,entry);
+    if(next===saved){$('#chatgpt-import-status').textContent='Cette recherche figure déjà dans le registre.';return;}
+    if(persist(next)){
+      $('#chatgpt-import-status').textContent='Recherche ChatGPT enregistrée avec sa provenance, sans modification des souvenirs.';
+      $('#chatgpt-import-json').value='';
+      showMemories();
+    }
+  }catch(e){$('#chatgpt-import-status').textContent=e.message||'Import refusé.';}
 });
 $('#quality').value=['eco','balanced','high'].includes(saved.quality)?saved.quality:'balanced';
 $('#quality').addEventListener('change',e=>{
