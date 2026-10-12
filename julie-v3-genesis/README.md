@@ -35,6 +35,25 @@ Paquet Android de développement : `com.julie.preview.v3` (inchangé par rapport
 - L'information de chargement se masque après quelques secondes afin de laisser les jambes visibles pour l'inspection.
 - Le visage, les cheveux, les vêtements physiques et les mouvements réalistes avancés restent à développer ; la correction doit être validée visuellement sur Android.
 
+
+## Recherche Google.com — développement séparé (12 octobre 2026)
+
+Décision : **Google.com est le moteur principal** de recherche JULIE. Cette intégration est développée sur `feature/julie-google-research-20261012`, à valider avant toute fusion dans `julie-v1`. La version **TEST** avec Qwen 3B n'est ni modifiée ni remplacée. Les deux APK restent distinctes jusqu'à identification/contrôle des identifiants de paquet et signatures.
+
+- L'onglet **Rechercher** ouvre `https://www.google.com/search?q=...` dans le **navigateur Android externe**, pas dans la WebView contenant le stockage chiffré.
+- Une commande explicite dans le dialogue « Cherche sur Google ... » prépare également cette ouverture.
+- L'utilisateur peut copier l'adresse HTTPS d'une page choisie depuis Google puis la transmettre à l'onglet Recherche. Le code natif lit **du texte public HTTPS seulement**, sans exécuter de JavaScript distant ; aucune redirection automatique, timeout, limitation de taille, vérification préalable des adresses réseau non publiques.
+- L'utilisateur peut enregistrer explicitement une **information recherchée** datée et sourcée, marquée « non vérifiée », séparée des messages et souvenirs. Les exports/imports et l'effacement incluent désormais ce registre, avec barrière contre la réintroduction après effacement.
+- Aucune API Google payante, aucun abonnement, aucune clé secrète et aucune extraction automatisée des résultats Google.com. Au 12/10/2026, la Custom Search JSON API Google n'accepte plus de nouveaux clients : il serait trompeur de promettre une recherche Google.com entièrement autonome avec cette méthode. Cette étape apporte un accès utilisateur à Google et un lecteur de pages, **pas encore un agent général autonome ni une intégration Qwen**.
+- Les pages protégées, fortement dynamiques, bloquant les robots ou les redirections peuvent être illisibles. Aucune réponse ne doit être présentée comme vérifiée sur la seule base d'une page.
+
+### Contrôles obligatoires avant installation
+
+1. Tests unitaires `node --test julie-v3-genesis/tests/google-research.test.mjs` et tests mémoire existants ; vérification de la syntaxe JS.
+2. Compilation Android avec `JulieWebResearch.java` copié via le workflow unique, puis examen des journaux et tests sur téléphone.
+3. Sauvegarde/export des souvenirs avant remplacement d'une APK de signature inconnue ; ne jamais désinstaller l'ancienne installation sans migration vérifiée.
+4. Confirmer la version installée, les deux paquets et leur rôle avant publication ; mettre à jour le document maître Google Drive après contrôle.
+
 ## Limites importantes
 Cette application n'est pas une compagne pleinement autonome, ne possède pas de voix, de synchronisation sécurisée ni de monde persistant. Le corps utilise la même source GLB humanoïde que Genesis et seulement une première morphologie féminine adaptée : l'apparence exacte d'Ève (cheveux, yeux, texture peau, animations et morphs avancés) est encore à intégrer et doit être contrôlée visuellement.
 
