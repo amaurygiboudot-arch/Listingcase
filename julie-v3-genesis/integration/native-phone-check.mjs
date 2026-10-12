@@ -47,6 +47,19 @@ async function connect(){
 }
 const {page}=await connect();
 const state=await page.evaluate(()=>JSON.parse(window.JulieAndroid.readState()));
+if(process.argv.includes('--inspect')){
+  const expected=JSON.parse(readFileSync(base+'native-exam-state.json','utf8'));
+  assert.deepEqual(state.messages,expected.messages);
+  assert.deepEqual(state.memories,expected.memories);
+  assert.deepEqual(state.learning.documentary.attempts,expected.learning.documentary.attempts);
+  assert.equal(await page.evaluate(()=>window.JulieLocal.available()),true);
+  const label=await page.evaluate(()=>document.body.textContent);
+  assert.ok(label.includes('modèle local Qwen2.5'));
+  assert.ok(!label.includes("Ce mode n'utilise pas encore"));
+  await page.evaluate(()=>document.querySelector('[data-view=chat]').click());
+  console.log('PASS final installed UI, native availability, 20 messages and 8 exams preserved');
+  process.exit(0);
+}
 if(process.argv.includes('--snapshot')){
   writeFileSync(base+'native-before-state.json',JSON.stringify(state));
   console.log(JSON.stringify({stage:'baseline',messages:state.messages.length,attempts:state.learning.documentary.attempts.length}));

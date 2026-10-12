@@ -1,0 +1,10 @@
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+import {learningPriorities,revisionQueue} from '../www/documentary-memory.mjs';
+const state=JSON.parse(readFileSync('C:/Dev/JULIE/learning-build-20261011/native-exam-state.json','utf8'));
+const priorities=learningPriorities(state.learning.documentary);
+assert.equal(priorities[0].skill,'isobares');
+assert.ok(priorities[0].errors>=1);
+const queue=revisionQueue(state.learning.documentary);
+assert.deepEqual(queue.map(r=>r.day),[1,7,30]);
+console.log(JSON.stringify({priorities,revisions:queue.map(r=>({day:r.day,dueAt:r.dueAt}))}));

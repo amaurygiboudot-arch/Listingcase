@@ -54,3 +54,8 @@ C:/Dev/JULIE/learning-build-20261011/native-before-state.json
 C:/Dev/JULIE/learning-build-20261011/native-after-state.json
 C:/Dev/JULIE/learning-build-20261011/native-exam-state.json
 La sauvegarde XML chiffrée est conservée dans le même dossier.
+
+## Mise à jour finale des libellés
+APK final SHA256 1ebfb292a45c29f12422b480ff7860033d3d2425b2c66c9072538137a517cef2. Compilation incrémentale réussie en 19 s, installation réussie, données chiffrées strictement identiques avant/après installation.
+Priorité de révision vérifiée sur les données réelles : isobares, une erreur ; échéances J+1/J+7/J+30 présentes.
+V�rification finale de la WebView install�e : libell� du moteur correct, moteur disponible, 20 messages et 8 examens conserv�s. Application laiss�e sur Parler.
