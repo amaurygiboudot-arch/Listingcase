@@ -24,3 +24,8 @@ Examens, imports, stockage, ADN et traitement des boucles restent couverts.
 Test d'interface Edge isolé : mesures affichées avec les bonnes unités, commandes du modèle conservées. Passerelle Android simulée.
 Téléphone débranché : les nouveaux délais et la qualité doivent encore être mesurés sur le téléphone. Aucune promesse de fluidité générale.
 Document maître V1.2 consulté en lecture seule. Son index de julie-v1/0.3.5 ne remplace pas cette branche expérimentale connue et ses APK 0.3.x.
+
+## Paquet vérifié
+Compilation Android réussie en 2 min 34 s. Signature valide, certificat identique aux mises à jour TEST précédentes.
+Paquet com.julie.learning.experimental ; versionCode 300007 ; versionName 0.3.11-3b-optimise-test (aapt).
+APK : 65 688 369 octets ; SHA-256 75b4c168dbd2c6575e94e4132c3a190dc03d20e5a0e0f5f953d43372fcb8b965.
