@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createInitialState,parseJulieState,mergeImport,eraseDemoHistory} from '../www/state-store.mjs';
-import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge,RESEARCH_LIMIT,requestedSourceFromConversation} from '../www/google-research.mjs';
+import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge,RESEARCH_LIMIT,requestedSourceFromConversation,requestedPublicSearch,normalizePublicSearchResult} from '../www/google-research.mjs';
 test('Recherche principale exclusivement Google.com, paramètres encodés',()=>{
   assert.equal(new URL(googleSearchUrl('actualité Julie & Qwen')).hostname,'www.google.com');
   assert.equal(new URL(googleSearchUrl('actualité Julie & Qwen')).searchParams.get('q'),'actualité Julie & Qwen');
@@ -56,4 +56,20 @@ test('Lien Web demandé dans la conversation sans appuyer sur un bouton',()=>{
   assert.equal(requestedSourceFromConversation('Salut Julie'),null);
   assert.equal(requestedSourceFromConversation('http://127.0.0.1/private'),null);
   assert.equal(requestedSourceFromConversation('https://example.org/a https://example.org/b'),null);
+});
+
+test('Recherche automatique de connaissances dans le chat, sans confusion avec Google explicite',()=>{
+  assert.equal(requestedPublicSearch('Julie, cherche le système solaire'),'le système solaire');
+  assert.equal(requestedPublicSearch('cherche des informations sur le soleil'),'des informations sur le soleil');
+  assert.equal(requestedPublicSearch('Cherche sur Google Mars'),null);
+  assert.equal(requestedPublicSearch('Bonjour Julie'),null);
+});
+test('Résultats publics vérifiés et sources reconnues',()=>{
+  const result=normalizePublicSearchResult({ok:true,engine:'Wikimedia Action API',query:'Mars',
+    results:[{title:'Mars',url:'https://fr.wikipedia.org/wiki/Mars_(plan%C3%A8te)',excerpt:'Planète rocheuse'}]});
+  assert.equal(result.results.length,1);
+  assert.equal(result.results[0].excerpt,'Planète rocheuse');
+  assert.throws(()=>normalizePublicSearchResult({ok:true,engine:'Google',query:'Mars',results:[]}));
+  assert.throws(()=>normalizePublicSearchResult({ok:true,engine:'Wikimedia Action API',query:'Mars',
+    results:[{title:'X',url:'https://localhost/secret',excerpt:'x'}]}));
 });
