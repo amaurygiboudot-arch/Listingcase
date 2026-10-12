@@ -1,4 +1,5 @@
 import {DNA_FOUNDATION,DNA_TRAITS,DNA_STATES,dnaSnapshot,normalizeDNA,changeDNA} from './digital-dna.mjs';
+import {latestMoment} from './autonomous-personality.mjs';
 export function mountDNA({getState,persist,canEdit}){
  const parent=document.querySelector('#memory-view');if(!parent)return;
  const root=document.createElement('section');root.id='dna-panel';root.className='card';
@@ -12,8 +13,11 @@ export function mountDNA({getState,persist,canEdit}){
   root.append(el('p','Identité : Julie, femme virtuelle adulte. Couple virtuel établi avec Amaury. Mes goûts peuvent évoluer ; mes permissions réelles restent séparées.'));
   const list=el('ul');for(const [key,value] of Object.entries(s.traits))
    list.append(el('li',DNA_TRAITS[key]+' : '+(value===0?'profil fondateur':value<0?'expression plus discrète':'expression plus marquée')));
-  root.append(list,el('p','État simulé : '+s.current.humeur+' · priorité : '+s.current.priorite+'. Les changements d’état expirent après 4 h.'));
-  root.append(el('p','Cette première version évolue par des réglages explicites et justifiés. Une réponse du modèle ne change jamais seule mon ADN.'));
+  const moment=latestMoment(getState().messages);
+  const humeur=moment.humeur==='neutre'?s.current.humeur:moment.humeur;
+  const priorite=moment.priorite==='dialogue'?s.current.priorite:moment.priorite;
+  root.append(list,el('p','Tendance du moment (simulation selon le thème) : '+humeur+' · priorité : '+priorite+'. Les anciens réglages temporaires expirent après 4 h.'));
+  root.append(el('p','Julie adapte sa façon de répondre sans intervention. Un trait durable ne change qu’après trois préférences explicites exprimées à des moments différents. Les évolutions restent traçables et corrigeables.'));
   const form=el('form'),field=el('select'),value=el('select'),reason=el('input'),button=el('button','Enregistrer l’évolution');
   field.id='dna-field';value.id='dna-value';reason.id='dna-reason';button.id='dna-save';
   field.setAttribute('aria-label','Élément à faire évoluer');value.setAttribute('aria-label','Nouvelle expression');
@@ -39,7 +43,9 @@ export function mountDNA({getState,persist,canEdit}){
     else {message='Sauvegarde non confirmée : aucune évolution annoncée.';render();}
    }catch(e){message=e.message;render();}
   });
-  root.append(form);const status=el('p',message);status.id='dna-status';status.setAttribute('role','status');root.append(status);
+  const advanced=el('details');advanced.append(el('summary','Réglages manuels avancés (facultatifs)'));
+  advanced.append(form);root.append(advanced);
+  const status=el('p',message);status.id='dna-status';status.setAttribute('role','status');root.append(status);
   const details=el('details');details.append(el('summary','Historique des évolutions ('+dna.events.length+')'));
   for(const e of [...dna.events].reverse()){
    details.append(el('p',new Date(e.at).toLocaleString('fr-FR')+' — '+(DNA_TRAITS[e.key]||e.key)+' : '+e.value+' — '+e.reason+' — '+e.source));

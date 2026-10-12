@@ -1,5 +1,6 @@
 import {controlReply,checkDialogueReply} from './dialogue-guard.mjs';
 import {dnaPrompt,dnaReply,dnaSnapshot} from './digital-dna.mjs';
+import {momentContext} from './autonomous-personality.mjs';
 import {profileReply} from './dialogue-profile.mjs';
 import {DIALOGUE_SYSTEM,DIALOGUE_EXAMPLES,dialogueContext} from './dialogue-context.mjs';
 import {verifiedRules} from './documentary-memory.mjs';
@@ -12,9 +13,10 @@ export function selectedModel(bridge=globalThis.window?.JulieLocal){
 }
 export function buildPrompt(messages,text,hasRules=false,exam=false,dna,modelName='1.5B'){
   const turn=(role,t)=>'<|im_start|>'+role+'\n'+clean(t)+'<|im_end|>\n';
-  const system=exam ? 'Réponds en français uniquement au format demandé. Ne joue aucun rôle romantique. N’invente pas de résultat.' : (modelName==='3B'?SYSTEM_3B:DIALOGUE_SYSTEM)+(dnaPrompt(dna)?' '+dnaPrompt(dna):'');
+  const moment=exam?{prompt:'',priorite:'dialogue'}:momentContext(text);
+  const system=exam ? 'Réponds en français uniquement au format demandé. Ne joue aucun rôle romantique. N’invente pas de résultat.' : (modelName==='3B'?SYSTEM_3B:DIALOGUE_SYSTEM)+(dnaPrompt(dna)?' '+dnaPrompt(dna):'')+(moment.prompt?' '+moment.prompt:'');
   const snapshot=dnaSnapshot(dna);
-  const sober=snapshot.current.priorite==='projet'||snapshot.traits.affection<0;
+  const sober=snapshot.current.priorite==='projet'||moment.priorite==='projet'||snapshot.traits.affection<0;
   const selectedExamples=sober ? [['user',"Aide-moi à préparer une séance."],['assistant',"Choisis un objectif précis, révise les notions utiles, puis termine par un contrôle."]] : DIALOGUE_EXAMPLES;
   const examples=exam||modelName==='3B'?'':selectedExamples.map(([role,t])=>turn(role,t)).join('');
   const history=(exam?[]:dialogueContext(messages)).map(m=>turn(m.role==='user'?'user':'assistant',clean(m.text).slice(0,160))).join('');

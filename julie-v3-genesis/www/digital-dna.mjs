@@ -22,7 +22,7 @@ export function normalizeDNA(input){
  for(const e of input.events){
   if(!e||!exactKeys(e,['id','at','kind','key','value','reason','source'])||
    typeof e.id!=='string'||!e.id||ids.has(e.id)||!Number.isSafeInteger(e.at)||e.at<=previous||
-   typeof e.reason!=='string'||!e.reason.trim()||e.reason.length>240||e.source!=='réglage explicite utilisateur')
+   typeof e.reason!=='string'||!e.reason.trim()||e.reason.length>240||!['réglage explicite utilisateur','dialogue direct confirmé'].includes(e.source))
    throw Error('Historique ADN invalide : aucune modification enregistrée.');
   const valid=e.kind==='trait'?Object.hasOwn(DNA_TRAITS,e.key)&&[-1,0,1].includes(e.value):
    e.kind==='state'&&Object.hasOwn(DNA_STATES,e.key)&&DNA_STATES[e.key].includes(e.value);
@@ -41,7 +41,8 @@ export function dnaSnapshot(input,now=Date.now()){
  }
  return {foundation:DNA_FOUNDATION,traits,current,revision:dna.events.length};
 }
-export function changeDNA(input,{kind,key,value,reason},now=Date.now()){
+export function changeDNA(input,{kind,key,value,reason,source='réglage explicite utilisateur'},now=Date.now()){
+ if(!['réglage explicite utilisateur','dialogue direct confirmé'].includes(source))throw Error('Source d’évolution interdite.');
  const dna=normalizeDNA(input);const snapshot=dnaSnapshot(dna,now);
  if(typeof reason!=='string'||!reason.trim()||reason.trim().length>240)throw Error('Indique une raison de 1 à 240 caractères.');
  const valid=kind==='trait'?Object.hasOwn(DNA_TRAITS,key)&&[-1,0,1].includes(value):kind==='state'&&Object.hasOwn(DNA_STATES,key)&&DNA_STATES[key].includes(value);
@@ -50,7 +51,7 @@ export function changeDNA(input,{kind,key,value,reason},now=Date.now()){
  if(previous===value)return dna;
  const at=Math.max(Math.trunc(now),dna.erasedBefore+1,(dna.events.at(-1)?.at||0)+1);
  const id=globalThis.crypto.randomUUID();
- return normalizeDNA({...dna,events:[...dna.events,{id,at,kind,key,value,reason:reason.trim(),source:'réglage explicite utilisateur'}]});
+ return normalizeDNA({...dna,events:[...dna.events,{id,at,kind,key,value,reason:reason.trim(),source}]});
 }
 export function eraseDNA(input,now=Date.now()){
  const dna=normalizeDNA(input);

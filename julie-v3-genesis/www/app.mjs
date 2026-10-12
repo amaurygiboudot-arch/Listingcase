@@ -2,6 +2,7 @@ import {mountModelSettings} from './model-settings.mjs';
 import {controlReply} from './dialogue-guard.mjs';
 import {mountDNA} from './digital-dna-ui.mjs';
 import {dnaReply} from './digital-dna.mjs';
+import {adaptDNAFromDirectChat} from './autonomous-personality.mjs';
 import * as THREE from 'three';
 
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
@@ -14,7 +15,7 @@ import {mountLearningExams} from './learning-exams-ui.mjs';
 import {examConversation} from './chat-exams.mjs';
 import {engineAvailable,localReply,localExamRespond,ENGINE_MODE} from './local-conversation.mjs';
 
-const APP_VERSION = '0.3.13-identite-test';
+const APP_VERSION = '0.3.14-autonomie-test';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -155,7 +156,9 @@ $('#chat-form').addEventListener('submit',async(event)=>{
     let next=await examConversation(saved,t,engineAvailable()?{respond:localExamRespond,respondentMode:ENGINE_MODE}:{});
     if(!next){
       const reply=controlReply(t) ?? dnaReply(saved.dna,t) ?? (engineAvailable()?await localReply(saved,t):await documentaryAnswer(saved.learning.documentary,t));
-      next=appendConversation(saved,t,reply||answer(t),Date.now());
+      const postedAt=Date.now();
+      next=appendConversation(saved,t,reply||answer(t),postedAt);
+      next={...next,dna:adaptDNAFromDirectChat(next.dna,next.messages,t,postedAt)};
     }
     if(JSON.stringify(saved)!==baseline)throw new Error('Mémoire modifiée pendant la réponse ; renvoie ton message.');
     if(persist(next)){field.value='';renderChat();renderLearning();}
