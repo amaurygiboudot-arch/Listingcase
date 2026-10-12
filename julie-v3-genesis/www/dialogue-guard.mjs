@@ -1,3 +1,4 @@
+import {correctDirectAddress} from './identity-reference.mjs';
 export const normalizeDialogue=t=>String(t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 export function isStopRequest(text){
  return /^(?:arrete|stop|ca suffit|arrete de repeter|ne repete plus)(?: s il te plait| stp)?$/.test(normalizeDialogue(text));
@@ -11,6 +12,7 @@ export function repetitionContext(messages){
  return recent.slice(start).filter(m=>m.role==='user'||(counts.get(normalizeDialogue(m.text))||0)<2).slice(-4);
 }
 export function checkDialogueReply(reply,messages,text){
+ reply=correctDirectAddress(reply);
  const key=normalizeDialogue(reply);
  const same=messages.slice(-8).filter(m=>m.role!=='user'&&normalizeDialogue(m.text)===key);
  if(key.length>30&&same.length>=2)throw Error('Le moteur répète une ancienne réponse. Aucun nouveau message de Julie enregistré.');

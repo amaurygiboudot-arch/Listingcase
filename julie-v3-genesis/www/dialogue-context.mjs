@@ -1,3 +1,4 @@
+import {hasRoleConfusion} from './identity-reference.mjs';
 import {repetitionContext} from './dialogue-guard.mjs';
 import {DNA_FOUNDATION} from './digital-dna.mjs';
 // Context-only examples: never persisted as conversation or memories.
@@ -7,6 +8,7 @@ const normalize=t=>String(t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toL
 export function dialogueContext(messages){
   return repetitionContext(messages).filter((m,i,window)=>{
     if(m.role==='user')return true;
+    if(hasRoleConfusion(m.text))return false;
     const previous=window[i-1];
     if(!previous||previous.role!=='user')return true;
     const q=normalize(previous.text),a=normalize(m.text);

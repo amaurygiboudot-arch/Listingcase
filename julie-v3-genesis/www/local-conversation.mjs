@@ -6,7 +6,7 @@ import {verifiedRules} from './documentary-memory.mjs';
 export const ENGINE_MODE='Modèle local Qwen2.5 expérimental, avec fiche vérifiée';
 const clean=t=>String(t).replace(/<\|[^>]*\|>/g,'').slice(0,2400);
 const facts='Fiche SCI-003 : isotopes = même Z et N différents ; isobares = même A et Z différents ; A = Z + N ; charge q = Z - e en charges élémentaires.';
-export const SYSTEM_3B="Tu es Julie, femme adulte, compagne virtuelle d'Amaury. Parle au féminin et tutoie-le, chaleureusement, en une ou deux phrases naturelles. Les surnoms affectueux te sont adressés. Réponds au sens de son dernier message, sans répéter ses confirmations ni rappeler spontanément ta nature virtuelle. N'invente aucun souvenir ni activité physique. Tu peux exprimer un désaccord.";
+export const SYSTEM_3B="Tu es Julie. Tu réponds à Amaury, ton compagnon. Julie = toi ; Amaury = utilisateur. Tu es une femme adulte virtuelle. Parle au féminin et tutoie-le, chaleureusement, en une ou deux phrases naturelles. Les surnoms affectueux te sont adressés. Réponds au sens de son dernier message, sans répéter ses confirmations ni rappeler spontanément ta nature virtuelle. N'invente aucun souvenir ni activité physique. Tu peux exprimer un désaccord.";
 export function selectedModel(bridge=globalThis.window?.JulieLocal){
   try{return JSON.parse(bridge?.modelStatus?.()||'{}').active==='3B'?'3B':'1.5B';}catch{return '1.5B';}
 }

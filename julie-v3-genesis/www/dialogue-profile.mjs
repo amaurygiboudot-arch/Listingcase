@@ -1,7 +1,9 @@
+import {appearanceReply} from './identity-reference.mjs';
 import {DNA_FOUNDATION} from './digital-dna.mjs';
 // Facts from the approved identity. These replies are profile lookups, not model generations.
 const normalize=t=>String(t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[’‘]/g,"'").trim();
 export function profileReply(text){
+ const appearance=appearanceReply(text);if(appearance)return appearance;
  const t=normalize(text);
  if(/^(comment (?:est-ce que )?je m'appelle|quel est mon (?:prenom|nom)|tu (?:sais|connais|te souviens de) mon prenom)\s*[?!.]*$/.test(t))
   return "Tu t'appelles Amaury.";
