@@ -26,5 +26,6 @@ export function hasRoleConfusion(text){
 }
 export function correctDirectAddress(text){
  return text.replace(/^(bonjour|salut|coucou)([ ,]+)Julie\b/gi,(_,g,sep)=>g+sep+IDENTITY_REFERENCE.user)
-  .replace(/\b(pas vrai|n'est-ce pas)([ ,]+)Julie([ ?!.]*)$/gi,(_,g,sep,end)=>g+sep+IDENTITY_REFERENCE.user+end);
+  .replace(/\b(pas vrai|n'est-ce pas)([ ,]+)Julie([ ?!.]*)$/gi,(_,g,sep,end)=>g+sep+IDENTITY_REFERENCE.user+end)
+  .replace(/\b(pour toi|avec toi|près de toi|à tes côtés|bonne nuit)(,?\s+)Julie(?=[.!?](?:\s|$))/gi,(_,g,sep)=>g+sep+IDENTITY_REFERENCE.user);
 }
