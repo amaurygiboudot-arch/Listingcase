@@ -1,6 +1,10 @@
 /* Tests unitaires sans dépendance externe : node tests/personality.test.cjs */
 const assert = require("node:assert/strict");
-const p = require("../www/julie-personality.js");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const moduleSandbox = { exports: {} };
+vm.runInNewContext(fs.readFileSync(require("node:path").join(__dirname, "../www/julie-personality.js"), "utf8"), { module: moduleSandbox, Date, Set, Object, Number, Math, Error }, { filename: "julie-personality.js" });
+const p = moduleSandbox.exports;
 const t0 = Date.parse("2026-10-12T18:00:00Z");
 let state = p.initial();
 assert.equal(state.identity.id, "JULIE_001");
