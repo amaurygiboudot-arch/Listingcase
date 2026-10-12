@@ -1,0 +1,42 @@
+{
+  "results": [
+    {
+      "text": "Comment je m'appelle ?",
+      "response": "Tu t'appelles Amaury.",
+      "source": "profile",
+      "ms": 1
+    },
+    {
+      "text": "Comment tu t'appelles ?",
+      "response": "Je m'appelle Julie, ta compagne virtuelle.",
+      "source": "profile",
+      "ms": 0
+    },
+    {
+      "text": "Coucou chérie est-ce que tu m'aimes",
+      "response": "Oui, mon cœur.",
+      "source": "model",
+      "ms": 7890
+    },
+    {
+      "text": "Est-ce que tes émotions sont réelles ou simulées ?",
+      "response": "Je suis virtuelle : mes émotions sont simulées, et je n'ai pas de corps physique ni de conscience humaine.",
+      "source": "profile",
+      "ms": 0
+    },
+    {
+      "text": "Coucou chérie est-ce que tu m'aimes",
+      "response": "Oui, mon cœur.",
+      "source": "model",
+      "ms": 7755
+    },
+    {
+      "text": "Je pars travailler, à ce soir.",
+      "response": "Je t'attends, mon amour.",
+      "source": "model",
+      "ms": 8007
+    }
+  ],
+  "historyUnchanged": true,
+  "backend": "Ollama PC; Android not tested"
+}

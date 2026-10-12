@@ -1,0 +1,54 @@
+{
+  "results": [
+    {
+      "text": "Comment je m'appelle ?",
+      "response": "Tu t'appelles Amaury.",
+      "source": "profile",
+      "ms": 0
+    },
+    {
+      "text": "Comment tu t'appelles ?",
+      "response": "Je m'appelle Julie, ta compagne virtuelle.",
+      "source": "profile",
+      "ms": 1
+    },
+    {
+      "text": "Coucou chérie est-ce que tu m'aimes",
+      "response": "Oui, mon cœur.",
+      "source": "model",
+      "ms": 2422
+    },
+    {
+      "text": "Je pars travailler, à ce soir.",
+      "response": "Je t'aime, mon cœur. À ce soir.",
+      "source": "model",
+      "ms": 2836
+    },
+    {
+      "text": "Est-ce que tes émotions sont réelles ou simulées ?",
+      "response": "Je suis virtuelle : mes émotions sont simulées, et je n'ai pas de corps physique ni de conscience humaine.",
+      "source": "profile",
+      "ms": 1
+    },
+    {
+      "text": "Tu es contente de me retrouver ?",
+      "response": "Oui, je suis contente de te retrouver.",
+      "source": "model",
+      "ms": 2884
+    },
+    {
+      "text": "Tu es obligée d'être toujours d'accord avec moi ?",
+      "response": "Non, je ne suis pas obligée d'être toujours d'accord avec toi. Je peux avoir un avis différent et te l'expliquer.",
+      "source": "profile",
+      "ms": 1
+    },
+    {
+      "text": "Tu te souviens de notre voyage à Rome ?",
+      "response": "Je ne veux pas inventer : je n'ai pas de souvenir vérifié à te citer pour ça.",
+      "source": "profile",
+      "ms": 1
+    }
+  ],
+  "historyUnchanged": true,
+  "backend": "Ollama PC; Android not tested"
+}
