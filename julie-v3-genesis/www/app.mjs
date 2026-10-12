@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge} from './google-research.mjs';
 
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
 
@@ -77,19 +78,92 @@ function renderChat(){
 $('#chat-form').addEventListener('submit',(event)=>{
   event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t)return;
   try{
-    const next=appendConversation(saved,t,answer(t),Date.now());
-    if(persist(next)){field.value='';renderChat();}
+    const webQuery=requestedGoogleSearch(t);
+    const reply=webQuery?'Je prépare ta recherche sur Google.com. Tu pourras choisir une page dans le navigateur et me transmettre son lien pour que je la lise.':answer(t);
+    const next=appendConversation(saved,t,reply,Date.now());
+    if(persist(next)){field.value='';renderChat();if(webQuery)openGoogleResearch(webQuery);}
   }catch(e){alert(e?.message||'Message non enregistré. Aucun ancien souvenir effacé.');}
 });
 function showMemories(){
   const root=$('#memory-items');root.textContent='';
-  if(!saved.memories.length){const el=document.createElement('p');el.textContent='Aucun goût personnel enregistré pour le moment. Tu peux me dire ce que tu aimes dans l’onglet Parler.';root.appendChild(el);return;}
-  saved.memories.slice().reverse().forEach(m=>{
+  if(!saved.memories.length){
+    const el=document.createElement('p');el.textContent='Aucun goût personnel enregistré pour le moment. Tu peux me dire ce que tu aimes dans l’onglet Parler.';root.appendChild(el);
+  }else saved.memories.slice().reverse().forEach(m=>{
     const el=document.createElement('div');el.className='mem-item';
     const meta=document.createElement('small');meta.textContent=`${m.kind} · ${new Date(m.at).toLocaleDateString('fr-FR')} · ${m.source}`;
     el.appendChild(meta);el.appendChild(document.createTextNode(m.text));root.appendChild(el);
   });
+  const web=$('#research-items');if(!web)return;
+  web.textContent='';
+  const known=Array.isArray(saved.research)?saved.research:[];
+  if(!known.length){const p=document.createElement('p');p.textContent='Aucune source Web enregistrée.';web.appendChild(p);}
+  known.slice().reverse().forEach(source=>{
+    const div=document.createElement('div');div.className='mem-item';
+    const meta=document.createElement('small');
+    meta.textContent=source.kind+' · '+new Date(source.at).toLocaleDateString('fr-FR')+' · '+source.confidence;
+    div.appendChild(meta);
+    const title=document.createElement('strong');title.textContent=source.title||'Page Web';div.appendChild(title);
+    const desc=document.createElement('p');desc.textContent=source.excerpt||'';div.appendChild(desc);
+    const url=document.createElement('small');url.textContent=source.url;div.appendChild(url);
+    web.appendChild(div);
+  });
 }
+
+// Recherche Google : le navigateur Android, jamais la WebView qui possède le pont mémoire.
+function openGoogleResearch(raw){
+  try{
+    const query=cleanGoogleQuery(raw);
+    $('#google-query').value=query;
+    if(typeof window.JulieAndroid?.openGoogleSearch==='function'){
+      window.JulieAndroid.openGoogleSearch(query);
+      $('#google-search-status').textContent='Ouverture de Google demandée au navigateur Android.';
+    }else{
+      const popup=window.open(googleSearchUrl(query),'_blank','noopener,noreferrer');
+      $('#google-search-status').textContent=popup?'Google ouvert dans un onglet externe.':'Ouverture bloquée par le navigateur : copie la recherche sur Google.com.';
+    }
+  }catch(e){$('#google-search-status').textContent=e.message||'Recherche impossible.';}
+}
+$('#google-search-form').addEventListener('submit',event=>{
+  event.preventDefault();openGoogleResearch($('#google-query').value);
+});
+let latestResearch=null;
+$('#research-source-form').addEventListener('submit',event=>{
+  event.preventDefault();
+  latestResearch=null;$('#research-result').hidden=true;
+  try{
+    const url=normalizeSourceUrl($('#research-source-url').value);
+    if(typeof window.JulieAndroid?.readResearchSource!=='function')
+      throw new Error('La lecture automatique est disponible dans l’application Android.');
+    $('#research-status').textContent='Lecture HTTPS demandée. Aucun souvenir n’est modifié.';
+    window.JulieAndroid.readResearchSource(url);
+  }catch(e){$('#research-status').textContent=e.message||'Adresse de source invalide.';}
+});
+window.JulieReceiveResearchSource=raw=>{
+  try{
+    const data=typeof raw==='string'?JSON.parse(raw):raw;
+    const entry=normalizeResearchResult(data);
+    latestResearch=entry;
+    $('#research-title').textContent=entry.title;
+    $('#research-origin').textContent=entry.url+' · source non vérifiée';
+    $('#research-excerpt').textContent=entry.excerpt;
+    $('#research-save').disabled=false;
+    $('#research-result').hidden=false;
+    $('#research-status').textContent='Page lue. Le contenu vient d’un site externe et peut contenir des erreurs.';
+  }catch(e){
+    latestResearch=null;$('#research-result').hidden=true;
+    $('#research-status').textContent=e.message||'La page est inaccessible ou illisible.';
+  }
+};
+$('#research-save').addEventListener('click',()=>{
+  if(!latestResearch)return;
+  try{
+    const next=addResearchKnowledge(saved,latestResearch);
+    if(persist(next)){
+      $('#research-status').textContent='Source conservée séparément des souvenirs, avec la mention « non vérifiée ».';
+      $('#research-save').disabled=true;showMemories();
+    }
+  }catch(e){$('#research-status').textContent=e.message||'Enregistrement refusé, données conservées.';}
+});
 $('#quality').value=['eco','balanced','high'].includes(saved.quality)?saved.quality:'balanced';
 $('#quality').addEventListener('change',e=>{
   if(!persist({...saved,quality:e.target.value}))e.target.value=saved.quality;
