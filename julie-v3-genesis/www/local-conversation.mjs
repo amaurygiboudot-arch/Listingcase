@@ -61,7 +61,7 @@ export async function localReply(state,text){
   if(profile)return profile;
   if(text.length>2400)throw new Error('Message trop long pour ce moteur : limite de 2 400 caractères.');
   const rules=state.learning.disabled||!needsScienceContext(state.messages,text)?null:await verifiedRules(state.learning.documentary);
-  const reply=checkDialogueReply(await generateLocal(buildPrompt(state.messages,text,!!rules,false,state.dna,selectedModel())),state.messages,text);
+  const reply=checkDialogueReply(await generateLocal(buildPrompt(state.messages,text,!!rules,false,state.dna,selectedModel())),state.messages,text,state.memories);
   return reply+(rules&&/isotop|isobar|masse|charge|neutron|proton/i.test(text)?'\nSource documentaire fournie au modèle : '+rules.source:'');
 }
 export async function localExamRespond(question,rules){

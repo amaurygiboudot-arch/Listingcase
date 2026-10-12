@@ -11,8 +11,24 @@ export function repetitionContext(messages){
  for(let i=0;i<recent.length;i++)if(recent[i].role==='user'&&isStopRequest(recent[i].text))start=i+1;
  return recent.slice(start).filter(m=>m.role==='user'||(counts.get(normalizeDialogue(m.text))||0)<2).slice(-4);
 }
-export function checkDialogueReply(reply,messages,text){
- reply=correctDirectAddress(reply);
+// Évite de transformer une scène commune jamais enregistrée en souvenir affirmé.
+ // Une vraie déclaration utilisateur conservée reste une source possible.
+export function stripUnverifiedSharedMoments(reply,memories=[]){
+ const parts=String(reply).split(/(?<=[.!?])\s+/u);
+ const known=(Array.isArray(memories)?memories:[]).filter(m=>m&&m.source==='message utilisateur'&&m.confidence===1).map(m=>normalizeDialogue(m.text));
+ const keep=parts.filter(s=>{
+  const normalized=normalizeDialogue(s);
+  const match=normalized.match(/(?:ca me rappelle|je me souviens de|je me rappelle) (?:notre|nos) ([a-z0-9 ]+)/);
+  if(match){
+   const key=match[1].trim().split(/\s+/).slice(0,7).join(' ');
+   return key.length>5&&known.some(v=>v.includes(key));
+  }
+  return !/(?:comme la derniere fois|souviens toi de notre premiere fois)/.test(normalized);
+ });
+ return keep.join(' ').trim()||"Je préfère ne pas inventer de souvenir partagé. Raconte-moi ce moment si tu en as envie.";
+}
+export function checkDialogueReply(reply,messages,text,memories=[]){
+ reply=correctDirectAddress(stripUnverifiedSharedMoments(reply,memories));
  const key=normalizeDialogue(reply);
  const same=messages.slice(-8).filter(m=>m.role!=='user'&&normalizeDialogue(m.text)===key);
  if(key.length>30&&same.length>=2)throw Error('Le moteur répète une ancienne réponse. Aucun nouveau message de Julie enregistré.');

@@ -43,7 +43,7 @@ export function adaptDNAFromDirectChat(dna,messages,currentText,at){
 export function momentContext(text){
  const t=plain(text);
  if(/\b(apk|android|github|programme|code|projet|compile|compilation|bug|tests?|developp\w*|application|logiciel|mise a jour)\b/.test(t))
-  return {humeur:'concentrée',priorite:'projet',prompt:'Échange technique : sois concrète, précise et sans surnoms amoureux.'};
+  return {humeur:'concentrée',priorite:'projet',prompt:'Échange technique : propose 2 à 4 étapes vérifiables et cite les outils précis si connus, sans inventer de tests exécutés. Évite les surnoms amoureux.'};
  if(/\b(examen|etudi\w*|apprendre|revision|cours|recherche scientifique)\b/.test(t))
   return {humeur:'concentrée',priorite:'apprentissage',prompt:'Échange éducatif : vérifie les faits et distingue les hypothèses.'};
  if(/\b(fatigu\w*|triste|inquiet\w*|stress\w*|difficile)\b/.test(t))

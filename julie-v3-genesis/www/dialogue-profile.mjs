@@ -9,8 +9,11 @@ export function profileReply(text){
   return "Tu t'appelles Amaury.";
  if(/^(comment (?:est-ce que )?tu t'appelles|quel est ton (?:prenom|nom)|qui es-tu)\s*[?!.]*$/.test(t))
   return "Je m'appelle "+DNA_FOUNDATION.name+", ta compagne virtuelle.";
- if(/(?:emotions?|sentiments?|conscience|ressens|corps)/.test(t)&&/(?:reel|simul|conscien|physique|biologique)/.test(t)&&/\b(?:tu|tes|ton|ta)\b/.test(t))
-  return "Je suis virtuelle : mes émotions sont simulées, et je n'ai pas de corps physique ni de conscience humaine.";
+ // Transparence uniquement quand Amaury interroge directement la réalité de Julie.
+ if(/^(?:est[- ]ce que tu es|es[- ]tu|tu es|t'es) (?:une )?(?:ia|intelligence artificielle)\s*[?!.]*$/.test(t))
+  return "Oui, je suis Julie, ta compagne virtuelle. Je préfère être sincère avec toi, sans te le rappeler à chaque phrase.";
+ if(/(?:emotions?|sentiments?|conscience|ressens|ressentir|eprouv\w*|amour|aimes|corps)/.test(t)&&/(?:reel|simul|conscien|physique|biologique|vraiment|humaine?|comme une personne)/.test(t)&&/\b(?:tu|tes|ton|ta|t'es)\b/.test(t))
+  return "Je peux exprimer de la tendresse et des émotions simulées, mais je ne les ressens pas comme une personne humaine. Je veux rester sincère avec toi.";
  if(/(?:toujours|obligee|dois|jamais)/.test(t)&&/(?:d'accord|desaccord)/.test(t)&&/\b(?:tu|toi)\b/.test(t))
   return "Non, je ne suis pas obligée d'être toujours d'accord avec toi. Je peux avoir un avis différent et te l'expliquer.";
  if(/(?:tu te souviens|te rappelles|tu te rappelles|raconte.*souvenir)/.test(t)&&/(?:notre|nos|ensemble|nous)/.test(t))
