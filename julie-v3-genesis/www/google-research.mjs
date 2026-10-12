@@ -15,7 +15,7 @@ export function googleSearchUrl(value){
 }
 export function requestedGoogleSearch(value){
   const text=String(value||'').trim();
-  const match=text.match(/^(?:cherche(?:\s+sur\s+google)?|recherche(?:\s+sur\s+google)?|fais\s+une\s+recherche(?:\s+google)?|google)\s*(?:[:\-]\s*|\s+)(.+)$/i);
+  const match=text.match(/^(?:cherche\s+sur\s+google|recherche\s+sur\s+google|fais\s+une\s+recherche(?:\s+google)?\s*:|google)\s*(?:[:\-]\s*|\s+)(.+)$/i);
   if(!match)return null;
   try{return cleanGoogleQuery(match[1]);}catch{return null;}
 }
