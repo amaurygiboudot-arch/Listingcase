@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from '../www/state-store.mjs';
+import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,appendJulieReply,checkCapacity} from '../www/state-store.mjs';
 
 test('Identité permanente et versionnement sans troncature automatique',()=>{
   let s=createInitialState(1000);
@@ -42,4 +42,14 @@ test('Plein stockage : erreur et données conservées',()=>{
   const s=createInitialState();s.messages.push({role:'user',at:3,text:'x'.repeat(MAX_STATE_BYTES)});
   assert.throws(()=>checkCapacity(s),/pleine/);
   assert.equal(s.messages[0].text.length,MAX_STATE_BYTES);
+});
+
+test('Une réponse Web de Julie ne crée pas de faux message utilisateur',()=>{
+  const base=createInitialState(10);
+  const next=appendJulieReply(base,'J’ai lu une page HTTPS, source non vérifiée.',20);
+  assert.equal(next.messages.length,1);
+  assert.equal(next.messages[0].role,'julie');
+  assert.equal(next.learning.length,0);
+  assert.equal(next.memories.length,0);
+  assert.throws(()=>appendJulieReply(base,'',21));
 });
