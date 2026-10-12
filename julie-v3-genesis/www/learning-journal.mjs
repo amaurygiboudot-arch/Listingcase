@@ -31,20 +31,24 @@ export function dailyLearnings(state,now=Date.now(),offsetMinutes=-new Date(now)
     .filter(x=>day(Number(x.at))===today);
   const sources=(Array.isArray(state?.research)?state.research:[])
     .filter(x=>day(Number(x.at))===today);
-  return {learned,sources,date:new Date(now+offset*60_000).toISOString().slice(0,10)};
+  const external=(Array.isArray(state?.externalResearch)?state.externalResearch:[])
+    .filter(x=>day(Number(x.at))===today);
+  return {learned,sources,external,date:new Date(now+offset*60_000).toISOString().slice(0,10)};
 }
 export function isDailyLearningQuestion(text){
   return /(?:^|\b)(?:qu['’]est[- ]ce que tu as appris aujourd['’]hui|qu['’]as[- ]tu appris aujourd['’]hui|tu as appris quoi aujourd['’]hui|bilan de tes apprentissages aujourd['’]hui)\s*\??\s*$/i.test(String(text||'').trim());
 }
 export function replyDailyLearning(state,now=Date.now(),offsetMinutes=-new Date(now).getTimezoneOffset()){
   const daily=dailyLearnings(state,now,offsetMinutes);
-  if(!daily.learned.length&&!daily.sources.length)
+  if(!daily.learned.length&&!daily.sources.length&&!daily.external.length)
     return "Aujourd'hui, je n'ai encore enregistré aucun nouvel apprentissage vérifiable. Je préfère te le dire plutôt qu'inventer mes découvertes.";
   const notes=daily.learned.slice(-3).map(x=>"«"+x.content+"» ("+x.confidence+")");
   const links=daily.sources.slice(-2).map(x=>(x.title||"Page consultée")+" ("+x.url+", non vérifiée)");
+  const imported=daily.external.slice(-2).map(x=>x.title+' (rapport ChatGPT importé, non revérifié)');
   const parts=[];
   if(notes.length)parts.push("Dans nos échanges, j'ai retenu : "+notes.join(" ; ")+".");
   if(links.length)parts.push("Comme sources Web enregistrées : "+links.join(" ; ")+".");
+  if(imported.length)parts.push("Depuis ChatGPT, j’ai reçu : "+imported.join(" ; ")+".");
   parts.push("Ce sont des informations enregistrées, pas des vérités que j'ai vérifiées toute seule.");
   return parts.join(" ");
 }
