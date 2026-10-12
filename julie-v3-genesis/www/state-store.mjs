@@ -73,7 +73,7 @@ export function mergeImport(current,external){
   const research=before.research.map(x=>({...x}));
   const messages=before.messages.map(m=>({...m}));
   const memories=before.memories.map(m=>({...m}));
-  let blocked=0,addedMessages=0,addedMemories=0;
+  let blocked=0,addedMessages=0,addedMemories=0,addedResearch=0;
   for(const item of incoming.messages){
     const m={...item};
     if(cutoff>0&&stamp(m.at)<=cutoff){blocked++;continue;}
@@ -92,7 +92,7 @@ export function mergeImport(current,external){
     const key=webKey(entry);
     if(!webSeen.has(key)){
       if(research.length>=RESEARCH_LIMIT)throw new Error('Trop de sources Web à importer');
-      research.push(entry);webSeen.add(key);
+      research.push(entry);webSeen.add(key);addedResearch++;
     }
   }
   research.sort((a,b)=>stamp(a.at)-stamp(b.at));
@@ -100,7 +100,7 @@ export function mergeImport(current,external){
   memories.sort((a,b)=>stamp(a.at)-stamp(b.at));
   const merged={...before,messages,memories,research};
   checkCapacity(merged);
-  return {state:merged,addedMessages,addedMemories,blocked};
+  return {state:merged,addedMessages,addedMemories,addedResearch,blocked};
 }
 export function eraseDemoHistory(current,at=Date.now()){
   const state=parseJulieState(current);
