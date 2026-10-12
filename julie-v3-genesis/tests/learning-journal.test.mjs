@@ -34,7 +34,7 @@ test('Bilan quotidien fondé uniquement sur les apprentissages enregistrés',()=
   assert.match(answer,/Blender/);
   assert.match(answer,/Source scientifique/);
   assert.doesNotMatch(answer,/thé/);
-  assert.equal(isDailyLearningQuestion("Julie, qu'as-tu appris aujourd'hui ?"),false);
+  assert.equal(isDailyLearningQuestion("Julie, qu'as-tu appris aujourd'hui ?"),true);
   assert.equal(isDailyLearningQuestion("Qu'as-tu appris aujourd'hui ?"),true);
   assert.match(replyDailyLearning({},now,120),/aucun nouvel apprentissage/);
 });
