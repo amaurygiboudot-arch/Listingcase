@@ -8,6 +8,7 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.Toast;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.IDN;
@@ -65,6 +66,84 @@ public final class JulieWebResearch {
             finally{reading.set(false);}
             report(result);
         });
+    }
+    // Recherche autonome gratuite sur l'API publique Wikipédia ; Google reste accessible
+    // en tant que moteur principal manuel, ses résultats n'étant pas accessibles
+    // légalement à une nouvelle application via l'ancienne Custom Search JSON API.
+    @JavascriptInterface public void searchPublicKnowledge(String rawQuery){
+        if(rawQuery==null||rawQuery.trim().isEmpty()||rawQuery.length()>180){
+            reportSearch(failure("Recherche invalide."));return;
+        }
+        if(!reading.compareAndSet(false,true)){
+            reportSearch(failure("Une recherche est déjà en cours."));return;
+        }
+        final String query=rawQuery.replaceAll("\\s+"," ").trim();
+        network.execute(()->{
+            JSONObject result;
+            try{result=searchWikipedia(query);}
+            catch(Exception ex){result=failure("Recherche Wikipédia indisponible. Réessaie avec une connexion Internet.");}
+            finally{reading.set(false);}
+            reportSearch(result);
+        });
+    }
+    private void reportSearch(JSONObject result){
+        String payload=JSONObject.quote(result.toString());
+        activity.runOnUiThread(()->{
+            if(web!=null)web.evaluateJavascript("window.JulieReceivePublicSearch("+payload+")",null);
+        });
+    }
+    private static JSONObject searchWikipedia(String query) throws Exception {
+        // L'API est publique, documentation : mediawiki.org/wiki/API:Search.
+        // On ne collecte aucune donnée privée et on ne transmet que les mots recherchés.
+        Uri target=new Uri.Builder().scheme("https").authority("fr.wikipedia.org")
+            .appendPath("w").appendPath("api.php")
+            .appendQueryParameter("action","query")
+            .appendQueryParameter("list","search")
+            .appendQueryParameter("srsearch",query)
+            .appendQueryParameter("srlimit","3")
+            .appendQueryParameter("srprop","snippet")
+            .appendQueryParameter("format","json").build();
+        URL url=validate(target.toString());
+        HttpsURLConnection conn=(HttpsURLConnection)url.openConnection();
+        conn.setConnectTimeout(6500);conn.setReadTimeout(7500);
+        conn.setInstanceFollowRedirects(false);
+        conn.setRequestProperty("User-Agent","JULIE-Research/0.3.5 (Android educational test; contact: Wikimedia API support)");
+        conn.setRequestProperty("Accept","application/json");
+        try{
+            if(conn.getResponseCode()!=200)throw new IllegalStateException("Service inaccessible");
+            String mime=String.valueOf(conn.getContentType()).toLowerCase(Locale.ROOT);
+            if(!mime.contains("application/json"))throw new IllegalStateException("Format inattendu");
+            ByteArrayOutputStream out=new ByteArrayOutputStream();
+            try(InputStream in=conn.getInputStream()){
+                byte[] buf=new byte[4096];int len;
+                while((len=in.read(buf))!=-1){
+                    if(out.size()+len>64_000)throw new IllegalStateException("Réponse trop longue");
+                    out.write(buf,0,len);
+                }
+            }
+            JSONObject payload=new JSONObject(out.toString(StandardCharsets.UTF_8.name()));
+            JSONArray entries=payload.getJSONObject("query").getJSONArray("search");
+            JSONArray cleaned=new JSONArray();
+            for(int i=0;i<Math.min(3,entries.length());i++){
+                JSONObject item=entries.getJSONObject(i);
+                String title=item.optString("title","").trim();
+                if(title.isEmpty())continue;
+                String snippet=Html.fromHtml(item.optString("snippet",""),
+                    Html.FROM_HTML_MODE_LEGACY).toString().replaceAll("\\s+"," ").trim();
+                String page="https://fr.wikipedia.org/wiki/"+Uri.encode(title.replace(' ','_'));
+                JSONObject row=new JSONObject();
+                row.put("title",title.length()>160?title.substring(0,160):title);
+                row.put("excerpt",snippet.length()>460?snippet.substring(0,460):snippet);
+                row.put("url",page);
+                cleaned.put(row);
+            }
+            JSONObject result=new JSONObject();
+            result.put("ok",true);
+            result.put("engine","Wikimedia Action API");
+            result.put("query",query);
+            result.put("results",cleaned);
+            return result;
+        }finally{conn.disconnect();}
     }
     private static JSONObject failure(String error){
         JSONObject result=new JSONObject();
