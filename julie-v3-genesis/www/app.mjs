@@ -186,7 +186,7 @@ $('#clear-data').addEventListener('click',()=>{
 function importOlderMemories(raw){
   if(typeof raw!=='string'||new TextEncoder().encode(raw).length>MAX_STATE_BYTES)throw new Error('Export trop volumineux');
   const merged=mergeImport(saved,raw);
-  const msg=`Ajouter ${merged.addedMessages} messages et ${merged.addedMemories} souvenirs ? Les données actuelles seront conservées. ${merged.blocked} entrées antérieurement supprimées resteront effacées.`;
+  const msg=`Ajouter ${merged.addedMessages} messages, ${merged.addedMemories} souvenirs et ${merged.addedResearch||0} sources Web ? Les données actuelles seront conservées. ${merged.blocked} entrées antérieurement supprimées resteront effacées.`;
   if(!confirm(msg))return false;
   if(!persist(merged.state))return false;
   renderChat();showMemories();
