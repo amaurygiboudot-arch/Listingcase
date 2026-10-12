@@ -23,3 +23,9 @@ Aucun test de cette version sur le téléphone débranché.
 
 ## Limite du test réel PC
 L'essai Ollama qwen2.5:3b du 12 octobre a dépassé le délai de 180 secondes sans résultat exploitable. Le bloc finally a demandé le déchargement du modèle et le processus s'est terminé avec code 1. Pas de réussite du modèle revendiquée. Les réponses documentaires sont vérifiées par la voie réelle localReply avec pont simulé; la consigne générale de prénom reste à valider sur téléphone.
+
+## Livraison vérifiée
+APK compilé avec succès en 9 min 3 s. Version 300009 / 0.3.13-identite-test, paquet com.julie.learning.experimental.
+Fichier JULIE-TEST-0.3.13-identite.apk: 65 689 253 octets; SHA-256 7f32fec734a6ccee6daff8bc39cc6fbe51231409a099cc46bd52548104451fcc.
+Signature identique aux mises à jour précédentes: certificat SHA-256 668bbf6dbcc590da70a37b0102a59407a3539f0146ccf24b68c3d0f6061499c2.
+Copie transférée vérifiée par SHA-256 et intégrité ZIP. Bibliothèques natives strictement identiques à 0.3.12. Installation par-dessus l'existant, sans désinstallation ni téléchargement du modèle.
