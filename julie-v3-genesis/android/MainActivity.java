@@ -40,6 +40,7 @@ public final class MainActivity extends Activity {
     private JulieSecureStore secureStore;
     private JulieUpdateManager updates;
     private WebView web;
+    private JulieLocalEngine localEngine;
     private String pendingExport;
 
     public final class JulieBridge {
@@ -142,7 +143,8 @@ public final class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         settings.setMediaPlaybackRequiresUserGesture(true);
         web.addJavascriptInterface(new JulieBridge(),"JulieAndroid");
-        web.addJavascriptInterface(new JulieLocalEngine(getApplicationContext()),"JulieLocal");
+        localEngine=new JulieLocalEngine(getApplicationContext());
+        web.addJavascriptInterface(localEngine,"JulieLocal");
         updates=new JulieUpdateManager(this,web);
         web.addJavascriptInterface(updates,"JulieUpdater");
         web.setWebViewClient(new WebViewClient(){
@@ -192,6 +194,7 @@ public final class MainActivity extends Activity {
         }
     }
     @Override protected void onDestroy(){
+        if(localEngine!=null)localEngine.close();
         if(updates!=null)updates.close();
         if(web!=null){web.removeJavascriptInterface("JulieLocal");web.removeJavascriptInterface("JulieUpdater");web.removeJavascriptInterface("JulieAndroid");web.destroy();}
         super.onDestroy();

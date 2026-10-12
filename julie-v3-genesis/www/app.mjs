@@ -128,6 +128,17 @@ function renderChat(){
   root.scrollTop=root.scrollHeight;
 }
 let chatBusy=false;
+let pendingBubble=null;
+document.addEventListener('julie-token',event=>{
+  if(!chatBusy)return;
+  if(!pendingBubble){
+    pendingBubble=document.createElement('div');pendingBubble.className='bubble julie';
+    pendingBubble.dataset.pending='true';
+    $('#conversation').appendChild(pendingBubble);
+  }
+  pendingBubble.textContent=event.detail.text;
+  $('#conversation').scrollTop=$('#conversation').scrollHeight;
+});
 $('#chat-input').placeholder='Écris à Julie ou tape contrôle surprise';
 $('#chat-form').addEventListener('submit',async(event)=>{
   event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t||chatBusy||!storageHealthy)return;
@@ -145,7 +156,7 @@ $('#chat-form').addEventListener('submit',async(event)=>{
     if(JSON.stringify(saved)!==baseline)throw new Error('Mémoire modifiée pendant la réponse ; renvoie ton message.');
     if(persist(next)){field.value='';renderChat();renderLearning();}
   }catch(e){alert(e?.message||'Message non enregistré. Aucun ancien souvenir effacé.');}
-  finally{chatBusy=false;if(sendButton){sendButton.disabled=false;sendButton.textContent=buttonLabel;}}
+  finally{chatBusy=false;pendingBubble?.remove();pendingBubble=null;if(sendButton){sendButton.disabled=false;sendButton.textContent=buttonLabel;}}
 });
 function renderLearning(){
   document.dispatchEvent(new Event('julie-learning-changed'));

@@ -9,6 +9,11 @@
 
 static std::mutex engine_mutex;
 static std::once_flag init_flag;
+static std::unique_ptr<llama_model,decltype(&llama_model_free)> model(nullptr,llama_model_free);
+static std::string loaded_path;
+extern "C" JNIEXPORT void JNICALL Java_com_humanpartner_JulieLocalEngine_release(JNIEnv*,jclass) {
+    std::lock_guard<std::mutex> lock(engine_mutex);model.reset();loaded_path.clear();
+}
 static std::string from_bytes(JNIEnv* env,jbyteArray a) {
     if(!a)throw std::runtime_error("Argument absent");
     std::string s(env->GetArrayLength(a),'\0');
@@ -24,14 +29,18 @@ static void batch_tokens(llama_batch_ext* b,const llama_token* t,int n,int pos) 
     llama_batch_ext_set_output_logits(b,n-1,true);
 }
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_humanpartner_JulieLocalEngine_infer(JNIEnv* env,jclass,jbyteArray path,jbyteArray input) {
+Java_com_humanpartner_JulieLocalEngine_infer(JNIEnv* env,jclass,jbyteArray path,jbyteArray input,jobject sink) {
     std::lock_guard<std::mutex> lock(engine_mutex);
     try {
         std::call_once(init_flag,[]{llama_log_set([](ggml_log_level,const char*,void*){},nullptr);llama_backend_init();});
         auto filename=from_bytes(env,path),prompt=from_bytes(env,input);
         auto mp=llama_model_default_params();mp.n_gpu_layers=0;
-        std::unique_ptr<llama_model,decltype(&llama_model_free)> model(
-            llama_model_load_from_file(filename.c_str(),mp),llama_model_free);
+        if(!model || loaded_path!=filename) {
+            model.reset(llama_model_load_from_file(filename.c_str(),mp));
+            loaded_path=filename;
+        }
+        jmethodID progress=env->GetMethodID(env->GetObjectClass(sink),"progress","([B)Z");
+        if(!progress)throw std::runtime_error("Progress callback unavailable");
         if(!model)throw std::runtime_error("Chargement du modele impossible");
         const auto* vocab=llama_model_get_vocab(model.get());
         int n=-llama_tokenize(vocab,prompt.data(),prompt.size(),nullptr,0,true,true);
@@ -63,6 +72,14 @@ Java_com_humanpartner_JulieLocalEngine_infer(JNIEnv* env,jclass,jbyteArray path,
             if(count<0){piece.resize(-count);count=llama_token_to_piece(vocab,token,piece.data(),piece.size(),0,false);}
             if(count<0)throw std::runtime_error("Conversion de texte impossible");
             output.append(piece.data(),count);
+            if(i==0 || i%4==0) {
+                auto update=env->NewByteArray(output.size());
+                if(!update)throw std::runtime_error("Memoire insuffisante");
+                env->SetByteArrayRegion(update,0,output.size(),reinterpret_cast<const jbyte*>(output.data()));
+                bool keep=env->CallBooleanMethod(sink,progress,update);
+                env->DeleteLocalRef(update);
+                if(env->ExceptionCheck()||!keep)throw std::runtime_error("Generation annulee");
+            }
             batch_tokens(batch.get(),&token,1,pos++);
         }
         if(!complete)output+="\n[Reponse interrompue : limite de longueur atteinte.]";
@@ -71,7 +88,7 @@ Java_com_humanpartner_JulieLocalEngine_infer(JNIEnv* env,jclass,jbyteArray path,
         if(result)env->SetByteArrayRegion(result,0,output.size(),reinterpret_cast<const jbyte*>(output.data()));
         return result;
     } catch(const std::exception& e) {
-        env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),e.what());
+        if(!env->ExceptionCheck())env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),e.what());
         return nullptr;
     }
 }

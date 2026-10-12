@@ -14,7 +14,23 @@ export function engineAvailable(bridge=globalThis.window?.JulieLocal){
 export async function generateLocal(prompt,bridge=globalThis.window?.JulieLocal){
   if(!engineAvailable(bridge))throw new Error('Le moteur local n’est pas disponible.');
   await new Promise(resolve=>setTimeout(resolve,30));
-  const result=JSON.parse(bridge.generate(prompt));
+  let result;
+  if(typeof bridge.start==='function'){
+    const id=bridge.start(prompt);
+    if(!id)throw new Error('Le moteur est déjà occupé ou indisponible.');
+    const deadline=Date.now()+120000;
+    let previous='';
+    for(;;){
+      result=JSON.parse(bridge.poll(id));
+      if(result.text&&result.text!==previous){
+        previous=result.text;
+        globalThis.document?.dispatchEvent(new CustomEvent('julie-token',{detail:{text:previous}}));
+      }
+      if(result.done)break;
+      if(Date.now()>deadline)throw new Error('Temps de réponse dépassé.');
+      await new Promise(resolve=>setTimeout(resolve,100));
+    }
+  }else{result=JSON.parse(bridge.generate(prompt));}
   if(result.error)throw new Error(result.error);
   if(typeof result.text!=='string'||!result.text.trim())throw new Error('Réponse locale vide');
   return result.text.trim();
