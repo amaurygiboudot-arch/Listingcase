@@ -22,6 +22,7 @@ public final class JulieLocalEngine {
 
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private volatile boolean closed;
+    private volatile long generationStarted=0,firstTokenMs=-1,totalMs=-1;
     private volatile String activeId="",partial="",finished=null;
     private static boolean loaded;
     static {
@@ -38,6 +39,7 @@ public final class JulieLocalEngine {
         try{
             android.app.ActivityManager.MemoryInfo mem=new android.app.ActivityManager.MemoryInfo();
             ((android.app.ActivityManager)context.getSystemService(Context.ACTIVITY_SERVICE)).getMemoryInfo(mem);
+            r.put("firstTokenMs",firstTokenMs);r.put("totalMs",totalMs);
             r.put("active",model.equals(large())?"3B":"1.5B");r.put("ready3b",largeReady());
             r.put("importing",importing);r.put("bytes",importedBytes);r.put("total",JulieModelFiles.SIZE);
             r.put("message",importMessage);r.put("ramBytes",mem.totalMem);r.put("freeRamBytes",mem.availMem);
@@ -83,6 +85,7 @@ public final class JulieLocalEngine {
     // Called only by the native worker. Keep UTF-8 conversion out of the UI thread.
     public boolean progress(byte[] bytes) {
         if(closed)return false;
+        if(firstTokenMs<0&&bytes.length>0)firstTokenMs=android.os.SystemClock.elapsedRealtime()-generationStarted;
         partial=new String(bytes,StandardCharsets.UTF_8);
         return true;
     }
@@ -102,12 +105,14 @@ public final class JulieLocalEngine {
         }catch(Exception e){
             try{result.put("error",e.getMessage()==null?"Erreur locale":e.getMessage());}catch(Exception ignored){}
         }
+        totalMs=android.os.SystemClock.elapsedRealtime()-generationStarted;
         try{result.put("done",true);}catch(Exception ignored){}
         return result.toString();
     }
     @JavascriptInterface public synchronized String start(String prompt) {
         if(importing||!available()||(!activeId.isEmpty()&&finished==null))return "";
         activeId=UUID.randomUUID().toString();partial="";finished=null;
+        generationStarted=android.os.SystemClock.elapsedRealtime();firstTokenMs=-1;totalMs=-1;
         worker.execute(()->finished=compute(prompt));
         return activeId;
     }

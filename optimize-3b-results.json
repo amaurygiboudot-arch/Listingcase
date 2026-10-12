@@ -1,0 +1,46 @@
+[
+  {
+    "mode": "baseline",
+    "text": "Et toi bébé qu'est-ce que tu fais de beau",
+    "response": "Je suis ici pour discuter, bébé. Que puis-je faire pour toi aujourd'hui ?",
+    "promptChars": 1393,
+    "promptTokens": 349,
+    "promptMs": 43859.283,
+    "loadMs": 36474.2236,
+    "totalMs": 83413,
+    "tokens": 21
+  },
+  {
+    "mode": "baseline",
+    "text": "Je rentre au travail, pas chez moi. Tu as compris ?",
+    "response": "Oui, tu rentres au travail.",
+    "promptChars": 1403,
+    "promptTokens": 352,
+    "promptMs": 2787.901,
+    "loadMs": 25.2466,
+    "totalMs": 4154,
+    "tokens": 10
+  },
+  {
+    "mode": "compact",
+    "text": "Et toi bébé qu'est-ce que tu fais de beau",
+    "response": "Bébé, je suis là pour t'accompagner dans toutes tes aventures, même quand tu rentres au travail.",
+    "promptChars": 769,
+    "promptTokens": 196,
+    "promptMs": 30632.432,
+    "loadMs": 24.1184,
+    "totalMs": 34711,
+    "tokens": 28
+  },
+  {
+    "mode": "compact",
+    "text": "Je rentre au travail, pas chez moi. Tu as compris ?",
+    "response": "Oui, je comprends, tu rentres au travail. Comment ça va pour toi aujourd'hui ?",
+    "promptChars": 779,
+    "promptTokens": 199,
+    "promptMs": 2977.749,
+    "loadMs": 27.744,
+    "totalMs": 6202,
+    "tokens": 22
+  }
+]

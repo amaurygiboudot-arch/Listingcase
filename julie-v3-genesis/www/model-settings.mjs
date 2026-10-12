@@ -17,7 +17,7 @@ export function mountModelSettings({canEdit=()=>true}={}){
   if(!bridge?.modelStatus){status.textContent='Choix du moteur disponible dans la nouvelle application Android.';buttons.forEach(b=>b.disabled=true);return;}
   try{
    const s=JSON.parse(bridge.modelStatus()),busy=s.importing||!canEdit();
-   status.textContent='Modèle actif : '+s.active+'. RAM du téléphone : '+(s.ramBytes/1e9).toFixed(1)+' Go. '+(s.importing?'Import : '+Math.floor(100*s.bytes/s.total)+' %. ': '')+(s.message||'');
+   status.textContent='Modèle actif : '+s.active+'. RAM du téléphone : '+(s.ramBytes/1e9).toFixed(1)+' Go. '+(s.importing?'Import : '+Math.floor(100*s.bytes/s.total)+' %. ': '')+(s.message||'')+(s.firstTokenMs>=0?' Premiers mots : '+(s.firstTokenMs/1000).toFixed(1)+' s.':'')+(s.totalMs>=0?' Durée totale : '+(s.totalMs/1000).toFixed(1)+' s.':'');
    buttons.forEach(b=>b.disabled=busy);useLarge.disabled=busy||!s.ready3b;
    const label=document.querySelector('#chat-view .pagehead p');if(label)label.textContent='Conversation expérimentale avec le modèle local Qwen2.5 '+s.active+'.';
   }catch{status.textContent='Impossible de lire le statut du moteur.';buttons.forEach(b=>b.disabled=true);}
