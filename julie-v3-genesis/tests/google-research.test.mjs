@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createInitialState,parseJulieState,mergeImport,eraseDemoHistory} from '../www/state-store.mjs';
 import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge,RESEARCH_LIMIT} from '../www/google-research.mjs';
 test('Recherche principale exclusivement Google.com, paramètres encodés',()=>{
   assert.equal(new URL(googleSearchUrl('actualité Julie & Qwen')).hostname,'www.google.com');
@@ -28,4 +29,23 @@ test('Une source reste externe, datée, non vérifiée, distincte des souvenirs'
   assert.deepEqual(next.memories,state.memories);
   assert.equal(addResearchKnowledge(next,data).research.length,1);
   assert.throws(()=>addResearchKnowledge({...state,research:Array(RESEARCH_LIMIT).fill(data)},data),/Limite/);
+});
+
+test('Import : connaissances Web conservées sans résurrection après suppression',()=>{
+  const past=addResearchKnowledge(createInitialState(1),normalizeResearchResult({
+    ok:true,url:'https://example.org/a',title:'Un site',excerpt:'Un contenu fictif'
+  },10));
+  const parsed=parseJulieState(JSON.stringify(past));
+  assert.equal(parsed.research.length,1);
+  const cleared=eraseDemoHistory(parsed,100);
+  assert.equal(cleared.research.length,0);
+  const recovered=mergeImport(cleared,past);
+  assert.equal(recovered.state.research.length,0);
+  assert.ok(recovered.blocked>=1);
+  const newer=addResearchKnowledge(createInitialState(101),normalizeResearchResult({
+    ok:true,url:'https://example.org/new',title:'Source récente',excerpt:'Contenu récent'
+  },200));
+  assert.equal(mergeImport(cleared,newer).state.research.length,1);
+  const old=JSON.parse(JSON.stringify(createInitialState(1)));delete old.research;
+  assert.deepEqual(parseJulieState(old).research,[]);
 });
