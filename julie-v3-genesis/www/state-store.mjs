@@ -1,3 +1,4 @@
+import {createDNA,normalizeDNA,mergeDNA,eraseDNA} from './digital-dna.mjs';
 // JULIE_001 — données de démonstration locales, sans suppression silencieuse.
 // Module pur : aucun accès au stockage ni au réseau.
 import {newLearningState,normalizeLearningState,mergeLearningStates} from './learning-engine.mjs';
@@ -16,7 +17,7 @@ export function checkCapacity(state){
 }
 export function createInitialState(now=Date.now()){
   return {id:JULIE_ID,schemaVersion:STATE_SCHEMA,version:'0.3.5',
-    firstOpened:now,quality:'balanced',deletedBefore:0,messages:[],memories:[],learning:newLearningState()};
+    firstOpened:now,quality:'balanced',deletedBefore:0,messages:[],memories:[],dna:createDNA(),learning:newLearningState()};
 }
 function stamp(v){return Number.isFinite(Number(v))&&Number(v)>=0?Number(v):0;}
 function validateMessages(messages){
@@ -46,7 +47,7 @@ export function parseJulieState(raw,{allowEmpty=false}={}){
     // Garder les champs inconnus : une mise à jour ne doit pas effacer des données futures.
     messages:input.messages.map(m=>({...m,role:m.role==='partner'?'julie':m.role})),
     memories:input.memories.map(m=>({...m})),
-    learning:normalizeLearningState(input.learning)};
+    dna:mergeDNA(input.dna,undefined,stamp(input.deletedBefore)),learning:normalizeLearningState(input.learning)};
   checkCapacity(result);
   return result;
 }
@@ -84,14 +85,17 @@ export function mergeImport(current,external){
   const addedLearnings=learning.records.filter(r=>!beforeLearnIds.has(r.id)).length;
   const removedLearnings=before.learning.records.filter(r=>!afterLearnIds.has(r.id)).length;
   const learningDisabled=!before.learning.disabled&&learning.disabled;
-  const merged={...before,deletedBefore:cutoff,messages,memories,learning};
+  const dna=mergeDNA(before.dna,incoming.dna,cutoff);
+  const addedDNA=dna.events.filter(e=>!before.dna.events.some(b=>b.id===e.id)).length;
+  const removedDNA=before.dna.events.filter(e=>!dna.events.some(b=>b.id===e.id)).length;
+  const merged={...before,deletedBefore:cutoff,messages,memories,learning,dna};
   checkCapacity(merged);
   return {state:merged,addedMessages,addedMemories,removedMessages,removedMemories,
-    addedLearnings,removedLearnings,learningDisabled,blocked};
+    addedLearnings,removedLearnings,learningDisabled,blocked,addedDNA,removedDNA};
 }
 export function eraseDemoHistory(current,at=Date.now()){
   const state=parseJulieState(current);
-  return {...state,deletedBefore:Math.max(state.deletedBefore,stamp(at)),messages:[],memories:[]};
+  return {...state,deletedBefore:Math.max(state.deletedBefore,stamp(at)),messages:[],memories:[],dna:eraseDNA(state.dna,at)};
 }
 export function appendConversation(current,text,reply,at=Date.now()){
   if(typeof text!=='string'||!text.trim()||typeof reply!=='string')throw new Error('Message invalide');

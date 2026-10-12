@@ -1,0 +1,10 @@
+{
+  "passed": 4,
+  "results": [
+    "Migration et évolution UI : anciens messages et souvenirs inchangés",
+    "Nouveau processus navigateur : ADN et raison retrouvés",
+    "Conversation : commande ton ADN reflète la valeur persistée",
+    "Échec de stockage : aucun événement ni succès fictif"
+  ],
+  "backend": "navigateur isolé, pas Android"
+}

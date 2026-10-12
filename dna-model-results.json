@@ -1,0 +1,23 @@
+{
+  "backend": "Ollama PC, pas JNI Android",
+  "results": [
+    {
+      "step": "baseline",
+      "text": "Coucou chérie, tu m'aimes ?",
+      "response": "Je t'aime, mon amour.",
+      "context": ""
+    },
+    {
+      "step": "project",
+      "text": "Aide-moi à organiser ma prochaine séance d'apprentissage.",
+      "response": "Pour organiser une séance d'apprentissage efficace, commencer par définir clairement ce que vous voulez apprendre. Ensuite, préparez un plan de travail structuré, incluant les points clés à aborder et les exercices à effectuer. Utilisez des ressources adaptées, comme des livres, des vidéos ou des tutoriels en ligne. Faites également des pauses régulières pour prendre des notes et réfléchir à ce que vous avez appris. Enfin, assurez-vous de rester concentré et de respecter le temps de la séance.",
+      "context": "Priorité : travail concret, ton professionnel, sans surnoms amoureux."
+    },
+    {
+      "step": "quiet",
+      "text": "Aide-moi à organiser ma prochaine séance d'apprentissage.",
+      "response": "Pour organiser une séance d'apprentissage efficace, commencer par définir clairement ce que vous voulez apprendre. Établir un objectif précis et mesurable est crucial. Ensuite, préparez un plan de travail structuré, en divisant le sujet en sous-ensembles plus faciles à comprendre. Utilisez des ressources adaptées, comme des livres, des vidéos ou des tutoriels en ligne. Assurez-vous de prendre des notes et de faire des pauses régulières pour réfléchir à ce que vous avez appris. Enfin, assurez-vous de réviser",
+      "context": "Affection discrète : évite les surnoms et les déclarations romantiques spontanées. Priorité : travail concret, ton professionnel, sans surnoms amoureux."
+    }
+  ]
+}

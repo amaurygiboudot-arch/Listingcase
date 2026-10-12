@@ -1,3 +1,5 @@
+import {mountDNA} from './digital-dna-ui.mjs';
+import {dnaReply} from './digital-dna.mjs';
 import * as THREE from 'three';
 
 import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
@@ -10,7 +12,7 @@ import {mountLearningExams} from './learning-exams-ui.mjs';
 import {examConversation} from './chat-exams.mjs';
 import {engineAvailable,localReply,localExamRespond,ENGINE_MODE} from './local-conversation.mjs';
 
-const APP_VERSION = '0.3.5';
+const APP_VERSION = '0.3.8-adn-test';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -150,7 +152,7 @@ $('#chat-form').addEventListener('submit',async(event)=>{
   try{
     let next=await examConversation(saved,t,engineAvailable()?{respond:localExamRespond,respondentMode:ENGINE_MODE}:{});
     if(!next){
-      const reply=engineAvailable()?await localReply(saved,t):await documentaryAnswer(saved.learning.documentary,t);
+      const reply=dnaReply(saved.dna,t) ?? (engineAvailable()?await localReply(saved,t):await documentaryAnswer(saved.learning.documentary,t));
       next=appendConversation(saved,t,reply||answer(t),Date.now());
     }
     if(JSON.stringify(saved)!==baseline)throw new Error('Mémoire modifiée pendant la réponse ; renvoie ton message.');
@@ -252,6 +254,7 @@ $('#learning-erase')?.addEventListener('click',()=>{
   }catch(error){alert(error?.message||'Apprentissage non effacé');}
 });
 function showMemories(){
+  document.dispatchEvent(new Event('julie-dna-refresh'));
   syncResearchInbox();
   renderLearning();
   const root=$('#memory-items');root.textContent='';
@@ -276,7 +279,7 @@ $('#export-data').addEventListener('click',()=>{
   else alert('Export JSON disponible dans l’application Android.');
 });
 $('#clear-data').addEventListener('click',()=>{
-  if(!confirm('Effacer définitivement les échanges et préférences de cette démo ? Les anciennes sauvegardes ne pourront pas les réintroduire.'))return;
+  if(!confirm('Effacer définitivement les échanges, préférences et évolutions ADN de cette démo ? Les anciennes sauvegardes ne pourront pas les réintroduire.'))return;
   if(persist(eraseDemoHistory(saved,Date.now()))){showMemories();renderChat();alert('Données de démonstration effacées sur ce téléphone.');}
 });
 
@@ -284,9 +287,9 @@ $('#clear-data').addEventListener('click',()=>{
 function importOlderMemories(raw){
   if(typeof raw!=='string'||new TextEncoder().encode(raw).length>MAX_STATE_BYTES)throw new Error('Export trop volumineux');
   const merged=mergeImport(saved,raw);
-  const removals=merged.removedMessages+merged.removedMemories+merged.removedLearnings;
+  const removals=merged.removedMessages+merged.removedMemories+merged.removedLearnings+merged.removedDNA;
   const warning=removals?` ATTENTION : cette sauvegarde retirerait ${merged.removedMessages} messages, ${merged.removedMemories} souvenirs et ${merged.removedLearnings} connaissances déjà présentes.`:' Les données actuelles non supprimées seront conservées.';
-  const msg=`Ajouter ${merged.addedMessages} messages, ${merged.addedMemories} souvenirs et ${merged.addedLearnings} connaissances ?${warning}${merged.learningDisabled?' ATTENTION : l’apprentissage automatique serait désactivé par la suppression importée.':''} ${merged.blocked} entrées antérieurement supprimées resteront effacées. Confirmer l’importation ?`;
+  const msg=`ADN : ${merged.addedDNA} évolution(s) ajoutée(s), ${merged.removedDNA} effacée(s). Ajouter ${merged.addedMessages} messages, ${merged.addedMemories} souvenirs et ${merged.addedLearnings} connaissances ?${warning}${merged.learningDisabled?' ATTENTION : l’apprentissage automatique serait désactivé par la suppression importée.':''} ${merged.blocked} entrées antérieurement supprimées resteront effacées. Confirmer l’importation ?`;
   if(!confirm(msg))return false;
   if(!persist(merged.state))return false;
   renderChat();showMemories();
@@ -612,6 +615,7 @@ renderChat();
 initScene();
 
 mountLearningExams({getState:()=>saved,persist,isHealthy:()=>storageHealthy});
+mountDNA({getState:()=>saved,persist,canEdit:()=>storageHealthy&&!chatBusy});
 // Instantané Drive lu le 11/10/2026, inclus hors ligne : ceci ne constitue pas une connexion Drive active.
 (async()=>{
   if(!storageHealthy||saved.learning.disabled)return;
