@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge,requestedSourceFromConversation} from './google-research.mjs';
+import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge,requestedSourceFromConversation,requestedPublicSearch,normalizePublicSearchResult} from './google-research.mjs';
 import {isDailyLearningQuestion,replyDailyLearning} from './learning-journal.mjs';
 import {parseChatGPTResearch,addChatGPTResearch} from './chatgpt-research.mjs';
 
@@ -81,12 +81,19 @@ $('#chat-form').addEventListener('submit',(event)=>{
   event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t)return;
   try{
     const webQuery=requestedGoogleSearch(t);
+    const publicQuery=webQuery?null:requestedPublicSearch(t);
     const sourceUrl=webQuery?null:requestedSourceFromConversation(t);
-    const reply=isDailyLearningQuestion(t)?replyDailyLearning(saved):sourceUrl?'Je consulte le texte public de cette page. Je te dirai ce que j’ai réellement pu lire, avec sa source.':webQuery?'Je prépare ta recherche sur Google.com. Tu pourras choisir une page dans le navigateur et me transmettre son lien pour que je la lise.':answer(t);
+    const reply=isDailyLearningQuestion(t)?replyDailyLearning(saved):publicQuery?'Je cherche dans les sources publiques de Wikipédia, puis je te donnerai les références trouvées.':sourceUrl?'Je consulte le texte public de cette page. Je te dirai ce que j’ai réellement pu lire, avec sa source.':webQuery?'Je prépare ta recherche sur Google.com. Tu pourras choisir une page dans le navigateur et me transmettre son lien pour que je la lise.':answer(t);
     const next=appendConversation(saved,t,reply,Date.now());
     if(persist(next)){
       field.value='';renderChat();
       if(webQuery)openGoogleResearch(webQuery);
+      else if(publicQuery){
+        if(typeof window.JulieAndroid?.searchPublicKnowledge==='function'){
+          pendingPublicSearch=publicQuery;
+          window.JulieAndroid.searchPublicKnowledge(publicQuery);
+        }else if(persist(appendJulieReply(saved,'La recherche directe nécessite la version Android avec le module Wikipédia.'))){renderChat();}
+      }
       else if(sourceUrl){
         if(typeof window.JulieAndroid?.readResearchSource==='function'){
           pendingConversationSource=sourceUrl;
@@ -174,6 +181,29 @@ $('#google-search-form').addEventListener('submit',event=>{
 });
 let latestResearch=null;
 let pendingConversationSource=null;
+let pendingPublicSearch=null;
+window.JulieReceivePublicSearch=raw=>{
+  const pending=pendingPublicSearch;
+  pendingPublicSearch=null;
+  if(!pending)return;
+  try{
+    const parsed=typeof raw==='string'?JSON.parse(raw):raw;
+    const answer=normalizePublicSearchResult(parsed);
+    if(answer.query!==pending)throw new Error('Résultat ne correspondant pas à la demande.');
+    const parts=[];
+    let next=saved;
+    for(const hit of answer.results){
+      const entry=normalizeResearchResult({ok:true,url:hit.url,title:hit.title,excerpt:hit.excerpt});
+      if(entry.excerpt){next=addResearchKnowledge(next,entry);
+        parts.push(hit.title+' : '+entry.excerpt.slice(0,190)+' ('+entry.url+')');}
+    }
+    const reply=parts.length?'J’ai trouvé sur Wikipédia : '+parts.join(' ; ')+'. Ces informations doivent être vérifiées auprès d’autres sources.':'Je n’ai trouvé aucun résultat public pour cette recherche.';
+    next=appendJulieReply(next,reply.slice(0,1500));
+    if(persist(next)){renderChat();showMemories();}
+  }catch(e){
+    if(persist(appendJulieReply(saved,'Je n’ai pas pu terminer la recherche Wikipédia : '+String(e.message||'réseau indisponible').slice(0,180))))renderChat();
+  }
+};
 $('#research-source-form').addEventListener('submit',event=>{
   event.preventDefault();
   latestResearch=null;$('#research-result').hidden=true;
