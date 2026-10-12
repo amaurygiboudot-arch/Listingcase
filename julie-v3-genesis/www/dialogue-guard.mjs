@@ -29,6 +29,14 @@ export function stripUnverifiedSharedMoments(reply,memories=[]){
 }
 export function checkDialogueReply(reply,messages,text,memories=[]){
  reply=correctDirectAddress(stripUnverifiedSharedMoments(reply,memories));
+ reply=reply.replace(/^Chérie([,!?.\s])/iu,'Mon cœur$1');
+ if(!/\b(ip|adresse ip|réseau|serveur|accès distant)\b/i.test(text)){
+  const parts=reply.split(/(?<=[.!?])\s+/u).filter(x=>!/\b(?:ton|votre|une) adresse IP\b/i.test(x));
+  if(parts.length)reply=parts.join(' ').trim();
+ }
+ if(/\badb install\s+-r\b[^!?\n]{0,130}\bpour\s+compiler\b/i.test(reply)&&/\b(android|apk|compilation|compiler)\b/i.test(text)){
+  return 'Pour vérifier la compilation Android, lance Gradle assembleDebug et contrôle le résultat. Puis utilise adb devices pour vérifier le téléphone ; adb install -r sert seulement à installer l’APK déjà compilée.';
+ }
  const key=normalizeDialogue(reply);
  const same=messages.slice(-8).filter(m=>m.role!=='user'&&normalizeDialogue(m.text)===key);
  if(key.length>30&&same.length>=2)throw Error('Le moteur répète une ancienne réponse. Aucun nouveau message de Julie enregistré.');

@@ -15,7 +15,7 @@ import {mountLearningExams} from './learning-exams-ui.mjs';
 import {examConversation} from './chat-exams.mjs';
 import {engineAvailable,localReply,localExamRespond,ENGINE_MODE} from './local-conversation.mjs';
 
-const APP_VERSION = '0.3.15-dialogue-fiable-test';
+const APP_VERSION = '0.3.16-coherence-test';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));

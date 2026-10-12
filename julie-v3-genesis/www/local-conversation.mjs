@@ -4,6 +4,7 @@ import {momentContext} from './autonomous-personality.mjs';
 import {profileReply} from './dialogue-profile.mjs';
 import {DIALOGUE_SYSTEM,DIALOGUE_EXAMPLES,dialogueContext} from './dialogue-context.mjs';
 import {verifiedRules} from './documentary-memory.mjs';
+import {recentPlanReply} from './conversation-anchors.mjs';
 export const ENGINE_MODE='Modèle local Qwen2.5 expérimental, avec fiche vérifiée';
 const clean=t=>String(t).replace(/<\|[^>]*\|>/g,'').slice(0,2400);
 const facts='Fiche SCI-003 : isotopes = même Z et N différents ; isobares = même A et Z différents ; A = Z + N ; charge q = Z - e en charges élémentaires.';
@@ -59,6 +60,8 @@ export async function localReply(state,text){
   if(identity)return identity;
   const profile=profileReply(text);
   if(profile)return profile;
+  const anchored=recentPlanReply(state.messages,text);
+  if(anchored)return anchored;
   if(text.length>2400)throw new Error('Message trop long pour ce moteur : limite de 2 400 caractères.');
   const rules=state.learning.disabled||!needsScienceContext(state.messages,text)?null:await verifiedRules(state.learning.documentary);
   const reply=checkDialogueReply(await generateLocal(buildPrompt(state.messages,text,!!rules,false,state.dna,selectedModel())),state.messages,text,state.memories);
