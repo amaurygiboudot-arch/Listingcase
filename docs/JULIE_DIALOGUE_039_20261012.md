@@ -19,3 +19,7 @@ Résultats et script : dialogue-loop-results.json, dialogue-loop-tests.txt, juli
 Le téléphone est débranché : modèle testé via Ollama PC, pas via JNI Android ; installation et comportement mobile restent à confirmer.
 ## Livraison
 APK de mise à jour privée de com.julie.learning.experimental, versionCode 300005, versionName 0.3.9-dialogue-test. Installer par-dessus TEST sans désinstaller. Aucun déploiement en production.
+
+Compilation Android réussie en 23 s. Signature vérifiée, même certificat que 0.3.8.
+APK : 65 670 593 octets ; SHA-256 3ff7d1da65973dda7bb2ccdf0ac78be8197046acfa028390c86c7f06de8a34bf.
+Version et paquet vérifiés avec aapt. Reconstruction du fichier transféré vérifiée par SHA-256.
