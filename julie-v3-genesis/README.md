@@ -36,6 +36,18 @@ Paquet Android de développement : `com.julie.preview.v3` (inchangé par rapport
 - Le visage, les cheveux, les vêtements physiques et les mouvements réalistes avancés restent à développer ; la correction doit être validée visuellement sur Android.
 
 
+## Recherches issues de ChatGPT — format d’échange JULIE (12 octobre 2026)
+- Bibliothèque commune de **connaissances importables**, mais pas de lecture automatique de l'historique du compte ChatGPT : aucune API de synchronisation ni permission implicite. La source de chaque recherche doit être conservée.
+- Dans ChatGPT, préparer volontairement un compte rendu **JSON** puis le coller dans l'onglet **Rechercher** de JULIE. Exemple minimal :
+```json
+{"type":"julie.research.v1","origin":"chatgpt","title":"Sujet documenté","summary":"Résumé des éléments établis et des incertitudes.","sources":[{"title":"Référence","url":"https://example.org/article"}]}
+```
+- Les recherches importées sont horodatées à l'import, marquées **non vérifiées dans JULIE** et séparées des souvenirs, des messages et des recherches Web natives. Elles sont incluses dans les exports/imports chiffrés au repos sur Android et dans les protections anti-restauration après effacement.
+- Les conversations privées, les données bancaires ou les secrets ne doivent pas être copiés automatiquement. La source et les licences des documents doivent être respectées.
+- Les imports ChatGPT ne garantissent pas l'exactitude du résumé. Les pages Web individuelles doivent être vérifiées indépendamment.
+- La synchronisation entièrement automatique entre toutes les conversations ChatGPT et JULIE reste **non développée** et ne doit jamais être annoncée comme active.
+- Les recherches Google, ChatGPT et les apprentissages locaux peuvent apparaître dans le bilan quotidien, à condition d'avoir réellement été enregistrés.
+
 ## Journal d'apprentissage local — étape expérimentale (12 octobre 2026)
 - Chaque échange reste dans l'historique existant. Un journal séparé conserve seulement les déclarations explicites et corrections de l'utilisateur (non vérifiées automatiquement), avec date et provenance.
 - La question « Julie, qu'as-tu appris aujourd'hui ? » reçoit directement dans le dialogue un bilan des éléments explicitement enregistrés ce jour-là et des sources Web enregistrées. En l'absence de nouvelles entrées, JULIE le dit sans inventer.
