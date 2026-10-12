@@ -47,3 +47,12 @@ export function addResearchKnowledge(state,result){
     return {...state,research:previous.slice()};
   return {...state,research:[...previous,result]};
 }
+
+/** Une URL HTTPS explicitement envoyée dans une conversation peut être lue sans onglet supplémentaire. */
+export function requestedSourceFromConversation(text){
+  if(typeof text!=='string'||text.length>500)return null;
+  const matches=text.match(/https:\/\/[^\s<>"']+/gi);
+  if(!matches||matches.length!==1)return null;
+  let candidate=matches[0].replace(/[),.;!?]+$/,'');
+  try{return normalizeSourceUrl(candidate);}catch{return null;}
+}
