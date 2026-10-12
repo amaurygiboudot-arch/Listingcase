@@ -1,5 +1,8 @@
 // JULIE_001 — données de démonstration locales, sans suppression silencieuse.
 // Module pur : aucun accès au stockage ni au réseau.
+import {normalizeSourceUrl,RESEARCH_LIMIT,MAX_SOURCE_TEXT} from './google-research.mjs';
+import {captureLearning,LEARNING_MAX} from './learning-journal.mjs';
+import {validateImportedResearch,MAX_IMPORTED_RESEARCH} from './chatgpt-research.mjs';
 export const JULIE_ID = 'JULIE_001';
 export const STATE_SCHEMA = 2;
 export const MAX_STATE_BYTES = 8_000_000;
@@ -15,7 +18,7 @@ export function checkCapacity(state){
 }
 export function createInitialState(now=Date.now()){
   return {id:JULIE_ID,schemaVersion:STATE_SCHEMA,version:'0.3.5',
-    firstOpened:now,quality:'balanced',deletedBefore:0,messages:[],memories:[]};
+    firstOpened:now,quality:'balanced',deletedBefore:0,messages:[],memories:[],research:[],learning:[],externalResearch:[]};
 }
 function stamp(v){return Number.isFinite(Number(v))&&Number(v)>=0?Number(v):0;}
 function validateMessages(messages){
@@ -32,19 +35,43 @@ function validateMemories(memories){
       throw new Error('Export contenant un souvenir incompatible : aucune donnée importée');
   }
 }
+function validateResearch(entries){
+  if(!Array.isArray(entries)||entries.length>RESEARCH_LIMIT)throw new Error('Sources Web invalides');
+  for(const item of entries){
+    if(!item||item.kind!=='information recherchée'||typeof item.url!=='string'||
+       normalizeSourceUrl(item.url)!==item.url||typeof item.excerpt!=='string'||
+       item.excerpt.length>MAX_SOURCE_TEXT||!Number.isFinite(Number(item.at)))
+      throw new Error('Source Web incompatible ou dangereuse');
+  }
+}
+function validateLearning(items){
+  if(!Array.isArray(items)||items.length>LEARNING_MAX)throw new Error('Journal d’apprentissage invalide');
+  for(const item of items){
+    if(!item||!['déclaration utilisateur','correction utilisateur'].includes(item.kind)||
+       typeof item.content!=='string'||item.content.length>360||
+       !Number.isFinite(Number(item.at))||item.source!=='message utilisateur')
+       throw new Error('Entrée d’apprentissage invalide');
+  }
+}
 export function parseJulieState(raw,{allowEmpty=false}={}){
   if((raw===null||raw===undefined||raw==='')&&allowEmpty)return createInitialState();
   const input=typeof raw==='string'?JSON.parse(raw):raw;
   if(!input||typeof input!=='object'||input.id!==JULIE_ID)
     throw new Error('Cet export ne correspond pas à l’identité JULIE_001');
   validateMessages(input.messages);validateMemories(input.memories);
+  validateResearch(input.research??[]);
+  validateLearning(input.learning??[]);
+  validateImportedResearch(input.externalResearch??[]);
   const result={...input,id:JULIE_ID,schemaVersion:STATE_SCHEMA,
     version:'0.3.5',firstOpened:stamp(input.firstOpened)||Date.now(),
     deletedBefore:stamp(input.deletedBefore),
     quality:qualities.has(input.quality)?input.quality:'balanced',
     // Garder les champs inconnus : une mise à jour ne doit pas effacer des données futures.
     messages:input.messages.map(m=>({...m,role:m.role==='partner'?'julie':m.role})),
-    memories:input.memories.map(m=>({...m}))};
+    memories:input.memories.map(m=>({...m})),
+    research:(input.research??[]).map(x=>({...x})),
+    learning:(input.learning??[]).map(x=>({...x})),
+    externalResearch:(input.externalResearch??[]).map(x=>({...x,sources:x.sources.map(y=>({...y}))}))};
   checkCapacity(result);
   return result;
 }
@@ -56,9 +83,18 @@ export function mergeImport(current,external){
   const cutoff=before.deletedBefore;
   const msgSeen=new Set(before.messages.map(msgKey));
   const memSeen=new Set(before.memories.map(memKey));
+  const webKey=x=>JSON.stringify([x.url,x.excerpt,x.at]);
+  const webSeen=new Set(before.research.map(webKey));
+  const research=before.research.map(x=>({...x}));
+  const learning=before.learning.map(x=>({...x}));
+  const externalResearch=before.externalResearch.map(x=>({...x,sources:x.sources.map(y=>({...y}))}));
+  const externalKey=x=>JSON.stringify([x.title,x.summary,x.at]);
+  const seenExternal=new Set(externalResearch.map(externalKey));
+  const learnKey=x=>JSON.stringify([x.kind,x.content]);
+  const learned=new Set(learning.map(learnKey));
   const messages=before.messages.map(m=>({...m}));
   const memories=before.memories.map(m=>({...m}));
-  let blocked=0,addedMessages=0,addedMemories=0;
+  let blocked=0,addedMessages=0,addedMemories=0,addedResearch=0;
   for(const item of incoming.messages){
     const m={...item};
     if(cutoff>0&&stamp(m.at)<=cutoff){blocked++;continue;}
@@ -71,15 +107,50 @@ export function mergeImport(current,external){
     const k=memKey(m);
     if(!memSeen.has(k)){memories.push(m);memSeen.add(k);addedMemories++;}
   }
+  for(const item of incoming.research){
+    const entry={...item};
+    if(cutoff>0&&stamp(entry.at)<=cutoff){blocked++;continue;}
+    const key=webKey(entry);
+    if(!webSeen.has(key)){
+      if(research.length>=RESEARCH_LIMIT)throw new Error('Trop de sources Web à importer');
+      research.push(entry);webSeen.add(key);addedResearch++;
+    }
+  }
+  for(const entry of incoming.learning){
+    if(cutoff>0&&stamp(entry.at)<=cutoff){blocked++;continue;}
+    const key=learnKey(entry);
+    if(!learned.has(key)){
+      if(learning.length>=LEARNING_MAX)throw new Error('Journal d’apprentissage plein : aucun effacement silencieux');
+      learning.push({...entry});learned.add(key);
+    }
+  }
+  for(const entry of incoming.externalResearch){
+    if(cutoff>0&&stamp(entry.at)<=cutoff){blocked++;continue;}
+    const key=externalKey(entry);
+    if(!seenExternal.has(key)){
+      if(externalResearch.length>=MAX_IMPORTED_RESEARCH)throw new Error('Registre de recherches importées plein : aucun effacement silencieux');
+      externalResearch.push({...entry,sources:entry.sources.map(x=>({...x}))});seenExternal.add(key);
+    }
+  }
+  externalResearch.sort((a,b)=>stamp(a.at)-stamp(b.at));
+  learning.sort((a,b)=>stamp(a.at)-stamp(b.at));
+  research.sort((a,b)=>stamp(a.at)-stamp(b.at));
   messages.sort((a,b)=>stamp(a.at)-stamp(b.at));
   memories.sort((a,b)=>stamp(a.at)-stamp(b.at));
-  const merged={...before,messages,memories};
+  const merged={...before,messages,memories,research,learning,externalResearch};
   checkCapacity(merged);
-  return {state:merged,addedMessages,addedMemories,blocked};
+  return {state:merged,addedMessages,addedMemories,addedResearch,blocked};
 }
 export function eraseDemoHistory(current,at=Date.now()){
   const state=parseJulieState(current);
-  return {...state,deletedBefore:Math.max(state.deletedBefore,stamp(at)),messages:[],memories:[]};
+  return {...state,deletedBefore:Math.max(state.deletedBefore,stamp(at)),messages:[],memories:[],research:[],learning:[],externalResearch:[]};
+}
+export function appendJulieReply(current,reply,at=Date.now()){
+  if(typeof reply!=='string'||!reply.trim()||reply.length>1500)
+    throw new Error('Réponse de Julie invalide');
+  const state=parseJulieState(current);
+  const next={...state,messages:[...state.messages,{role:'julie',text:reply,at}]};
+  checkCapacity(next);return next;
 }
 export function appendConversation(current,text,reply,at=Date.now()){
   if(typeof text!=='string'||!text.trim()||typeof reply!=='string')throw new Error('Message invalide');
@@ -90,5 +161,5 @@ export function appendConversation(current,text,reply,at=Date.now()){
     if(!memories.some(m=>m.text.toLocaleLowerCase('fr')===text.toLocaleLowerCase('fr')))
       memories.push({kind:'déclaration utilisateur',text,at,source:'message utilisateur',confidence:1});
   }
-  const result={...state,messages,memories};checkCapacity(result);return result;
+  const result=captureLearning({...state,messages,memories},text,at);checkCapacity(result);return result;
 }

@@ -12,3 +12,11 @@ main{flex:1;min-height:0;overflow:hidden}.view{display:none;height:100%;overflow
 
 /* Chargement explicite du GLB réaliste, lisible sur mobile. */
 .model-status{position:absolute;top:52px;left:14px;right:14px;background:rgba(22,27,33,.78);color:#fff;border-radius:10px;padding:7px 12px;font-size:11px;text-align:center;pointer-events:none;z-index:4} .model-status[hidden]{display:none}
+
+/* Recherche Google : onglet compact accessible sur Android. */
+.bottomnav{grid-template-columns:repeat(5,minmax(0,1fr))}.navitem{min-width:0;font-size:9px}.navitem span{font-size:21px}
+.research-form{display:flex;flex-direction:column;gap:8px}.research-form label{margin:8px 0 0}.research-form input{width:100%;color:var(--text);background:#292d3a;border:1px solid #575e69;border-radius:10px;padding:11px;min-height:44px;outline-color:var(--accent)}
+.research-excerpt{max-height:220px;overflow-y:auto;white-space:pre-wrap;overflow-wrap:anywhere;border-left:3px solid var(--accent);padding-left:12px;line-height:1.5}
+#research-result{margin-top:15px;padding-top:12px;border-top:1px solid #444a53}#research-result[hidden]{display:none}
+
+.research-form textarea{width:100%;min-height:112px;resize:vertical;color:var(--text);background:#292d3a;border:1px solid #575e69;border-radius:10px;padding:11px;font:12px/1.5 ui-monospace,monospace;overflow-wrap:anywhere}

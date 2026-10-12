@@ -1,6 +1,9 @@
 import * as THREE from 'three';
+import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge,requestedSourceFromConversation,requestedPublicSearch,normalizePublicSearchResult} from './google-research.mjs';
+import {isDailyLearningQuestion,replyDailyLearning} from './learning-journal.mjs';
+import {parseChatGPTResearch,addChatGPTResearch} from './chatgpt-research.mjs';
 
-import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
+import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,appendJulieReply,checkCapacity} from './state-store.mjs';
 
 const APP_VERSION = '0.3.5';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
@@ -77,19 +80,195 @@ function renderChat(){
 $('#chat-form').addEventListener('submit',(event)=>{
   event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t)return;
   try{
-    const next=appendConversation(saved,t,answer(t),Date.now());
-    if(persist(next)){field.value='';renderChat();}
+    const webQuery=requestedGoogleSearch(t);
+    const publicQuery=webQuery?null:requestedPublicSearch(t);
+    const sourceUrl=webQuery?null:requestedSourceFromConversation(t);
+    const reply=isDailyLearningQuestion(t)?replyDailyLearning(saved):publicQuery?'Je cherche dans les sources publiques de Wikipédia, puis je te donnerai les références trouvées.':sourceUrl?'Je consulte le texte public de cette page. Je te dirai ce que j’ai réellement pu lire, avec sa source.':webQuery?'Je prépare ta recherche sur Google.com. Tu pourras choisir une page dans le navigateur et me transmettre son lien pour que je la lise.':answer(t);
+    const next=appendConversation(saved,t,reply,Date.now());
+    if(persist(next)){
+      field.value='';renderChat();
+      if(webQuery)openGoogleResearch(webQuery);
+      else if(publicQuery){
+        if(typeof window.JulieAndroid?.searchPublicKnowledge==='function'){
+          pendingPublicSearch=publicQuery;
+          window.JulieAndroid.searchPublicKnowledge(publicQuery);
+        }else if(persist(appendJulieReply(saved,'La recherche directe nécessite la version Android avec le module Wikipédia.'))){renderChat();}
+      }
+      else if(sourceUrl){
+        if(typeof window.JulieAndroid?.readResearchSource==='function'){
+          pendingConversationSource=sourceUrl;
+          window.JulieAndroid.readResearchSource(sourceUrl);
+        }else{
+          persist(appendJulieReply(saved,'La lecture directe de cette page nécessite la version Android de JULIE.'));
+          renderChat();
+        }
+      }
+    }
   }catch(e){alert(e?.message||'Message non enregistré. Aucun ancien souvenir effacé.');}
 });
 function showMemories(){
   const root=$('#memory-items');root.textContent='';
-  if(!saved.memories.length){const el=document.createElement('p');el.textContent='Aucun goût personnel enregistré pour le moment. Tu peux me dire ce que tu aimes dans l’onglet Parler.';root.appendChild(el);return;}
-  saved.memories.slice().reverse().forEach(m=>{
+  if(!saved.memories.length){
+    const el=document.createElement('p');el.textContent='Aucun goût personnel enregistré pour le moment. Tu peux me dire ce que tu aimes dans l’onglet Parler.';root.appendChild(el);
+  }else saved.memories.slice().reverse().forEach(m=>{
     const el=document.createElement('div');el.className='mem-item';
     const meta=document.createElement('small');meta.textContent=`${m.kind} · ${new Date(m.at).toLocaleDateString('fr-FR')} · ${m.source}`;
     el.appendChild(meta);el.appendChild(document.createTextNode(m.text));root.appendChild(el);
   });
+  const learningPanel=$('#learning-items');
+  if(learningPanel){
+    learningPanel.textContent='';
+    const entries=Array.isArray(saved.learning)?saved.learning:[];
+    if(!entries.length){learningPanel.textContent='Aucun apprentissage explicite pour le moment.';}
+    entries.slice(-30).reverse().forEach(item=>{
+      const block=document.createElement('div');block.className='mem-item';
+      const meta=document.createElement('small');
+      meta.textContent=item.kind+' · '+new Date(item.at).toLocaleDateString('fr-FR')+' · '+item.confidence;
+      block.appendChild(meta);
+      const content=document.createElement('span');content.textContent=item.content;block.appendChild(content);
+      learningPanel.appendChild(block);
+    });
+  }
+  const web=$('#research-items');if(!web)return;
+  web.textContent='';
+  const known=Array.isArray(saved.research)?saved.research:[];
+  if(!known.length){const p=document.createElement('p');p.textContent='Aucune source Web enregistrée.';web.appendChild(p);}
+  const chatGPT=$('#chatgpt-research-items');
+  if(chatGPT){
+    chatGPT.textContent='';
+    const entries=Array.isArray(saved.externalResearch)?saved.externalResearch:[];
+    entries.slice().reverse().forEach(entry=>{
+      const box=document.createElement('div');box.className='mem-item';
+      const meta=document.createElement('small');meta.textContent='ChatGPT · '+new Date(entry.at).toLocaleDateString('fr-FR')+' · non vérifiée dans JULIE';
+      const title=document.createElement('strong');title.textContent=entry.title;
+      const summary=document.createElement('p');summary.textContent=entry.summary;
+      box.append(meta,title,summary);
+      for(const source of entry.sources){
+        const item=document.createElement('small');item.textContent=(source.title||'Source')+' — '+source.url;
+        box.appendChild(item);
+      }
+      chatGPT.appendChild(box);
+    });
+  }
+  known.slice().reverse().forEach(source=>{
+    const div=document.createElement('div');div.className='mem-item';
+    const meta=document.createElement('small');
+    meta.textContent=source.kind+' · '+new Date(source.at).toLocaleDateString('fr-FR')+' · '+source.confidence;
+    div.appendChild(meta);
+    const title=document.createElement('strong');title.textContent=source.title||'Page Web';div.appendChild(title);
+    const desc=document.createElement('p');desc.textContent=source.excerpt||'';div.appendChild(desc);
+    const url=document.createElement('small');url.textContent=source.url;div.appendChild(url);
+    web.appendChild(div);
+  });
 }
+
+// Recherche Google : le navigateur Android, jamais la WebView qui possède le pont mémoire.
+function openGoogleResearch(raw){
+  try{
+    const query=cleanGoogleQuery(raw);
+    $('#google-query').value=query;
+    if(typeof window.JulieAndroid?.openGoogleSearch==='function'){
+      window.JulieAndroid.openGoogleSearch(query);
+      $('#google-search-status').textContent='Ouverture de Google demandée au navigateur Android.';
+    }else{
+      const popup=window.open(googleSearchUrl(query),'_blank','noopener,noreferrer');
+      $('#google-search-status').textContent=popup?'Google ouvert dans un onglet externe.':'Ouverture bloquée par le navigateur : copie la recherche sur Google.com.';
+    }
+  }catch(e){$('#google-search-status').textContent=e.message||'Recherche impossible.';}
+}
+$('#google-search-form').addEventListener('submit',event=>{
+  event.preventDefault();openGoogleResearch($('#google-query').value);
+});
+let latestResearch=null;
+let pendingConversationSource=null;
+let pendingPublicSearch=null;
+window.JulieReceivePublicSearch=raw=>{
+  const pending=pendingPublicSearch;
+  pendingPublicSearch=null;
+  if(!pending)return;
+  try{
+    const parsed=typeof raw==='string'?JSON.parse(raw):raw;
+    const answer=normalizePublicSearchResult(parsed);
+    if(answer.query!==pending)throw new Error('Résultat ne correspondant pas à la demande.');
+    const parts=[];
+    let next=saved;
+    for(const hit of answer.results){
+      const entry=normalizeResearchResult({ok:true,url:hit.url,title:hit.title,excerpt:hit.excerpt});
+      if(entry.excerpt){next=addResearchKnowledge(next,entry);
+        parts.push(hit.title+' : '+entry.excerpt.slice(0,190)+' ('+entry.url+')');}
+    }
+    const reply=parts.length?'J’ai trouvé sur Wikipédia : '+parts.join(' ; ')+'. Ces informations doivent être vérifiées auprès d’autres sources.':'Je n’ai trouvé aucun résultat public pour cette recherche.';
+    next=appendJulieReply(next,reply.slice(0,1500));
+    if(persist(next)){renderChat();showMemories();}
+  }catch(e){
+    if(persist(appendJulieReply(saved,'Je n’ai pas pu terminer la recherche Wikipédia : '+String(e.message||'réseau indisponible').slice(0,180))))renderChat();
+  }
+};
+$('#research-source-form').addEventListener('submit',event=>{
+  event.preventDefault();
+  latestResearch=null;$('#research-result').hidden=true;
+  try{
+    const url=normalizeSourceUrl($('#research-source-url').value);
+    if(typeof window.JulieAndroid?.readResearchSource!=='function')
+      throw new Error('La lecture automatique est disponible dans l’application Android.');
+    $('#research-status').textContent='Lecture HTTPS demandée. Aucun souvenir n’est modifié.';
+    window.JulieAndroid.readResearchSource(url);
+  }catch(e){$('#research-status').textContent=e.message||'Adresse de source invalide.';}
+});
+window.JulieReceiveResearchSource=raw=>{
+  try{
+    const data=typeof raw==='string'?JSON.parse(raw):raw;
+    const entry=normalizeResearchResult(data);
+    latestResearch=entry;
+    if(pendingConversationSource){
+      const expected=pendingConversationSource;
+      pendingConversationSource=null;
+      if(expected===entry.url){
+        let next=addResearchKnowledge(saved,entry);
+        const message='J’ai pu lire « '+entry.title+' » sur '+entry.url+'. Voici un extrait : '+entry.excerpt.slice(0,480)+'… Cette source n’est pas encore vérifiée.';
+        next=appendJulieReply(next,message.slice(0,1500));
+        if(persist(next)){renderChat();showMemories();}
+      }
+    }
+    $('#research-title').textContent=entry.title;
+    $('#research-origin').textContent=entry.url+' · source non vérifiée';
+    $('#research-excerpt').textContent=entry.excerpt;
+    $('#research-save').disabled=false;
+    $('#research-result').hidden=false;
+    $('#research-status').textContent='Page lue. Le contenu vient d’un site externe et peut contenir des erreurs.';
+  }catch(e){
+    if(pendingConversationSource){
+      pendingConversationSource=null;
+      const failed=appendJulieReply(saved,'Je n’ai pas réussi à lire cette page. Son contenu peut être inaccessible, protégé ou incompatible avec le lecteur.');
+      if(persist(failed))renderChat();
+    }
+    latestResearch=null;$('#research-result').hidden=true;
+    $('#research-status').textContent=e.message||'La page est inaccessible ou illisible.';
+  }
+};
+$('#research-save').addEventListener('click',()=>{
+  if(!latestResearch)return;
+  try{
+    const next=addResearchKnowledge(saved,latestResearch);
+    if(persist(next)){
+      $('#research-status').textContent='Source conservée séparément des souvenirs, avec la mention « non vérifiée ».';
+      $('#research-save').disabled=true;showMemories();
+    }
+  }catch(e){$('#research-status').textContent=e.message||'Enregistrement refusé, données conservées.';}
+});
+$('#chatgpt-import-form')?.addEventListener('submit',event=>{
+  event.preventDefault();
+  try{
+    const entry=parseChatGPTResearch($('#chatgpt-import-json').value);
+    const next=addChatGPTResearch(saved,entry);
+    if(next===saved){$('#chatgpt-import-status').textContent='Cette recherche figure déjà dans le registre.';return;}
+    if(persist(next)){
+      $('#chatgpt-import-status').textContent='Recherche ChatGPT enregistrée avec sa provenance, sans modification des souvenirs.';
+      $('#chatgpt-import-json').value='';
+      showMemories();
+    }
+  }catch(e){$('#chatgpt-import-status').textContent=e.message||'Import refusé.';}
+});
 $('#quality').value=['eco','balanced','high'].includes(saved.quality)?saved.quality:'balanced';
 $('#quality').addEventListener('change',e=>{
   if(!persist({...saved,quality:e.target.value}))e.target.value=saved.quality;
@@ -112,7 +291,7 @@ $('#clear-data').addEventListener('click',()=>{
 function importOlderMemories(raw){
   if(typeof raw!=='string'||new TextEncoder().encode(raw).length>MAX_STATE_BYTES)throw new Error('Export trop volumineux');
   const merged=mergeImport(saved,raw);
-  const msg=`Ajouter ${merged.addedMessages} messages et ${merged.addedMemories} souvenirs ? Les données actuelles seront conservées. ${merged.blocked} entrées antérieurement supprimées resteront effacées.`;
+  const msg=`Ajouter ${merged.addedMessages} messages, ${merged.addedMemories} souvenirs et ${merged.addedResearch||0} sources Web ainsi que les apprentissages explicites ? Les données actuelles seront conservées. ${merged.blocked} entrées antérieurement supprimées resteront effacées.`;
   if(!confirm(msg))return false;
   if(!persist(merged.state))return false;
   renderChat();showMemories();
