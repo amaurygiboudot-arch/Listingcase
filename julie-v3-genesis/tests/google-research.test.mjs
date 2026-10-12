@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createInitialState,parseJulieState,mergeImport,eraseDemoHistory} from '../www/state-store.mjs';
-import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge,RESEARCH_LIMIT} from '../www/google-research.mjs';
+import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge,RESEARCH_LIMIT,requestedSourceFromConversation} from '../www/google-research.mjs';
 test('Recherche principale exclusivement Google.com, paramètres encodés',()=>{
   assert.equal(new URL(googleSearchUrl('actualité Julie & Qwen')).hostname,'www.google.com');
   assert.equal(new URL(googleSearchUrl('actualité Julie & Qwen')).searchParams.get('q'),'actualité Julie & Qwen');
@@ -48,4 +48,12 @@ test('Import : connaissances Web conservées sans résurrection après suppressi
   assert.equal(mergeImport(cleared,newer).state.research.length,1);
   const old=JSON.parse(JSON.stringify(createInitialState(1)));delete old.research;
   assert.deepEqual(parseJulieState(old).research,[]);
+});
+
+test('Lien Web demandé dans la conversation sans appuyer sur un bouton',()=>{
+  assert.equal(requestedSourceFromConversation('Julie, lis https://example.org/article.'),'https://example.org/article');
+  assert.equal(requestedSourceFromConversation('https://example.org/test'),'https://example.org/test');
+  assert.equal(requestedSourceFromConversation('Salut Julie'),null);
+  assert.equal(requestedSourceFromConversation('http://127.0.0.1/private'),null);
+  assert.equal(requestedSourceFromConversation('https://example.org/a https://example.org/b'),null);
 });
