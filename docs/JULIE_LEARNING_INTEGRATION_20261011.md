@@ -87,3 +87,10 @@ NDK r30 Windows officiel : 727980788 octets, SHA1 attendu 9bf167a1985fa7d4a03618
 Modele candidat deja local : Qwen2.5 1.5B, blob Ollama sha256:183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4, taille 986048512 octets. Pas encore transfere, ni teste sur Android.
 Moteur llama.cpp : source officielle https://github.com/ggml-org/llama.cpp ; HEAD observe f2cc7282ce0042641df55e0e563b75e824e2b647. Compilation puis integration native, memoire, test hors reseau et conservation apres relance restent a faire.
 Aucun moteur installe sur le telephone a ce stade. Blocage actuel : acquisition outils native incomplete, debit observe environ 107 ko/s via curl.
+
+## 2026-10-12 - Premier essai natif Android
+NDK r30 complet, empreinte verifiee et extraction terminee. llama.cpp f2cc728 compile ARM64 Android 28 avec succes (llama-simple, 76 etapes, 284.52 s).
+Modele Qwen2.5 1.5B, 986048512 octets, SHA256 183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4 verifie sur PC et telephone. Licence locale Apache 2.0 examinee.
+Moteur et modele transferes dans /data/local/tmp/julie-engine-test, hors donnees applicatives.
+Essai reel: distinction isotopes/isobares, prompt ChatML, 96 tokens. Chargement 2.81 s; prompt 1.96 s; generation rapportee 12.09 s, 7.94 tokens/s. Reponse tronquee a la limite, exemples insuffisants pour validation scientifique. Processus PowerShell rapporte code 1 malgre statistiques completes: verifier code adb separement et redirection stderr avant conclusion.
+Preuve brute locale: phone-model-probe.log. Aucune integration native dans APK realisee a ce stade. Application TEST et originale non remplacees. Prochaine etape: essai court avec capture du code natif, puis pont JNI et sauvegarde conversationnelle.

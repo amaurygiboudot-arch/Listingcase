@@ -11,7 +11,7 @@ export async function examConversation(state,text,options={}){
   const result=await runSurpriseExam(state.learning.documentary,options);
   const a=result.attempt;
   const lines=['Contrôle surprise — '+a.score+'/20',
-    'Je réponds à quatre questions sur la fiche SCI-003. Réponses locales, sans modèle IA général.'];
+    'Je réponds à quatre questions sur la fiche SCI-003. '+a.mode+'.'];
   a.items.forEach((q,i)=>lines.push(
     (i+1)+'. '+q.prompt,
     'Ma réponse : '+frenchAnswer(q.observed)+'.',

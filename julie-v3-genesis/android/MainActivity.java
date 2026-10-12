@@ -142,6 +142,7 @@ public final class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         settings.setMediaPlaybackRequiresUserGesture(true);
         web.addJavascriptInterface(new JulieBridge(),"JulieAndroid");
+        web.addJavascriptInterface(new JulieLocalEngine(getApplicationContext()),"JulieLocal");
         updates=new JulieUpdateManager(this,web);
         web.addJavascriptInterface(updates,"JulieUpdater");
         web.setWebViewClient(new WebViewClient(){
@@ -192,7 +193,7 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onDestroy(){
         if(updates!=null)updates.close();
-        if(web!=null){web.removeJavascriptInterface("JulieUpdater");web.removeJavascriptInterface("JulieAndroid");web.destroy();}
+        if(web!=null){web.removeJavascriptInterface("JulieLocal");web.removeJavascriptInterface("JulieUpdater");web.removeJavascriptInterface("JulieAndroid");web.destroy();}
         super.onDestroy();
     }
 }

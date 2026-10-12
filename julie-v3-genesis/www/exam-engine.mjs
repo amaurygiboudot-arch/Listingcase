@@ -27,7 +27,7 @@ export function gradeExam(exam,responses){
   const items=exam.map((q,i)=>({...q,observed:responses[i],passed:responses[i]===q.expected,points:responses[i]===q.expected?5:0}));
   return {items,score:items.reduce((n,i)=>n+i.points,0)};
 }
-export async function runSurpriseExam(input,{at=Date.now(),draw=Math.random,respond=answerExamQuestion,review=false}={}){
+export async function runSurpriseExam(input,{at=Date.now(),draw=Math.random,respond=answerExamQuestion,review=false,respondentMode='récupération documentaire et règles locales ; sans modèle IA'}={}){
   const before=normalizeDocumentary(input),rules=await verifiedRules(before);
   if(!rules)throw new Error('Aucune version documentaire vérifiée disponible ; examen non lancé');
   const exam=createExam({draw,priorities:learningPriorities(before).map(p=>p.skill)});
@@ -41,6 +41,6 @@ export async function runSurpriseExam(input,{at=Date.now(),draw=Math.random,resp
   const result=gradeExam(exam,responses);
   const due=review?revisionQueue(before,at).find(r=>r.due):null;
   const attempt={id:crypto.randomUUID(),at,versionId:rules.versionId,source:rules.source,
-    mode:'récupération documentaire et règles locales ; sans modèle IA',reviewDay:due?.day||null,...result};
+    mode:respondentMode,reviewDay:due?.day||null,...result};
   return {state:normalizeDocumentary({...before,attempts:[...before.attempts,attempt]}),attempt};
 }

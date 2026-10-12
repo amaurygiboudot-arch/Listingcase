@@ -8,6 +8,7 @@ import {syncDriveLearning} from './drive-learning-sync.mjs';
 import {documentaryAnswer} from './documentary-answer.mjs';
 import {mountLearningExams} from './learning-exams-ui.mjs';
 import {examConversation} from './chat-exams.mjs';
+import {engineAvailable,localReply,localExamRespond,ENGINE_MODE} from './local-conversation.mjs';
 
 const APP_VERSION = '0.3.5';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
@@ -131,17 +132,20 @@ $('#chat-input').placeholder='Écris à Julie ou tape contrôle surprise';
 $('#chat-form').addEventListener('submit',async(event)=>{
   event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t||chatBusy||!storageHealthy)return;
   chatBusy=true;
+  const sendButton=$('#chat-form button[type=submit]')||$('#chat-form button');
+  const buttonLabel=sendButton?.textContent;
+  if(sendButton){sendButton.disabled=true;sendButton.textContent='Julie réfléchit…';}
   const baseline=JSON.stringify(saved);
   try{
-    let next=await examConversation(saved,t);
+    let next=await examConversation(saved,t,engineAvailable()?{respond:localExamRespond,respondentMode:ENGINE_MODE}:{});
     if(!next){
-      const reply=await documentaryAnswer(saved.learning.documentary,t);
+      const reply=engineAvailable()?await localReply(saved,t):await documentaryAnswer(saved.learning.documentary,t);
       next=appendConversation(saved,t,reply||answer(t),Date.now());
     }
     if(JSON.stringify(saved)!==baseline)throw new Error('Mémoire modifiée pendant la réponse ; renvoie ton message.');
     if(persist(next)){field.value='';renderChat();renderLearning();}
   }catch(e){alert(e?.message||'Message non enregistré. Aucun ancien souvenir effacé.');}
-  finally{chatBusy=false;}
+  finally{chatBusy=false;if(sendButton){sendButton.disabled=false;sendButton.textContent=buttonLabel;}}
 });
 function renderLearning(){
   document.dispatchEvent(new Event('julie-learning-changed'));
