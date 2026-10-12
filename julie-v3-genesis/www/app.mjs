@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge} from './google-research.mjs';
+import {cleanGoogleQuery,googleSearchUrl,requestedGoogleSearch,normalizeSourceUrl,normalizeResearchResult,addResearchKnowledge,requestedSourceFromConversation} from './google-research.mjs';
 import {isDailyLearningQuestion,replyDailyLearning} from './learning-journal.mjs';
 import {parseChatGPTResearch,addChatGPTResearch} from './chatgpt-research.mjs';
 
-import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,checkCapacity} from './state-store.mjs';
+import {JULIE_ID,MAX_STATE_BYTES,createInitialState,parseJulieState,mergeImport,eraseDemoHistory,appendConversation,appendJulieReply,checkCapacity} from './state-store.mjs';
 
 const APP_VERSION = '0.3.5';
 const KEY = 'julie-preview:' + JULIE_ID + ':v1';
@@ -81,9 +81,22 @@ $('#chat-form').addEventListener('submit',(event)=>{
   event.preventDefault();const field=$('#chat-input');const t=field.value.trim();if(!t)return;
   try{
     const webQuery=requestedGoogleSearch(t);
-    const reply=isDailyLearningQuestion(t)?replyDailyLearning(saved):webQuery?'Je prépare ta recherche sur Google.com. Tu pourras choisir une page dans le navigateur et me transmettre son lien pour que je la lise.':answer(t);
+    const sourceUrl=webQuery?null:requestedSourceFromConversation(t);
+    const reply=isDailyLearningQuestion(t)?replyDailyLearning(saved):sourceUrl?'Je consulte le texte public de cette page. Je te dirai ce que j’ai réellement pu lire, avec sa source.':webQuery?'Je prépare ta recherche sur Google.com. Tu pourras choisir une page dans le navigateur et me transmettre son lien pour que je la lise.':answer(t);
     const next=appendConversation(saved,t,reply,Date.now());
-    if(persist(next)){field.value='';renderChat();if(webQuery)openGoogleResearch(webQuery);}
+    if(persist(next)){
+      field.value='';renderChat();
+      if(webQuery)openGoogleResearch(webQuery);
+      else if(sourceUrl){
+        if(typeof window.JulieAndroid?.readResearchSource==='function'){
+          pendingConversationSource=sourceUrl;
+          window.JulieAndroid.readResearchSource(sourceUrl);
+        }else{
+          persist(appendJulieReply(saved,'La lecture directe de cette page nécessite la version Android de JULIE.'));
+          renderChat();
+        }
+      }
+    }
   }catch(e){alert(e?.message||'Message non enregistré. Aucun ancien souvenir effacé.');}
 });
 function showMemories(){
@@ -160,6 +173,7 @@ $('#google-search-form').addEventListener('submit',event=>{
   event.preventDefault();openGoogleResearch($('#google-query').value);
 });
 let latestResearch=null;
+let pendingConversationSource=null;
 $('#research-source-form').addEventListener('submit',event=>{
   event.preventDefault();
   latestResearch=null;$('#research-result').hidden=true;
@@ -176,6 +190,16 @@ window.JulieReceiveResearchSource=raw=>{
     const data=typeof raw==='string'?JSON.parse(raw):raw;
     const entry=normalizeResearchResult(data);
     latestResearch=entry;
+    if(pendingConversationSource){
+      const expected=pendingConversationSource;
+      pendingConversationSource=null;
+      if(expected===entry.url){
+        let next=addResearchKnowledge(saved,entry);
+        const message='J’ai pu lire « '+entry.title+' » sur '+entry.url+'. Voici un extrait : '+entry.excerpt.slice(0,480)+'… Cette source n’est pas encore vérifiée.';
+        next=appendJulieReply(next,message.slice(0,1500));
+        if(persist(next)){renderChat();showMemories();}
+      }
+    }
     $('#research-title').textContent=entry.title;
     $('#research-origin').textContent=entry.url+' · source non vérifiée';
     $('#research-excerpt').textContent=entry.excerpt;
@@ -183,6 +207,11 @@ window.JulieReceiveResearchSource=raw=>{
     $('#research-result').hidden=false;
     $('#research-status').textContent='Page lue. Le contenu vient d’un site externe et peut contenir des erreurs.';
   }catch(e){
+    if(pendingConversationSource){
+      pendingConversationSource=null;
+      const failed=appendJulieReply(saved,'Je n’ai pas réussi à lire cette page. Son contenu peut être inaccessible, protégé ou incompatible avec le lecteur.');
+      if(persist(failed))renderChat();
+    }
     latestResearch=null;$('#research-result').hidden=true;
     $('#research-status').textContent=e.message||'La page est inaccessible ou illisible.';
   }
