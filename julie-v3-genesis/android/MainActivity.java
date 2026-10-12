@@ -39,6 +39,7 @@ public final class MainActivity extends Activity {
 
     private JulieSecureStore secureStore;
     private JulieUpdateManager updates;
+    private JulieWebResearch research;
     private WebView web;
     private String pendingExport;
 
@@ -57,6 +58,12 @@ public final class MainActivity extends Activity {
                     Toast.makeText(MainActivity.this,"Export indisponible",Toast.LENGTH_SHORT).show();
                 }
             });
+        }
+        @JavascriptInterface public void openGoogleSearch(String query){
+            if(research!=null)research.openGoogleSearch(query);
+        }
+        @JavascriptInterface public void readResearchSource(String url){
+            if(research!=null)research.readSource(url);
         }
         @JavascriptInterface public void importData(){
             runOnUiThread(()->{
@@ -128,6 +135,7 @@ public final class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(true);
         web.addJavascriptInterface(new JulieBridge(),"JulieAndroid");
         updates=new JulieUpdateManager(this,web);
+        research=new JulieWebResearch(this,web);
         web.addJavascriptInterface(updates,"JulieUpdater");
         web.setWebViewClient(new WebViewClient(){
             @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){
@@ -177,6 +185,7 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onDestroy(){
         if(updates!=null)updates.close();
+        if(research!=null)research.close();
         if(web!=null){web.removeJavascriptInterface("JulieUpdater");web.removeJavascriptInterface("JulieAndroid");web.destroy();}
         super.onDestroy();
     }
