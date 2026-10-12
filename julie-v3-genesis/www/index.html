@@ -63,6 +63,16 @@
             <button id="research-save" class="secondary-btn" type="button">Conserver dans les connaissances</button>
           </div>
         </article>
+        <article class="info-card">
+          <div class="subhead">RECHERCHES DE CHATGPT</div>
+          <p>Importe un compte rendu de recherche au format JULIE (JSON), fourni volontairement depuis ChatGPT. Pas de connexion invisible au compte ChatGPT.</p>
+          <form id="chatgpt-import-form" class="research-form">
+            <label for="chatgpt-import-json">Compte rendu de recherche</label>
+            <textarea id="chatgpt-import-json" maxlength="18000" rows="5" spellcheck="false" placeholder='{"type":"julie.research.v1","origin":"chatgpt","title":"Sujet","summary":"Résumé...","sources":[{"title":"Source","url":"https://exemple.fr"}]}' required></textarea>
+            <button class="secondary-btn" type="submit">Enregistrer cette recherche</button>
+          </form>
+          <p class="smallline" id="chatgpt-import-status" role="status" aria-live="polite">Import explicite seulement : ne colle aucun secret ni conversation personnelle complète.</p>
+        </article>
         <p class="note">Les recherches ne sont pas mémorisées automatiquement. Les pages ne sont pas considérées comme fiables sans vérification. Aucun accès automatique aux résultats Google.com n'est revendiqué.</p>
       </section>
       <section id="memory-view" class="view" aria-label="Souvenirs">
@@ -70,7 +80,7 @@
         <article class="info-card"><div class="subhead">IDENTITÉ PERMANENTE</div><h2>Julie <span class="green">✦</span></h2><p>Identifiant : <code>JULIE_001</code></p><p>22 ans au lancement · 1 jour réel = 1 jour virtuel</p><p>Couple virtuel établi · souvenirs communs à construire ensemble</p></article>
         <article class="info-card"><div class="subhead">SOUVENIRS ENREGISTRÉS DANS CETTE DÉMO</div><div id="memory-items" class="mem-items"></div></article>
         <article class="info-card"><div class="subhead">APPRENTISSAGES DE NOS CONVERSATIONS</div><div id="learning-items" class="mem-items"></div></article>
-        <article class="info-card"><div class="subhead">CONNAISSANCES WEB CONSERVÉES</div><div id="research-items" class="mem-items"></div></article>
+        <article class="info-card"><div class="subhead">CONNAISSANCES WEB CONSERVÉES</div><div id="research-items" class="mem-items"></div><div id="chatgpt-research-items" class="mem-items"></div></article>
         <article class="info-card"><div class="subhead">CONSERVATION</div><p>Les messages et préférences de cette prévisualisation restent chiffrés uniquement sur cet appareil Android. L’export volontaire en JSON n’est pas chiffré. Ils ne sont pas encore reliés à la mémoire SQLite de Human Partner.</p></article>
       </section>
       <section id="settings-view" class="view" aria-label="Réglages">
