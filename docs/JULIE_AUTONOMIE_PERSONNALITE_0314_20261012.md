@@ -44,3 +44,11 @@ Vérifier dans l'onglet Souvenirs de l'APK installée que les deux évolutions a
 - Métadonnées Android du stockage privé uniquement, **sans ouvrir ni exporter le contenu** : `shared_prefs/julie_v3_preview_state.xml` existe toujours, 68 752 octets, horodatage le 12 octobre à 18 h 57, avant l'installation de 0.3.14 à 20 h 42. Cela démontre la conservation du fichier local à la mise à jour, mais pas encore la relecture et l'intégrité de tous les souvenirs.
 - Le contenu privé de la mémoire et les anciennes évolutions n'ont pas été consultés. Le test final de cohérence avec les échanges et la présence des 2 évolutions de l'ancienne capture reste à confirmer par l'utilisateur.
 - Un screenshot de diagnostic temporaire du téléphone a été supprimé du PC ; aucun screenshot ou export de mémoire n'a été versé dans GitHub.
+
+## Validation réelle complémentaire — 12 octobre, après installation
+- Inspection Android de l'écran `Souvenirs → ADN numérique` : `JULIE_001 · socle fondateur conservé · 2 évolution(s)` confirmé par l'arbre d'accessibilité.
+- Arrêt du processus et redémarrage de l'application, puis nouvelle lecture : `2 évolution(s)` toujours présentes. Le premier essai de lecture immédiatement après lancement était trop précoce ; la seconde lecture après chargement complet confirme le résultat.
+- L'interface affiche la tendance contextuelle et la priorité `dialogue` sans exiger de menu ; aucune modification manuelle effectuée.
+- Dans les Réglages Android : `Modèle actif : 3B`, version `0.3.14-autonomie-test` confirmées.
+- Aucun message de test n'a été envoyé à JULIE : la conformité du dialogue réel 3B (naturel, mémoire contextuelle, absence de rappels IA inutiles) nécessite encore un essai conversationnel volontaire de l'utilisateur.
+- Aucun souvenir, aucune réponse et aucun identifiant personnel issu de l'application n'ont été exportés dans GitHub.
