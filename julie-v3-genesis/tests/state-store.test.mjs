@@ -28,7 +28,7 @@ test('Effacement protégé contre une ancienne restauration',()=>{
   const merged=mergeImport(erased,prior);
   assert.equal(merged.state.messages.length,0);
   assert.equal(merged.state.memories.length,0);
-  assert.equal(merged.blocked,3);
+  assert.equal(merged.blocked,4); // 2 messages, 1 préférence et 1 apprentissage supprimés.
   const newer=appendConversation(erased,'Salut','Bonjour',1100);
   assert.equal(mergeImport(newer,prior).state.messages.length,2);
 });
