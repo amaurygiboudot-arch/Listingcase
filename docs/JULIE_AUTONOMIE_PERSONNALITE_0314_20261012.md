@@ -38,3 +38,9 @@ Document maître et les 22 étapes validées : inchangés.
 
 ## Prochaine vérification
 Vérifier dans l'onglet Souvenirs de l'APK installée que les deux évolutions antérieures sont toujours visibles, puis contrôler sur des dialogues consentis par l'utilisateur la reconnaissance des préférences, la franchise sur la nature virtuelle et le naturel des réponses. Rechercher des anomalies dans les journaux Android sans exporter les conversations privées.
+
+## Contrôle complémentaire après lancement — appareil réel
+- ADB confirme l'activité JULIE Learning visible au premier plan et son processus actif.
+- Métadonnées Android du stockage privé uniquement, **sans ouvrir ni exporter le contenu** : `shared_prefs/julie_v3_preview_state.xml` existe toujours, 68 752 octets, horodatage le 12 octobre à 18 h 57, avant l'installation de 0.3.14 à 20 h 42. Cela démontre la conservation du fichier local à la mise à jour, mais pas encore la relecture et l'intégrité de tous les souvenirs.
+- Le contenu privé de la mémoire et les anciennes évolutions n'ont pas été consultés. Le test final de cohérence avec les échanges et la présence des 2 évolutions de l'ancienne capture reste à confirmer par l'utilisateur.
+- Un screenshot de diagnostic temporaire du téléphone a été supprimé du PC ; aucun screenshot ou export de mémoire n'a été versé dans GitHub.
