@@ -61,7 +61,7 @@ export function requestedSourceFromConversation(text){
 export function requestedPublicSearch(value){
   const text=String(value||'').trim();
   if(requestedGoogleSearch(text))return null;
-  const match=text.match(/^(?:(?:julie[,\s]+)?(?:cherche|recherche|renseigne[- ]toi|trouve des informations|fais une recherche)\s+(?:sur\s+|à propos de\s+|au sujet de\s+|des informations sur\s+)?)(.{3,180})$/i);
+  const match=text.match(/^(?:julie[,\s]+)?(?:cherche|recherche|renseigne[- ]toi|trouve des informations|fais une recherche)\s+(.{3,180})$/i);
   if(!match)return null;
   try{return cleanGoogleQuery(match[1]);}catch{return null;}
 }
