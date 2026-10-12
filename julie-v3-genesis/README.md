@@ -36,6 +36,12 @@ Paquet Android de développement : `com.julie.preview.v3` (inchangé par rapport
 - Le visage, les cheveux, les vêtements physiques et les mouvements réalistes avancés restent à développer ; la correction doit être validée visuellement sur Android.
 
 
+## Lecture Web directement depuis la conversation — expérimental
+- Si l'utilisateur envoie explicitement une adresse HTTPS publique dans une conversation, JULIE appelle son lecteur natif puis affiche un extrait et l'URL directement dans le dialogue, sans passage par l'onglet Rechercher.
+- Une recherche Google par mots-clés ouvre toujours le navigateur externe. Cette évolution ne constitue **pas** une récupération autonome des résultats Google ni une intégration à Qwen.
+- La source lue est étiquetée non vérifiée et enregistrée séparément des souvenirs et déclarations personnelles. En cas d'erreur réseau, JULIE ne prétend pas avoir lu la page.
+- Tests JavaScript du projet : 40/40 réussis sur EDUCTOR avant ajout du test de sauvegarde de réponse ; test ciblé de cette réponse ajouté et réussi. Compilation Android de la révision précédente 0.3.5-dev.google-research réalisée et signée en debug localement. La révision suivante reste à construire et inspecter indépendamment.
+
 ## Recherches issues de ChatGPT — format d’échange JULIE (12 octobre 2026)
 - Bibliothèque commune de **connaissances importables**, mais pas de lecture automatique de l'historique du compte ChatGPT : aucune API de synchronisation ni permission implicite. La source de chaque recherche doit être conservée.
 - Dans ChatGPT, préparer volontairement un compte rendu **JSON** puis le coller dans l'onglet **Rechercher** de JULIE. Exemple minimal :
