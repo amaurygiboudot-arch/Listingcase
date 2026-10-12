@@ -34,7 +34,7 @@ export function dailyLearnings(state,now=Date.now(),offsetMinutes=-new Date(now)
   return {learned,sources,date:new Date(now+offset*60_000).toISOString().slice(0,10)};
 }
 export function isDailyLearningQuestion(text){
-  return /\b(?:qu['’]est[- ]ce que tu as appris aujourd['’]hui|qu['’]as[- ]tu appris aujourd['’]hui|tu as appris quoi aujourd['’]hui|bilan de tes apprentissages aujourd['’]hui)\s*\??\s*$/i.test(String(text||'').trim());
+  return /(?:^|\b)(?:qu['’]est[- ]ce que tu as appris aujourd['’]hui|qu['’]as[- ]tu appris aujourd['’]hui|tu as appris quoi aujourd['’]hui|bilan de tes apprentissages aujourd['’]hui)\s*\??\s*$/i.test(String(text||'').trim());
 }
 export function replyDailyLearning(state,now=Date.now(),offsetMinutes=-new Date(now).getTimezoneOffset()){
   const daily=dailyLearnings(state,now,offsetMinutes);
