@@ -36,6 +36,15 @@ Paquet Android de développement : `com.julie.preview.v3` (inchangé par rapport
 - Le visage, les cheveux, les vêtements physiques et les mouvements réalistes avancés restent à développer ; la correction doit être validée visuellement sur Android.
 
 
+## Recherche autonome limitée : Wikipédia, test Android (12 octobre 2026)
+- L'ancienne API Google Custom Search JSON n'accepte plus de nouveaux clients (annonce Google du 20/01/2026). Ne jamais simuler une intégration à Google ni contourner ses restrictions. Les demandes **explicites Google** ouvrent son site dans le navigateur.
+- Pour une demande générique « Julie, cherche… », le pont Android appelle l'API publique officielle MediaWiki (`fr.wikipedia.org/w/api.php`, module `query&list=search`) et retourne au maximum trois résultats dans le dialogue, avec des liens et l'indication que la source n'a pas été recoupée.
+- Aucun service payant, aucune clé API, aucune donnée de conversation envoyée au service : uniquement le texte de recherche. Stockage distinct des souvenirs, réponse issue de résultats réels et message d'échec si réseau indisponible.
+- Résultats vérifiés sur EDUCTOR : API Wikipédia HTTP 200 ; 43/43 tests JavaScript réussis ; build Android Gradle réussi avec modèle 3D et modules embarqués.
+- APK isolée `com.julie.research.preview`, versionCode 2, `0.3.5-research-auto-test.2`, installée par `adb install -r` avec résultat Success. L'application a été lancée, `MainActivity` visible sur Redmi. Les autres installations `com.julie.learning.experimental`, `com.humanpartner`, `com.julie.preview.v3` sont restées installées.
+- L'interaction réelle avec Wikipédia **depuis l'application sur le téléphone** n'a pas encore été validée de bout en bout par un essai utilisateur ; les tests établissent le code, le serveur accessible depuis EDUCTOR, la compilation et le lancement Android, pas la qualité de toutes les réponses.
+- Aucun moteur Qwen raccordé à cette version isolée, aucune exploration générale Google automatisée ; le système renvoie des extraits, pas une synthèse raisonnée par un grand modèle de langage.
+
 ## Lecture Web directement depuis la conversation — expérimental
 - Si l'utilisateur envoie explicitement une adresse HTTPS publique dans une conversation, JULIE appelle son lecteur natif puis affiche un extrait et l'URL directement dans le dialogue, sans passage par l'onglet Rechercher.
 - Une recherche Google par mots-clés ouvre toujours le navigateur externe. Cette évolution ne constitue **pas** une récupération autonome des résultats Google ni une intégration à Qwen.
