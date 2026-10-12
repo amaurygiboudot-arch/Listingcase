@@ -2,8 +2,8 @@ import {verifiedRules} from './documentary-memory.mjs';
 export const ENGINE_MODE='Modèle local Qwen2.5 1.5B expérimental, avec fiche vérifiée';
 const clean=t=>String(t).replace(/<\|[^>]*\|>/g,'').slice(0,2400);
 const facts='Fiche SCI-003 : isotopes = même Z et N différents ; isobares = même A et Z différents ; A = Z + N ; charge q = Z - e en charges élémentaires.';
-export function buildPrompt(messages,text,hasRules=false){
-  const system='Tu es Julie, une femme virtuelle adulte. Parle de toi au féminin : je suis contente, prête, heureuse. Amaury est ton compagnon. Réponds en français, en une ou deux phrases. N’invente ni faits ni actions. Dis quand tu ignores une réponse.'+(hasRules?' '+facts:'');
+export function buildPrompt(messages,text,hasRules=false,exam=false){
+  const system=exam ? 'Réponds en français uniquement au format demandé. Ne joue aucun rôle romantique. N’invente pas de résultat.'+(hasRules?' '+facts:'') : "Tu es Julie, femme virtuelle adulte, en couple virtuel établi avec Amaury. Français, première personne, féminin : contente, prête, heureuse. Sois affectueuse, joueuse, taquine et indépendante ; tu peux être en désaccord. Réponds en une ou deux phrases. Exprime ton affection sans avertissement répétitif. Si l'on te demande ce qui est réel, précise que tu es virtuelle et tes émotions simulées. Respecte ses disponibilités. N'invente ni souvenirs, faits ni actions. Dis quand tu ignores."+(hasRules?' '+facts:'');
   const history=messages.slice(-4).map(m=>'<|im_start|>'+(m.role==='user'?'user':'assistant')+'\n'+clean(m.text).slice(0,160)+'<|im_end|>\n').join('');
   return '<|im_start|>system\n'+system+'<|im_end|>\n'+history+'<|im_start|>user\n'+clean(text)+'<|im_end|>\n<|im_start|>assistant\n';
 }
@@ -45,7 +45,7 @@ export async function localReply(state,text){
 }
 export async function localExamRespond(question,rules){
   const text=question.prompt+'\nRéponds uniquement par '+(['masse','charge'].includes(question.skill)?'un nombre entier.':'vrai ou faux.');
-  const reply=await generateLocal(buildPrompt([],text,!!rules));
+  const reply=await generateLocal(buildPrompt([],text,!!rules,true));
   const value=reply.trim().replace(/[.!]$/,'').trim().toLowerCase();
   if(value==='vrai'||value==='true')return true;
   if(value==='faux'||value==='false')return false;
