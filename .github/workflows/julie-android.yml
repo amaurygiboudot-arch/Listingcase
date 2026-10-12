@@ -102,6 +102,9 @@ jobs:
           assert 'PackageManager.GET_SIGNING_CERTIFICATES' in updater
           assert 'NET_CAPABILITY_NOT_METERED' in updater
           assert (d/'android/JulieInstallReceiver.java').exists()
+          assert (d/'android/JulieWebResearch.java').exists()
+          assert 'openGoogleSearch' in (d/'android/JulieWebResearch.java').read_text()
+          assert 'readResearchSource' in (d/'android/MainActivity.java').read_text()
           print('Identité, schéma mémoire, accès HTTPS et validation d’installation : OK')
           PYCHECK
       - name: Construire JavaScript 3D embarqué
@@ -126,6 +129,7 @@ jobs:
           set -euo pipefail
           cp julie-v3-genesis/android/MainActivity.java android/app/src/main/java/com/humanpartner/MainActivity.java
           cp julie-v3-genesis/android/JulieSecureStore.java android/app/src/main/java/com/humanpartner/JulieSecureStore.java
+          cp julie-v3-genesis/android/JulieWebResearch.java android/app/src/main/java/com/humanpartner/JulieWebResearch.java
           cp julie-v3-genesis/android/JulieUpdateManager.java julie-v3-genesis/android/JulieInstallReceiver.java android/app/src/main/java/com/humanpartner/
           cp julie-v3-genesis/android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
           mkdir -p android/app/src/main/assets/julie/models android/app/src/main/res/drawable
