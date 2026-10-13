@@ -30,3 +30,26 @@ La PR #4 signale un risque encore ouvert : les jetons affichés en streaming peu
 **Budget additionnel : 0 €**. La branche d'essai et la PR de revue ne lancent pas le workflow Android, limité à `julie-v1`, ni le CI `main`.
 
 **Statut : patch de code expérimental proposé à la revue ; aucune validation utilisateur de l'APK.**
+
+
+## Complément — apprentissage conversationnel de l’ADN (13/10/2026)
+
+Décision utilisateur : aucune série de confirmations ou de boutons n'est nécessaire pour que le comportement s'adapte naturellement aux échanges. Ce complément ne modifie ni les 22 étapes ni l'identité JULIE_001.
+
+- Une préférence non ambiguë formulée directement pendant le dialogue modifie le trait concerné dès cet échange ; un événement daté, sourcé et réversible est conservé dans l'ADN existant.
+- Les demandes explicitement temporaires adaptent le contexte de la réponse sans écrire d'évolution durable.
+- Certains signaux indirects (« tu me fais rire ») influencent seulement la réponse du moment ; ils ne prouvent pas une préférence permanente.
+- Une phrase ambiguë, un exemple hypothétique, une réponse de JULIE et les messages historiques/importés ne peuvent pas provoquer directement une nouvelle évolution.
+- Un nouvel événement identique n'est pas enregistré si le trait possède déjà la valeur souhaitée.
+- Les réglages ADN demeurent facultatifs ; les anciennes évolutions et le format mémoire restent inchangés.
+
+Sources modifiées sur la branche expérimentale :
+- julie-v3-genesis/www/autonomous-personality.mjs
+- julie-v3-genesis/www/digital-dna-ui.mjs
+- julie-v3-genesis/tests/autonomous-personality.test.mjs
+
+**Vérification disponible :** 7/7 tests comportementaux isolés réussis avec un simulateur local minimal de l'ADN, sans accès aux souvenirs utilisateur. Les tests complets du dépôt, les appels JNI Qwen 3B, Gradle, la signature et l'installation Android ne sont PAS vérifiés pour ce complément. EDUCTOR reste hors ligne.
+
+**Écart de version :** la capture utilisateur atteste JULIE Learning 0.3.17-provenance-test sur Android ; la branche GitHub de travail est issue du code 0.3.16. Il faut comparer le code effectivement installé et préserver le certificat/les souvenirs avant de produire une nouvelle APK.
+
+**Coût et publication :** aucun service payant ; aucune action GitHub Actions lancée volontairement ; aucune APK créée ni installée, aucun déploiement ni fusion. Le correctif n'est prêt que pour revue et validation Android ultérieure.
