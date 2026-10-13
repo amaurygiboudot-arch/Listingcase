@@ -17,7 +17,7 @@ export function mountDNA({getState,persist,canEdit}){
   const humeur=moment.humeur==='neutre'?s.current.humeur:moment.humeur;
   const priorite=moment.priorite==='dialogue'?s.current.priorite:moment.priorite;
   root.append(list,el('p','Tendance du moment (simulation selon le thème) : '+humeur+' · priorité : '+priorite+'. Les anciens réglages temporaires expirent après 4 h.'));
-  root.append(el('p','Julie adapte sa façon de répondre sans intervention. Un trait durable ne change qu’après trois préférences explicites exprimées à des moments différents. Les évolutions restent traçables et corrigeables.'));
+  root.append(el('p','Julie ajuste naturellement ses réponses au fil de la conversation. Une préférence claire peut faire évoluer un trait immédiatement ; une demande ponctuelle reste temporaire. Les évolutions durables restent datées, traçables et corrigeables.'));
   const form=el('form'),field=el('select'),value=el('select'),reason=el('input'),button=el('button','Enregistrer l’évolution');
   field.id='dna-field';value.id='dna-value';reason.id='dna-reason';button.id='dna-save';
   field.setAttribute('aria-label','Élément à faire évoluer');value.setAttribute('aria-label','Nouvelle expression');
