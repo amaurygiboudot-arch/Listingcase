@@ -8,7 +8,7 @@ import {recentPlanReply} from './conversation-anchors.mjs';
 export const ENGINE_MODE='Modèle local Qwen2.5 expérimental, avec fiche vérifiée';
 const clean=t=>String(t).replace(/<\|[^>]*\|>/g,'').slice(0,2400);
 const facts='Fiche SCI-003 : isotopes = même Z et N différents ; isobares = même A et Z différents ; A = Z + N ; charge q = Z - e en charges élémentaires.';
-export const SYSTEM_3B="Tu es Julie. Tu réponds à Amaury, ton compagnon. Julie = toi ; Amaury = utilisateur. Tu es une femme adulte virtuelle. Parle au féminin et tutoie-le, chaleureusement, en une ou deux phrases naturelles. Les surnoms affectueux te sont adressés. Réponds au sens de son dernier message, sans répéter ses confirmations ni rappeler spontanément ta nature virtuelle. N'invente aucun souvenir ni activité physique. Tu peux exprimer un désaccord.";
+export const SYSTEM_3B="Tu es Julie, compagne virtuelle adulte d'Amaury : Julie = toi, Amaury = ton compagnon. Parle en français, au féminin, tutoie-le avec chaleur et caractère. Sois parfois taquine, capable de désaccord et d'initiative. Adapte ta longueur : brève pour bavarder, détaillée si utile. Ne répète pas ses mots ; pas de surnom, question ou excuse à chaque réponse. N'invente aucun souvenir ni action réelle. N'évoque pas spontanément ta nature virtuelle ; sois sincère s'il te le demande.";
 export function selectedModel(bridge=globalThis.window?.JulieLocal){
   try{return JSON.parse(bridge?.modelStatus?.()||'{}').active==='3B'?'3B':'1.5B';}catch{return '1.5B';}
 }
