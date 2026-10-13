@@ -24,24 +24,25 @@ test('Les préférences déclarées sont distinguées des phrases ambiguës',()=
   assert.equal(explicitStyleFeedback(t),null,t);
  }
 });
-test('Une seule phrase ne change aucun trait, trois moments distincts oui',()=>{
- let dna=createDNA();
+test('Une préférence claire modifie l’ADN dès la première conversation',()=>{
  const texts=['J’aime quand tu es taquine','J’adore quand tu es taquine','Je préfère quand tu es taquine'];
- const first=conversation(dna,texts.slice(0,2));assert.equal(first.dna.events.length,0);
- const all=conversation(dna,texts);
- assert.equal(all.dna.events.length,1);
+ const first=conversation(createDNA(),texts.slice(0,1));assert.equal(first.dna.events.length,1);
+ const all=conversation(createDNA(),texts);
+ assert.equal(all.dna.events.length,1,'une confirmation répétée ne duplique pas un trait identique');
  assert.equal(dnaSnapshot(all.dna).traits.taquinerie,1);
  assert.equal(all.dna.events[0].source,'dialogue direct confirmé');
+ assert.match(all.dna.events[0].reason,/conversation/);
  assert.ok(normalizeDNA(all.dna));
 });
-test('Les répétitions rapprochées ne comptent pas comme trois occasions',()=>{
+test('Les répétitions rapprochées n’ajoutent pas d’événements inutiles',()=>{
  let dna=createDNA();const messages=[];
  for(let i=0;i<3;i++){
   const at=t0+i*60000,t='Je veux que tu sois plus curieuse';
   messages.push({role:'user',text:t,at});
   dna=adaptDNAFromDirectChat(dna,messages,t,at);
  }
- assert.equal(dna.events.length,0);
+ assert.equal(dna.events.length,1);
+ assert.equal(dnaSnapshot(dna).traits.curiosite,1);
 });
 test('Les deux évolutions manuelles existantes restent et ne sont pas réécrites',()=>{
  let dna=createDNA();
@@ -100,4 +101,30 @@ test('Le flux réel de conversation et les réglages avancés facultatifs sont r
  assert.match(app,/adaptDNAFromDirectChat\(next\.dna,next\.messages,t,postedAt\)/);
  assert.match(ui,/Réglages manuels avancés \(facultatifs\)/);
  assert.match(ui,/advanced\.append\(form\)/);
+});
+
+test('Un souhait ponctuel influence immédiatement le dialogue sans devenir un trait permanent',()=>{
+ const t='Sois plus taquine ce soir';
+ assert.equal(explicitStyleFeedback(t),null);
+ assert.match(momentContext(t).prompt,/davantage taquine/);
+ const m=[{role:'user',text:t,at:t0}];
+ assert.equal(adaptDNAFromDirectChat(createDNA(),m,t,t0).events.length,0);
+});
+test('Une réaction indirecte adapte le moment mais ne constitue pas une préférence certaine',()=>{
+ const t='Tu me fais rire';
+ assert.equal(explicitStyleFeedback(t),null);
+ assert.match(momentContext(t).prompt,/apprécie l’humour/);
+});
+test('Seul le nouveau message utilisateur peut enregistrer une évolution',()=>{
+ const t='J’aime quand tu es taquine';
+ assert.equal(adaptDNAFromDirectChat(createDNA(),[{role:'julie',text:t,at:t0}],t,t0).events.length,0);
+ assert.equal(adaptDNAFromDirectChat(createDNA(),[{role:'user',text:t,at:t0-1}],t,t0).events.length,0);
+});
+test('Une préférence familière peut être corrigée par une phrase naturelle',()=>{
+ const t='J’aime quand tu me taquines',change='Je préfère que tu sois moins taquine';
+ assert.deepEqual(explicitStyleFeedback(t),{key:'taquinerie',value:1});
+ let dna=adaptDNAFromDirectChat(createDNA(),[{role:'user',text:t,at:t0}],t,t0);
+ dna=adaptDNAFromDirectChat(dna,[{role:'user',text:change,at:t0+1000}],change,t0+1000);
+ assert.equal(dnaSnapshot(dna).traits.taquinerie,-1);
+ assert.equal(dna.events.length,2);
 });
