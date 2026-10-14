@@ -1,0 +1,54 @@
+{
+  "schema": "julie-knowledge-catalog-v1",
+  "identity": "JULIE_001",
+  "created_at": "2026-10-14",
+  "status": "documentation_source_only_not_imported_into_apk",
+  "entries": [
+    {
+      "id": "TIME-001",
+      "version": "1.0",
+      "domain": "temps",
+      "confidence": "documenté",
+      "title": "Horloges, fuseaux et durées fiables",
+      "knowledge": "Un instant UTC est distinct de son affichage en heure locale. Lors du retour à l'heure d'hiver, 02:30 à Paris peut désigner deux instants; les durées nécessitent des instants ou offsets explicites. Android elapsedRealtime permet des intervalles depuis le démarrage, mais pas une date persistante après redémarrage.",
+      "source": "https://docs.google.com/document/d/1lg4dnfeg-B9GYR4i1ZzdwAN2h2NQNgT4konIdela2QA/edit",
+      "verified_as": "fiche documentaire, pas test de JULIE"
+    },
+    {
+      "id": "SCI-PROP-001",
+      "version": "1.0",
+      "domain": "neurosciences",
+      "confidence": "élevée pour mécanismes généraux",
+      "title": "Proprioception",
+      "knowledge": "La proprioception contribue à percevoir position et mouvement des segments corporels; fuseaux neuromusculaires et organes tendineux de Golgi participent à l'information sensorielle. Transposition dans l'avatar JULIE et Genesis : piste non implémentée.",
+      "source": "https://docs.google.com/document/d/1vegrgY9pqRJTO1VkK3O-3uvgrPSc1xiouzrNyt81xaU/edit",
+      "verified_as": "fiche documentaire, pas simulation vérifiée"
+    },
+    {
+      "id": "SCI-008",
+      "version": "0.1",
+      "domain": "biologie",
+      "confidence": "élevée pour publications citées, transposition non testée",
+      "title": "Lumière et horloge circadienne",
+      "knowledge": "La lumière participe à la synchronisation des rythmes circadiens; la rétine et les noyaux suprachiasmatiques jouent un rôle dans les mécanismes étudiés. L'utilisation pour le sommeil simulé de JULIE ou des espèces de Genesis est une piste technique, pas une fonction validée.",
+      "source": "https://docs.google.com/document/d/1sXxZyVUbJdImrOz2Y-DgD-wyL9FFvgaJbtjBqgx8UyY/edit",
+      "verified_as": "fiche documentaire"
+    },
+    {
+      "id": "ER-001",
+      "version": "suivi",
+      "domain": "méthodologie",
+      "confidence": "confirmé documentaire",
+      "title": "Ne pas confondre test réussi et apprentissage durable",
+      "knowledge": "Une fiche enregistrée et des tests ponctuels ne démontrent ni apprentissage durable des poids du modèle ni restitution autonome par l'APK. Statut ER-001 ouvert tant que le rappel différé et le test dans l'application ne sont pas prouvés.",
+      "source": "https://docs.google.com/document/d/1sxV98z9A5F6pYh3IJoOH5mqj3es6WVvLWE6WRA8ZZGc/edit",
+      "verified_as": "erreur ouverte"
+    }
+  ],
+  "import_policy": {
+    "replace_memories": false,
+    "requires_verified_backup": true,
+    "idempotent_by": "id+version",
+    "not_a_model_training": true
+  }
+}
